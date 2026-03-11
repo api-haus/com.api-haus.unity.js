@@ -31,11 +31,12 @@ namespace UnityJS.QJS.Tests
 
 		JSValue Eval(string code, int flags = QJS.JS_EVAL_TYPE_GLOBAL)
 		{
-			var bytes = Encoding.UTF8.GetBytes(code);
+			var bytes = Encoding.UTF8.GetBytes(code + '\0');
+			var len = bytes.Length - 1;
 			fixed (byte* pCode = bytes)
 			{
 				byte* pFile = stackalloc byte[] { (byte)'t', (byte)'e', (byte)'s', (byte)'t', 0 };
-				return QJS.JS_Eval(m_Ctx, pCode, bytes.Length, pFile, flags);
+				return QJS.JS_Eval(m_Ctx, pCode, len, pFile, flags);
 			}
 		}
 

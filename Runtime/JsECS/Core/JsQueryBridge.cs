@@ -1,6 +1,7 @@
 namespace UnityJS.Entities.Core
 {
 	using System.Collections.Generic;
+	using System.Runtime.InteropServices;
 	using System.Text;
 	using AOT;
 	using Components;
@@ -62,15 +63,111 @@ namespace UnityJS.Entities.Core
 			QJS.JS_FreeValue(ctx, global);
 		}
 
-		/// <summary>Query entities by component names. Stub — returns empty array.</summary>
+		/// <summary>Query entities by component names.</summary>
 		[MonoPInvokeCallback(typeof(QJSShimCallback))]
 		static unsafe void Query(JSContext ctx, long thisU, long thisTag,
 			int argc, JSValue* argv, long* outU, long* outTag)
 		{
-			// Stub — full query implementation in Stage 4
+			if (!s_initialized)
+			{
+				var empty = QJS.JS_NewArray(ctx);
+				*outU = empty.u; *outTag = empty.tag;
+				return;
+			}
+
+			var allComponents = new List<ComponentType>();
+			var noneComponents = new List<ComponentType>();
+
+			if (argc >= 1 && QJS.IsObject(argv[0]) && QJS.JS_IsArray(ctx, argv[0]) == 0)
+			{
+				// Table form: { all: [...], none: [...] }
+				var pAllBytes = Encoding.UTF8.GetBytes("all\0");
+				var pNoneBytes = Encoding.UTF8.GetBytes("none\0");
+				fixed (byte* pAll = pAllBytes, pNone = pNoneBytes)
+				{
+					var allArr = QJS.JS_GetPropertyStr(ctx, argv[0], pAll);
+					if (QJS.IsObject(allArr) && QJS.JS_IsArray(ctx, allArr) != 0)
+						ReadJsComponentArray(ctx, allArr, allComponents);
+					QJS.JS_FreeValue(ctx, allArr);
+
+					var noneArr = QJS.JS_GetPropertyStr(ctx, argv[0], pNone);
+					if (QJS.IsObject(noneArr) && QJS.JS_IsArray(ctx, noneArr) != 0)
+						ReadJsComponentArray(ctx, noneArr, noneComponents);
+					QJS.JS_FreeValue(ctx, noneArr);
+				}
+			}
+			else
+			{
+				// Varargs form: query("comp1", "comp2", ...)
+				for (var i = 0; i < argc; i++)
+				{
+					if (!QJS.IsString(argv[i])) continue;
+					var ptr = QJS.JS_ToCString(ctx, argv[i]);
+					var name = Marshal.PtrToStringUTF8((nint)ptr);
+					QJS.JS_FreeCString(ctx, ptr);
+					if (name != null && JsComponentRegistry.TryGetComponentType(name, out var ct))
+						allComponents.Add(ct);
+				}
+			}
+
+			if (allComponents.Count == 0)
+			{
+				var empty = QJS.JS_NewArray(ctx);
+				*outU = empty.u; *outTag = empty.tag;
+				return;
+			}
+
+			var query = GetOrCreateQuery(allComponents, noneComponents);
+			var entities = query.ToEntityArray(Allocator.Temp);
+
 			var arr = QJS.JS_NewArray(ctx);
-			*outU = arr.u;
-			*outTag = arr.tag;
+			uint resultIndex = 0;
+			for (var i = 0; i < entities.Length; i++)
+			{
+				var entity = entities[i];
+				var entityId = JsEntityRegistry.GetIdFromEntity(entity);
+				if (entityId <= 0)
+				{
+					if (s_entityManager.HasComponent<JsEntityId>(entity))
+						entityId = s_entityManager.GetComponentData<JsEntityId>(entity).value;
+				}
+
+				if (entityId > 0)
+				{
+					QJS.JS_SetPropertyUint32(ctx, arr, resultIndex++,
+						QJS.NewInt32(ctx, entityId));
+				}
+			}
+			entities.Dispose();
+
+			*outU = arr.u; *outTag = arr.tag;
+		}
+
+		static unsafe void ReadJsComponentArray(JSContext ctx, JSValue arr,
+			List<ComponentType> result)
+		{
+			var pLengthBytes = Encoding.UTF8.GetBytes("length\0");
+			fixed (byte* pLength = pLengthBytes)
+			{
+				var lenVal = QJS.JS_GetPropertyStr(ctx, arr, pLength);
+				int len;
+				QJS.JS_ToInt32(ctx, &len, lenVal);
+				QJS.JS_FreeValue(ctx, lenVal);
+
+				for (uint i = 0; i < len; i++)
+				{
+					var elem = QJS.JS_GetPropertyUint32(ctx, arr, i);
+					if (QJS.IsString(elem))
+					{
+						var ptr = QJS.JS_ToCString(ctx, elem);
+						var name = Marshal.PtrToStringUTF8((nint)ptr);
+						QJS.JS_FreeCString(ctx, ptr);
+						if (name != null && JsComponentRegistry.TryGetComponentType(name, out var ct))
+							result.Add(ct);
+					}
+					QJS.JS_FreeValue(ctx, elem);
+				}
+			}
 		}
 
 		static EntityQuery GetOrCreateQuery(

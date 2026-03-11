@@ -2,7 +2,10 @@ namespace UnityJS.Entities.Core
 {
 	using System.Text;
 	using AOT;
+	using Components;
 	using UnityJS.QJS;
+	using Unity.Collections;
+	using Unity.Entities;
 
 	/// <summary>
 	/// Bridge functions for cross-entity event operations.
@@ -14,6 +17,43 @@ namespace UnityJS.Entities.Core
 		static unsafe void Events_SendAttack(JSContext ctx, long thisU, long thisTag,
 			int argc, JSValue* argv, long* outU, long* outTag)
 		{
+			if (!s_initialized)
+			{
+				SetUndefined(outU, outTag);
+				return;
+			}
+
+			int sourceId, targetId, damage;
+			QJS.JS_ToInt32(ctx, &sourceId, argv[0]);
+			QJS.JS_ToInt32(ctx, &targetId, argv[1]);
+			QJS.JS_ToInt32(ctx, &damage, argv[2]);
+
+			var source = GetEntityFromIdBurst(sourceId);
+			var target = GetEntityFromIdBurst(targetId);
+
+			if (target == Entity.Null)
+			{
+				SetUndefined(outU, outTag);
+				return;
+			}
+
+			ref var bctx = ref s_burstContext.Data;
+			if (!bctx.isValid)
+			{
+				SetUndefined(outU, outTag);
+				return;
+			}
+
+			FixedString32Bytes eventName = "on_attacked";
+			var evt = new JsEvent
+			{
+				eventName = eventName,
+				source = source,
+				target = target,
+				intParam = damage,
+			};
+			bctx.ecb.AppendToBuffer(target, evt);
+
 			SetUndefined(outU, outTag);
 		}
 

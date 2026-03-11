@@ -1,6 +1,7 @@
 namespace UnityJS.Entities.Core
 {
 	using System.Collections.Generic;
+	using System.Runtime.InteropServices;
 	using System.Text;
 	using AOT;
 	using Components;
@@ -11,7 +12,7 @@ namespace UnityJS.Entities.Core
 	/// <summary>
 	/// Manages JS-defined component types.
 	/// Structural presence tracked via ECS tag pool (JsDynTag0..63).
-	/// Field data stored in JS objects.
+	/// Field data stored in JS objects (__js_comp[name][eid]).
 	/// </summary>
 	public static class JsComponentStore
 	{
@@ -31,8 +32,6 @@ namespace UnityJS.Entities.Core
 
 		public static unsafe void Register(JSContext ctx)
 		{
-			// Registration of ecs.define, ecs.add, ecs.remove, ecs.has as stubs
-			// Bodies will be implemented in Stage 4
 			var global = QJS.JS_GetGlobalObject(ctx);
 			var pEcsBytes = Encoding.UTF8.GetBytes("ecs\0");
 			fixed (byte* pEcs = pEcsBytes)
@@ -52,36 +51,53 @@ namespace UnityJS.Entities.Core
 				var pDefineBytes = Encoding.UTF8.GetBytes("define\0");
 				fixed (byte* pDefine = pDefineBytes)
 				{
-					var fn = QJSShim.qjs_shim_new_function(ctx, EcsDefine, pDefine, 0);
+					var fn = QJSShim.qjs_shim_new_function(ctx, EcsDefine, pDefine, 2);
 					QJS.JS_SetPropertyStr(ctx, ns, pDefine, fn);
 				}
 				var pAddBytes = Encoding.UTF8.GetBytes("add\0");
 				fixed (byte* pAdd = pAddBytes)
 				{
-					var fn = QJSShim.qjs_shim_new_function(ctx, EcsAdd, pAdd, 0);
+					var fn = QJSShim.qjs_shim_new_function(ctx, EcsAdd, pAdd, 3);
 					QJS.JS_SetPropertyStr(ctx, ns, pAdd, fn);
 				}
 				var pRemoveBytes = Encoding.UTF8.GetBytes("remove\0");
 				fixed (byte* pRemove = pRemoveBytes)
 				{
-					var fn = QJSShim.qjs_shim_new_function(ctx, EcsRemove, pRemove, 0);
+					var fn = QJSShim.qjs_shim_new_function(ctx, EcsRemove, pRemove, 2);
 					QJS.JS_SetPropertyStr(ctx, ns, pRemove, fn);
 				}
 				var pHasBytes = Encoding.UTF8.GetBytes("has\0");
 				fixed (byte* pHas = pHasBytes)
 				{
-					var fn = QJSShim.qjs_shim_new_function(ctx, EcsHas, pHas, 0);
+					var fn = QJSShim.qjs_shim_new_function(ctx, EcsHas, pHas, 2);
 					QJS.JS_SetPropertyStr(ctx, ns, pHas, fn);
 				}
 				var pGetBytes = Encoding.UTF8.GetBytes("get\0");
 				fixed (byte* pGet = pGetBytes)
 				{
-					var fn = QJSShim.qjs_shim_new_function(ctx, EcsGet, pGet, 0);
+					var fn = QJSShim.qjs_shim_new_function(ctx, EcsGet, pGet, 2);
 					QJS.JS_SetPropertyStr(ctx, ns, pGet, fn);
 				}
 
 				QJS.JS_SetPropertyStr(ctx, global, pEcs, ns);
 			}
+
+			// Bootstrap JS-side data store: __js_comp = {}
+			var pJsCompBytes = Encoding.UTF8.GetBytes("__js_comp\0");
+			fixed (byte* pJsComp = pJsCompBytes)
+			{
+				var existing = QJS.JS_GetPropertyStr(ctx, global, pJsComp);
+				if (QJS.IsUndefined(existing) || QJS.IsNull(existing))
+				{
+					QJS.JS_FreeValue(ctx, existing);
+					QJS.JS_SetPropertyStr(ctx, global, pJsComp, QJS.JS_NewObject(ctx));
+				}
+				else
+				{
+					QJS.JS_FreeValue(ctx, existing);
+				}
+			}
+
 			QJS.JS_FreeValue(ctx, global);
 		}
 
@@ -118,48 +134,376 @@ namespace UnityJS.Entities.Core
 			return s_nameToSlot.ContainsKey(name);
 		}
 
-		#region Bridge Function Stubs
+		/// <summary>
+		/// Scrubs JS-side data for an entity during cleanup.
+		/// </summary>
+		public static unsafe void ScrubJsData(JSContext ctx, int entityId, HashSet<string> componentNames)
+		{
+			var global = QJS.JS_GetGlobalObject(ctx);
+			var pJsCompBytes = Encoding.UTF8.GetBytes("__js_comp\0");
+			fixed (byte* pJsComp = pJsCompBytes)
+			{
+				var jsComp = QJS.JS_GetPropertyStr(ctx, global, pJsComp);
+				if (QJS.IsObject(jsComp))
+				{
+					foreach (var name in componentNames)
+					{
+						var pNameBytes = Encoding.UTF8.GetBytes(name + "\0");
+						fixed (byte* pName = pNameBytes)
+						{
+							var store = QJS.JS_GetPropertyStr(ctx, jsComp, pName);
+							if (QJS.IsObject(store))
+							{
+								// Delete __js_comp[name][eid] by setting to undefined
+								QJS.JS_SetPropertyUint32(ctx, store, (uint)entityId,
+									QJS.JS_UNDEFINED);
+							}
+							QJS.JS_FreeValue(ctx, store);
+						}
+					}
+				}
+				QJS.JS_FreeValue(ctx, jsComp);
+			}
+			QJS.JS_FreeValue(ctx, global);
+		}
+
+		#region Bridge Functions
 
 		[MonoPInvokeCallback(typeof(QJSShimCallback))]
 		static unsafe void EcsDefine(JSContext ctx, long thisU, long thisTag,
 			int argc, JSValue* argv, long* outU, long* outTag)
 		{
-			// Stub — full implementation in Stage 4
-			var undef = QJS.JS_UNDEFINED;
-			*outU = undef.u;
-			*outTag = undef.tag;
+			var ptr = QJS.JS_ToCString(ctx, argv[0]);
+			var name = Marshal.PtrToStringUTF8((nint)ptr);
+			QJS.JS_FreeCString(ctx, ptr);
+
+			if (string.IsNullOrEmpty(name))
+			{
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			// Check for collision with C#-defined components
+			if (JsComponentRegistry.TryGetComponentType(name, out _))
+			{
+				Log.Error("[JsComponentStore] ecs.define: '{0}' already exists as a C# component", name);
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			if (s_nameToSlot.ContainsKey(name))
+			{
+				Log.Error("[JsComponentStore] ecs.define: '{0}' already defined", name);
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			if (s_nextSlot >= MaxSlots)
+			{
+				Log.Error("[JsComponentStore] ecs.define: tag pool exhausted (max {0})", MaxSlots);
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			// Assign tag slot
+			var slot = s_nextSlot++;
+			s_nameToSlot[name] = slot;
+			s_slotToName[slot] = name;
+
+			// Register in JsComponentRegistry so ecs.query() resolves this name
+			var tagType = GetTagType(slot);
+			JsComponentRegistry.Register(name, tagType);
+
+			// Create JS-side storage: __js_comp[name] = {}
+			var global = QJS.JS_GetGlobalObject(ctx);
+			var pJsCompBytes = Encoding.UTF8.GetBytes("__js_comp\0");
+			var pNameBytes = Encoding.UTF8.GetBytes(name + "\0");
+			fixed (byte* pJsComp = pJsCompBytes, pN = pNameBytes)
+			{
+				var jsComp = QJS.JS_GetPropertyStr(ctx, global, pJsComp);
+				QJS.JS_SetPropertyStr(ctx, jsComp, pN, QJS.JS_NewObject(ctx));
+				QJS.JS_FreeValue(ctx, jsComp);
+			}
+			QJS.JS_FreeValue(ctx, global);
+
+			Log.Info("[JsComponentStore] Defined '{0}' → slot {1}", name, slot);
+			SetUndef(outU, outTag);
 		}
 
 		[MonoPInvokeCallback(typeof(QJSShimCallback))]
 		static unsafe void EcsAdd(JSContext ctx, long thisU, long thisTag,
 			int argc, JSValue* argv, long* outU, long* outTag)
 		{
-			var undef = QJS.JS_UNDEFINED;
-			*outU = undef.u;
-			*outTag = undef.tag;
+			int entityId;
+			QJS.JS_ToInt32(ctx, &entityId, argv[0]);
+			if (entityId <= 0)
+			{
+				Log.Error("[JsComponentStore] ecs.add: invalid entity id");
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			var ptr = QJS.JS_ToCString(ctx, argv[1]);
+			var name = Marshal.PtrToStringUTF8((nint)ptr);
+			QJS.JS_FreeCString(ctx, ptr);
+			if (string.IsNullOrEmpty(name))
+			{
+				Log.Error("[JsComponentStore] ecs.add: component name required");
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			if (!s_nameToSlot.TryGetValue(name, out var slot))
+			{
+				Log.Error("[JsComponentStore] ecs.add: '{0}' not defined (call ecs.define first)", name);
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			// Store data in __js_comp[name][eid]
+			var global = QJS.JS_GetGlobalObject(ctx);
+			var pJsCompBytes = Encoding.UTF8.GetBytes("__js_comp\0");
+			var pNameBytes = Encoding.UTF8.GetBytes(name + "\0");
+			fixed (byte* pJsComp = pJsCompBytes, pN = pNameBytes)
+			{
+				var jsComp = QJS.JS_GetPropertyStr(ctx, global, pJsComp);
+				var store = QJS.JS_GetPropertyStr(ctx, jsComp, pN);
+
+				JSValue data;
+				if (argc >= 3 && QJS.IsObject(argv[2]))
+					data = QJS.JS_DupValue(ctx, argv[2]);
+				else
+					data = QJS.JS_TRUE;
+
+				QJS.JS_SetPropertyUint32(ctx, store, (uint)entityId, data);
+				QJS.JS_FreeValue(ctx, store);
+				QJS.JS_FreeValue(ctx, jsComp);
+			}
+			QJS.JS_FreeValue(ctx, global);
+
+			// Track entity → component mapping
+			if (!s_entityComponents.TryGetValue(entityId, out var components))
+			{
+				components = new HashSet<string>();
+				s_entityComponents[entityId] = components;
+			}
+			components.Add(name);
+
+			// Add ECS tag via ECB
+			if (!JsECSBridge.TryGetBurstContextECB(out var ecb))
+			{
+				Log.Error("[JsComponentStore] ecs.add: no active ECB context");
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			var entity = JsECSBridge.GetEntityFromIdBurst(entityId);
+			if (entity == Entity.Null)
+			{
+				Log.Error("[JsComponentStore] ecs.add: entity {0} not found", entityId);
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			ecb.AddComponent(entity, GetTagType(slot));
+
+			// Add JsDataCleanup if not already present
+			if (s_entitiesWithCleanup.Add(entityId))
+				ecb.AddComponent(entity, new JsDataCleanup { entityId = entityId });
+
+			// Return the data or true
+			if (argc >= 3 && QJS.IsObject(argv[2]))
+			{
+				var dup = QJS.JS_DupValue(ctx, argv[2]);
+				*outU = dup.u; *outTag = dup.tag;
+			}
+			else
+			{
+				var t = QJS.JS_TRUE;
+				*outU = t.u; *outTag = t.tag;
+			}
 		}
 
 		[MonoPInvokeCallback(typeof(QJSShimCallback))]
 		static unsafe void EcsRemove(JSContext ctx, long thisU, long thisTag,
 			int argc, JSValue* argv, long* outU, long* outTag)
 		{
-			var undef = QJS.JS_UNDEFINED;
-			*outU = undef.u;
-			*outTag = undef.tag;
+			int entityId;
+			QJS.JS_ToInt32(ctx, &entityId, argv[0]);
+			if (entityId <= 0)
+			{
+				Log.Error("[JsComponentStore] ecs.remove: invalid entity id");
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			var namePtr = QJS.JS_ToCString(ctx, argv[1]);
+			var name = Marshal.PtrToStringUTF8((nint)namePtr);
+			QJS.JS_FreeCString(ctx, namePtr);
+			if (string.IsNullOrEmpty(name))
+			{
+				Log.Error("[JsComponentStore] ecs.remove: component name required");
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			if (!s_nameToSlot.TryGetValue(name, out var slot))
+			{
+				Log.Error("[JsComponentStore] ecs.remove: '{0}' not defined", name);
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			// Delete __js_comp[name][eid]
+			var global = QJS.JS_GetGlobalObject(ctx);
+			var pJsCompBytes = Encoding.UTF8.GetBytes("__js_comp\0");
+			var pNameBytes = Encoding.UTF8.GetBytes(name + "\0");
+			fixed (byte* pJsComp = pJsCompBytes, pN = pNameBytes)
+			{
+				var jsComp = QJS.JS_GetPropertyStr(ctx, global, pJsComp);
+				var store = QJS.JS_GetPropertyStr(ctx, jsComp, pN);
+				QJS.JS_SetPropertyUint32(ctx, store, (uint)entityId, QJS.JS_UNDEFINED);
+				QJS.JS_FreeValue(ctx, store);
+				QJS.JS_FreeValue(ctx, jsComp);
+			}
+			QJS.JS_FreeValue(ctx, global);
+
+			// Update tracking
+			if (s_entityComponents.TryGetValue(entityId, out var components))
+				components.Remove(name);
+
+			// Remove ECS tag via ECB
+			if (!JsECSBridge.TryGetBurstContextECB(out var ecb))
+			{
+				Log.Error("[JsComponentStore] ecs.remove: no active ECB context");
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			var entity = JsECSBridge.GetEntityFromIdBurst(entityId);
+			if (entity == Entity.Null)
+			{
+				Log.Error("[JsComponentStore] ecs.remove: entity {0} not found", entityId);
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			ecb.RemoveComponent(entity, GetTagType(slot));
+			SetUndef(outU, outTag);
 		}
 
 		[MonoPInvokeCallback(typeof(QJSShimCallback))]
 		static unsafe void EcsHas(JSContext ctx, long thisU, long thisTag,
 			int argc, JSValue* argv, long* outU, long* outTag)
 		{
-			var undef = QJS.JS_UNDEFINED;
-			*outU = undef.u;
-			*outTag = undef.tag;
+			int entityId;
+			QJS.JS_ToInt32(ctx, &entityId, argv[0]);
+			if (entityId <= 0)
+			{
+				var f = QJS.NewBool(ctx, false);
+				*outU = f.u; *outTag = f.tag;
+				return;
+			}
+
+			var namePtr = QJS.JS_ToCString(ctx, argv[1]);
+			var name = Marshal.PtrToStringUTF8((nint)namePtr);
+			QJS.JS_FreeCString(ctx, namePtr);
+			if (string.IsNullOrEmpty(name))
+			{
+				var f = QJS.NewBool(ctx, false);
+				*outU = f.u; *outTag = f.tag;
+				return;
+			}
+
+			// Check JS-defined components via data store
+			if (s_nameToSlot.ContainsKey(name))
+			{
+				var has = s_entityComponents.TryGetValue(entityId, out var components)
+					&& components.Contains(name);
+				var result = QJS.NewBool(ctx, has);
+				*outU = result.u; *outTag = result.tag;
+				return;
+			}
+
+			// Fall back to C#-defined components
+			if (!JsComponentRegistry.TryGetComponentType(name, out _))
+			{
+				var f = QJS.NewBool(ctx, false);
+				*outU = f.u; *outTag = f.tag;
+				return;
+			}
+
+			var entity = JsECSBridge.GetEntityFromIdBurst(entityId);
+			if (entity == Entity.Null)
+			{
+				var f = QJS.NewBool(ctx, false);
+				*outU = f.u; *outTag = f.tag;
+				return;
+			}
+
+			// If entity exists, assume component present (same as Lua impl)
+			var t = QJS.NewBool(ctx, true);
+			*outU = t.u; *outTag = t.tag;
 		}
 
 		[MonoPInvokeCallback(typeof(QJSShimCallback))]
 		static unsafe void EcsGet(JSContext ctx, long thisU, long thisTag,
 			int argc, JSValue* argv, long* outU, long* outTag)
+		{
+			int entityId;
+			QJS.JS_ToInt32(ctx, &entityId, argv[0]);
+			if (entityId <= 0)
+			{
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			var namePtr = QJS.JS_ToCString(ctx, argv[1]);
+			var name = Marshal.PtrToStringUTF8((nint)namePtr);
+			QJS.JS_FreeCString(ctx, namePtr);
+			if (string.IsNullOrEmpty(name))
+			{
+				SetUndef(outU, outTag);
+				return;
+			}
+
+			// Fetch __js_comp[name][eid]
+			var global = QJS.JS_GetGlobalObject(ctx);
+			var pJsCompBytes = Encoding.UTF8.GetBytes("__js_comp\0");
+			var pNameBytes = Encoding.UTF8.GetBytes(name + "\0");
+			fixed (byte* pJsComp = pJsCompBytes, pN = pNameBytes)
+			{
+				var jsComp = QJS.JS_GetPropertyStr(ctx, global, pJsComp);
+				if (!QJS.IsObject(jsComp))
+				{
+					QJS.JS_FreeValue(ctx, jsComp);
+					QJS.JS_FreeValue(ctx, global);
+					SetUndef(outU, outTag);
+					return;
+				}
+
+				var store = QJS.JS_GetPropertyStr(ctx, jsComp, pN);
+				if (!QJS.IsObject(store))
+				{
+					QJS.JS_FreeValue(ctx, store);
+					QJS.JS_FreeValue(ctx, jsComp);
+					QJS.JS_FreeValue(ctx, global);
+					SetUndef(outU, outTag);
+					return;
+				}
+
+				var data = QJS.JS_GetPropertyUint32(ctx, store, (uint)entityId);
+				// DupValue before returning (caller owns the return)
+				// GetPropertyUint32 already returns a new reference, so no dup needed
+				*outU = data.u; *outTag = data.tag;
+
+				QJS.JS_FreeValue(ctx, store);
+				QJS.JS_FreeValue(ctx, jsComp);
+			}
+			QJS.JS_FreeValue(ctx, global);
+		}
+
+		static unsafe void SetUndef(long* outU, long* outTag)
 		{
 			var undef = QJS.JS_UNDEFINED;
 			*outU = undef.u;

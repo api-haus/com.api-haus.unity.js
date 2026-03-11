@@ -86,11 +86,12 @@ namespace UnityJS.Runtime.Tests
 			});
 
 			// Eval as global (not module) so we can get the return value directly
-			var sourceBytes = Encoding.UTF8.GetBytes("bridgeFn()");
+			var sourceBytes = Encoding.UTF8.GetBytes("bridgeFn()\0");
+			var sourceLen = sourceBytes.Length - 1;
 			var fileBytes = Encoding.UTF8.GetBytes("test\0");
 			fixed (byte* pSrc = sourceBytes, pFile = fileBytes)
 			{
-				var result = QJS.JS_Eval(m_Manager.Context, pSrc, sourceBytes.Length, pFile,
+				var result = QJS.JS_Eval(m_Manager.Context, pSrc, sourceLen, pFile,
 					QJS.JS_EVAL_TYPE_GLOBAL);
 				if (QJS.IsException(result))
 				{
