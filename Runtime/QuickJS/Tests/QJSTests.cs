@@ -4,6 +4,7 @@ namespace UnityJS.QJS.Tests
 	using System.Runtime.InteropServices;
 	using System.Text;
 	using NUnit.Framework;
+	using AOT;
 
 	[TestFixture]
 	public unsafe class QJSTests
@@ -16,6 +17,7 @@ namespace UnityJS.QJS.Tests
 		{
 			m_Rt = QJS.JS_NewRuntime();
 			m_Ctx = QJS.JS_NewContext(m_Rt);
+			QJSShim.qjs_shim_reset();
 		}
 
 		[TearDown]
@@ -58,6 +60,110 @@ namespace UnityJS.QJS.Tests
 			QJS.JS_FreeCString(m_Ctx, ptr);
 			return str;
 		}
+
+		void SetGlobalFunction(string name, QJSShimCallback cb, int length)
+		{
+			var nameBytes = Encoding.UTF8.GetBytes(name + '\0');
+			fixed (byte* pName = nameBytes)
+			{
+				var fn = QJSShim.qjs_shim_new_function(m_Ctx, cb, pName, length);
+				var global = QJS.JS_GetGlobalObject(m_Ctx);
+				QJS.JS_SetPropertyStr(m_Ctx, global, pName, fn);
+				QJS.JS_FreeValue(m_Ctx, global);
+			}
+		}
+
+		// ── Callback stubs ──
+
+		[MonoPInvokeCallback(typeof(QJSShimCallback))]
+		static void CallbackReturns777(JSContext ctx, long thisU, long thisTag,
+			int argc, JSValue* argv, long* outU, long* outTag)
+		{
+			var v = QJS.NewInt32(ctx, 777);
+			*outU = v.u;
+			*outTag = v.tag;
+		}
+
+		[MonoPInvokeCallback(typeof(QJSShimCallback))]
+		static void CallbackAdd(JSContext ctx, long thisU, long thisTag,
+			int argc, JSValue* argv, long* outU, long* outTag)
+		{
+			int a, b;
+			QJS.JS_ToInt32(ctx, &a, argv[0]);
+			QJS.JS_ToInt32(ctx, &b, argv[1]);
+			var v = QJS.NewInt32(ctx, a + b);
+			*outU = v.u;
+			*outTag = v.tag;
+		}
+
+		[MonoPInvokeCallback(typeof(QJSShimCallback))]
+		static void CallbackReturnsHello(JSContext ctx, long thisU, long thisTag,
+			int argc, JSValue* argv, long* outU, long* outTag)
+		{
+			byte* pStr = stackalloc byte[] {
+				(byte)'h', (byte)'e', (byte)'l', (byte)'l', (byte)'o', 0
+			};
+			var v = QJS.JS_NewString(ctx, pStr);
+			*outU = v.u;
+			*outTag = v.tag;
+		}
+
+		[MonoPInvokeCallback(typeof(QJSShimCallback))]
+		static void CallbackThrows(JSContext ctx, long thisU, long thisTag,
+			int argc, JSValue* argv, long* outU, long* outTag)
+		{
+			var v = new JSValue { u = 0, tag = QJS.JS_TAG_EXCEPTION };
+			*outU = v.u;
+			*outTag = v.tag;
+		}
+
+		[MonoPInvokeCallback(typeof(QJSShimCallback))]
+		static void CallbackReturnsA(JSContext ctx, long thisU, long thisTag,
+			int argc, JSValue* argv, long* outU, long* outTag)
+		{
+			var v = QJS.NewInt32(ctx, 1);
+			*outU = v.u;
+			*outTag = v.tag;
+		}
+
+		[MonoPInvokeCallback(typeof(QJSShimCallback))]
+		static void CallbackReturnsB(JSContext ctx, long thisU, long thisTag,
+			int argc, JSValue* argv, long* outU, long* outTag)
+		{
+			var v = QJS.NewInt32(ctx, 2);
+			*outU = v.u;
+			*outTag = v.tag;
+		}
+
+		[MonoPInvokeCallback(typeof(QJSShimCallback))]
+		static void CallbackReturnsC(JSContext ctx, long thisU, long thisTag,
+			int argc, JSValue* argv, long* outU, long* outTag)
+		{
+			var v = QJS.NewInt32(ctx, 3);
+			*outU = v.u;
+			*outTag = v.tag;
+		}
+
+		[MonoPInvokeCallback(typeof(QJSShimCallback))]
+		static void CallbackReadsThis(JSContext ctx, long thisU, long thisTag,
+			int argc, JSValue* argv, long* outU, long* outTag)
+		{
+			// this_val should be an object (tag == JS_TAG_OBJECT)
+			var v = QJS.NewInt32(ctx, (int)thisTag);
+			*outU = v.u;
+			*outTag = v.tag;
+		}
+
+		[MonoPInvokeCallback(typeof(QJSShimCallback))]
+		static void CallbackReturnsPi(JSContext ctx, long thisU, long thisTag,
+			int argc, JSValue* argv, long* outU, long* outTag)
+		{
+			var v = QJS.NewFloat64(ctx, 3.14);
+			*outU = v.u;
+			*outTag = v.tag;
+		}
+
+		// ── Original tests ──
 
 		[Test]
 		public void NewRuntime_NewContext_Roundtrip()
@@ -127,27 +233,6 @@ namespace UnityJS.QJS.Tests
 		}
 
 		[Test]
-		public void NewCFunction_RegisterAndCallFromJS()
-		{
-			// Test C function registration via JS_Call (avoids managed callback ABI issues)
-			// Register a simple JS function, retrieve it, and call it via JS_Call
-			var fn = Eval("(function(a,b) { return a + b; })");
-			Assert.IsFalse(QJS.IsException(fn), "Function creation failed");
-			Assert.IsTrue(QJS.IsObject(fn), "Expected function to be an object");
-
-			var args = stackalloc JSValue[2];
-			args[0] = QJS.NewInt32(m_Ctx, 100);
-			args[1] = QJS.NewInt32(m_Ctx, 200);
-
-			var result = QJS.JS_Call(m_Ctx, fn, QJS.JS_UNDEFINED, 2, args);
-			Assert.IsFalse(QJS.IsException(result), "JS_Call returned exception");
-			Assert.AreEqual(300, ToInt32(result));
-
-			QJS.JS_FreeValue(m_Ctx, result);
-			QJS.JS_FreeValue(m_Ctx, fn);
-		}
-
-		[Test]
 		public void Eval_SyntaxError_IsException()
 		{
 			var result = Eval("function(");
@@ -162,6 +247,90 @@ namespace UnityJS.QJS.Tests
 			var result = Eval("(function() { function add(a,b) { return a+b; } return add(2,3); })()");
 			Assert.IsFalse(QJS.IsException(result), "Module eval returned exception");
 			Assert.AreEqual(5, ToInt32(result));
+			QJS.JS_FreeValue(m_Ctx, result);
+		}
+
+		// ── Shim callback tests ──
+
+		[Test]
+		public void Callback_ReturnsInt()
+		{
+			SetGlobalFunction("myFn", CallbackReturns777, 0);
+			var result = Eval("myFn()");
+			Assert.IsFalse(QJS.IsException(result), "myFn() returned exception");
+			Assert.AreEqual(777, ToInt32(result));
+			QJS.JS_FreeValue(m_Ctx, result);
+		}
+
+		[Test]
+		public void Callback_ReadsArgs()
+		{
+			SetGlobalFunction("add", CallbackAdd, 2);
+			var result = Eval("add(10, 20)");
+			Assert.IsFalse(QJS.IsException(result), "add() returned exception");
+			Assert.AreEqual(30, ToInt32(result));
+			QJS.JS_FreeValue(m_Ctx, result);
+		}
+
+		[Test]
+		public void Callback_ReturnsString()
+		{
+			SetGlobalFunction("greet", CallbackReturnsHello, 0);
+			var result = Eval("greet()");
+			Assert.IsFalse(QJS.IsException(result), "greet() returned exception");
+			Assert.AreEqual("hello", ToCString(result));
+			QJS.JS_FreeValue(m_Ctx, result);
+		}
+
+		[Test]
+		public void Callback_ThrowsException()
+		{
+			SetGlobalFunction("thrower", CallbackThrows, 0);
+			var result = Eval("thrower()");
+			Assert.IsTrue(QJS.IsException(result));
+			var exc = QJS.JS_GetException(m_Ctx);
+			QJS.JS_FreeValue(m_Ctx, exc);
+		}
+
+		[Test]
+		public void Callback_MultipleRegistrations()
+		{
+			SetGlobalFunction("fnA", CallbackReturnsA, 0);
+			SetGlobalFunction("fnB", CallbackReturnsB, 0);
+			SetGlobalFunction("fnC", CallbackReturnsC, 0);
+
+			var rA = Eval("fnA()");
+			var rB = Eval("fnB()");
+			var rC = Eval("fnC()");
+
+			Assert.AreEqual(1, ToInt32(rA));
+			Assert.AreEqual(2, ToInt32(rB));
+			Assert.AreEqual(3, ToInt32(rC));
+
+			QJS.JS_FreeValue(m_Ctx, rA);
+			QJS.JS_FreeValue(m_Ctx, rB);
+			QJS.JS_FreeValue(m_Ctx, rC);
+		}
+
+		[Test]
+		public void Callback_UsesThisVal()
+		{
+			SetGlobalFunction("getThisTag", CallbackReadsThis, 0);
+			// Bind on an object and call as method — this_val should be the object
+			var result = Eval("var obj = {}; obj.fn = getThisTag; obj.fn()");
+			Assert.IsFalse(QJS.IsException(result), "obj.fn() returned exception");
+			// JS_TAG_OBJECT == -1
+			Assert.AreEqual((int)QJS.JS_TAG_OBJECT, ToInt32(result));
+			QJS.JS_FreeValue(m_Ctx, result);
+		}
+
+		[Test]
+		public void Callback_ReturnsFloat()
+		{
+			SetGlobalFunction("getPi", CallbackReturnsPi, 0);
+			var result = Eval("getPi()");
+			Assert.IsFalse(QJS.IsException(result), "getPi() returned exception");
+			Assert.AreEqual(3.14, ToFloat64(result), 0.0001);
 			QJS.JS_FreeValue(m_Ctx, result);
 		}
 	}

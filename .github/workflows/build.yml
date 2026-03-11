@@ -23,11 +23,17 @@ jobs:
           cmake -S quickjs -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_SHARED_LIBS=ON
           cmake --build build --config Release
 
+      - name: Build shim
+        run: |
+          cl /LD /O2 /Febuild/Release/qjs_shim.dll shim~/qjs_shim.c /Iquickjs /link /LIBPATH:build/Release qjs.lib
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: win-x64
-          path: build/Release/qjs.dll
+          path: |
+            build/Release/qjs.dll
+            build/Release/qjs_shim.dll
 
   build-linux:
     runs-on: ubuntu-latest
@@ -45,11 +51,18 @@ jobs:
           cmake -S quickjs -B build -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j$(nproc)
 
+      - name: Build shim
+        run: |
+          gcc -shared -fPIC -O2 -o build/libqjs_shim.so shim~/qjs_shim.c \
+            -Iquickjs -Lbuild -lqjs
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-x64
-          path: build/libqjs.so
+          path: |
+            build/libqjs.so
+            build/libqjs_shim.so
 
   build-macos-x64:
     runs-on: macos-14
@@ -66,11 +79,18 @@ jobs:
           cmake -S quickjs -B build -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64
           cmake --build build -j$(sysctl -n hw.ncpu)
 
+      - name: Build shim
+        run: |
+          cc -shared -fPIC -O2 -arch x86_64 -o build/libqjs_shim.dylib shim~/qjs_shim.c \
+            -Iquickjs -Lbuild -lqjs
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: osx-x64
-          path: build/libqjs.dylib
+          path: |
+            build/libqjs.dylib
+            build/libqjs_shim.dylib
 
   build-macos-arm64:
     runs-on: macos-14
@@ -87,11 +107,18 @@ jobs:
           cmake -S quickjs -B build -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
           cmake --build build -j$(sysctl -n hw.ncpu)
 
+      - name: Build shim
+        run: |
+          cc -shared -fPIC -O2 -arch arm64 -o build/libqjs_shim.dylib shim~/qjs_shim.c \
+            -Iquickjs -Lbuild -lqjs
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: osx-arm64
-          path: build/libqjs.dylib
+          path: |
+            build/libqjs.dylib
+            build/libqjs_shim.dylib
 
   build-ios:
     runs-on: macos-14
@@ -113,11 +140,20 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j$(sysctl -n hw.ncpu)
 
+      - name: Build shim
+        run: |
+          cc -c -O2 -o build/qjs_shim.o shim~/qjs_shim.c \
+            -Iquickjs -target arm64-apple-ios12.0 \
+            -isysroot $(xcrun --sdk iphoneos --show-sdk-path)
+          ar rcs build/libqjs_shim.a build/qjs_shim.o
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-arm64
-          path: build/libqjs.a
+          path: |
+            build/libqjs.a
+            build/libqjs_shim.a
 
   build-android-arm64:
     runs-on: ubuntu-latest
@@ -146,11 +182,21 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j$(nproc)
 
+      - name: Build shim
+        env:
+          NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
+            -shared -fPIC -O2 -o build/libqjs_shim.so shim~/qjs_shim.c \
+            -Iquickjs -Lbuild -lqjs
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-arm64
-          path: build/libqjs.so
+          path: |
+            build/libqjs.so
+            build/libqjs_shim.so
 
   build-android-armv7:
     runs-on: ubuntu-latest
@@ -179,11 +225,21 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j$(nproc)
 
+      - name: Build shim
+        env:
+          NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang \
+            -shared -fPIC -O2 -o build/libqjs_shim.so shim~/qjs_shim.c \
+            -Iquickjs -Lbuild -lqjs
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-armv7
-          path: build/libqjs.so
+          path: |
+            build/libqjs.so
+            build/libqjs_shim.so
 
   build-android-x86:
     runs-on: ubuntu-latest
@@ -212,11 +268,21 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j$(nproc)
 
+      - name: Build shim
+        env:
+          NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android21-clang \
+            -shared -fPIC -O2 -o build/libqjs_shim.so shim~/qjs_shim.c \
+            -Iquickjs -Lbuild -lqjs
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-x86
-          path: build/libqjs.so
+          path: |
+            build/libqjs.so
+            build/libqjs_shim.so
 
   commit-binaries:
     needs:
@@ -251,13 +317,21 @@ jobs:
           mkdir -p runtimes/android-x86/native
 
           cp artifacts/win-x64/qjs.dll runtimes/win-x64/native/
+          cp artifacts/win-x64/qjs_shim.dll runtimes/win-x64/native/
           cp artifacts/linux-x64/libqjs.so runtimes/linux-x64/native/qjs.so
+          cp artifacts/linux-x64/libqjs_shim.so runtimes/linux-x64/native/qjs_shim.so
           cp artifacts/osx-x64/libqjs.dylib runtimes/osx-x64/native/qjs.dylib
+          cp artifacts/osx-x64/libqjs_shim.dylib runtimes/osx-x64/native/qjs_shim.dylib
           cp artifacts/osx-arm64/libqjs.dylib runtimes/osx-arm64/native/qjs.dylib
+          cp artifacts/osx-arm64/libqjs_shim.dylib runtimes/osx-arm64/native/qjs_shim.dylib
           cp artifacts/ios-arm64/libqjs.a runtimes/ios-arm64/native/qjs.a
+          cp artifacts/ios-arm64/libqjs_shim.a runtimes/ios-arm64/native/qjs_shim.a
           cp artifacts/android-arm64/libqjs.so runtimes/android-arm64/native/qjs.so
+          cp artifacts/android-arm64/libqjs_shim.so runtimes/android-arm64/native/qjs_shim.so
           cp artifacts/android-armv7/libqjs.so runtimes/android-armv7/native/qjs.so
+          cp artifacts/android-armv7/libqjs_shim.so runtimes/android-armv7/native/qjs_shim.so
           cp artifacts/android-x86/libqjs.so runtimes/android-x86/native/qjs.so
+          cp artifacts/android-x86/libqjs_shim.so runtimes/android-x86/native/qjs_shim.so
 
       - name: Commit and push
         run: |
