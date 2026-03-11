@@ -209,6 +209,9 @@ namespace UnityJS.QJS
 		[DllImport(Lib, CallingConvention = CC)]
 		public static extern int JS_IsArray(JSContext ctx, JSValue val);
 
+		[DllImport(Lib, CallingConvention = CC)]
+		public static extern int JS_IsFunction(JSContext ctx, JSValue val);
+
 		// Exceptions
 		[DllImport(Lib, CallingConvention = CC)]
 		public static extern JSValue JS_GetException(JSContext ctx);
