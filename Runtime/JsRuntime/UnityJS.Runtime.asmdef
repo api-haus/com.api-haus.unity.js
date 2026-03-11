@@ -1,0 +1,14 @@
+{
+    "name": "UnityJS.Runtime",
+    "rootNamespace": "UnityJS.Runtime",
+    "references": ["UnityJS.QJS", "Unity.Mathematics", "Unity.Collections", "Unity.Burst"],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -66,6 +66,7 @@ namespace UnityJS.QJS
 		// ── Eval flags ──
 		public const int JS_EVAL_TYPE_GLOBAL = 0;
 		public const int JS_EVAL_TYPE_MODULE = 1;
+		public const int JS_EVAL_FLAG_COMPILE_ONLY = 1 << 5;
 
 		// ── Inline reimplementations (NOT exported from .so) ──
 
@@ -105,6 +106,9 @@ namespace UnityJS.QJS
 
 		[DllImport(Lib, CallingConvention = CC)]
 		public static extern JSContext JS_NewContext(JSRuntime rt);
+
+		[DllImport(Lib, CallingConvention = CC)]
+		public static extern JSRuntime JS_GetRuntime(JSContext ctx);
 
 		[DllImport(Lib, CallingConvention = CC)]
 		public static extern void JS_FreeContext(JSContext ctx);

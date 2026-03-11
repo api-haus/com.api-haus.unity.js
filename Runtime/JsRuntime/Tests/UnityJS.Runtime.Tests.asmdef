@@ -1,0 +1,14 @@
+{
+    "name": "UnityJS.Runtime.Tests",
+    "rootNamespace": "UnityJS.Runtime.Tests",
+    "references": ["UnityJS.QJS", "UnityJS.Runtime", "Unity.Mathematics", "Unity.Collections", "Unity.Burst"],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": true,
+    "precompiledReferences": ["nunit.framework.dll"],
+    "autoReferenced": false,
+    "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

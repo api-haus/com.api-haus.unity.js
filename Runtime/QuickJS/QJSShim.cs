@@ -9,6 +9,14 @@ namespace UnityJS.QJS
 		int argc, JSValue* argv,
 		long* outU, long* outTag);
 
+	[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+	public unsafe delegate int QJSNormalizeCallback(
+		JSContext ctx, byte* baseName, byte* name, byte* outBuf, int outBufLen);
+
+	[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+	public unsafe delegate int QJSReadFileCallback(
+		byte* name, byte* outBuf, int outBufLen);
+
 	public static class QJSShim
 	{
 		const string Lib = "qjs_shim";
@@ -20,5 +28,9 @@ namespace UnityJS.QJS
 
 		[DllImport(Lib, CallingConvention = CC)]
 		public static extern void qjs_shim_reset();
+
+		[DllImport(Lib, CallingConvention = CC)]
+		public static extern unsafe void qjs_shim_set_module_loader(
+			JSContext ctx, QJSNormalizeCallback normalize, QJSReadFileCallback readFile);
 	}
 }
