@@ -1,0 +1,28 @@
+{
+	"name": "LuaECS",
+	"rootNamespace": "LuaECS",
+	"references": [
+		"LuaJIT",
+		"LuaVM",
+		"Unity.Entities",
+		"Unity.Entities.Hybrid",
+		"Unity.Mathematics",
+		"Unity.Collections",
+		"Unity.Burst",
+		"Unity.Transforms",
+		"Unity.Logging",
+		"Unity.Physics",
+		"Unity.InputSystem",
+		"ALINE",
+		"Unity.CharacterController"
+	],
+	"includePlatforms": [],
+	"excludePlatforms": [],
+	"allowUnsafeCode": true,
+	"overrideReferences": false,
+	"precompiledReferences": [],
+	"autoReferenced": true,
+	"defineConstraints": [],
+	"versionDefines": [],
+	"noEngineReferences": false
+}
