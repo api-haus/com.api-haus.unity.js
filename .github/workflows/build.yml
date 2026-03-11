@@ -1,4 +1,4 @@
-name: Build LuaJIT
+name: Build QuickJS
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
       - ".github/workflows/build.yml"
 
 env:
-  LUAJIT_REPO: https://github.com/LuaJIT/LuaJIT.git
+  QUICKJS_REPO: https://github.com/quickjs-ng/quickjs.git
 
 jobs:
   build-windows:
@@ -15,50 +15,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clone LuaJIT
-        run: git clone --depth 1 ${{ env.LUAJIT_REPO }} luajit
+      - name: Clone QuickJS
+        run: git clone --depth 1 ${{ env.QUICKJS_REPO }} quickjs
 
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-
-      - name: Build LuaJIT
-        shell: cmd
+      - name: Build QuickJS
         run: |
-          cd luajit\src
-          msvcbuild.bat
+          cmake -S quickjs -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_SHARED_LIBS=ON
+          cmake --build build --config Release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: win-x64
-          path: luajit/src/lua51.dll
+          path: build/Release/qjs.dll
 
   build-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clone LuaJIT
-        run: git clone --depth 1 ${{ env.LUAJIT_REPO }} luajit
+      - name: Clone QuickJS
+        run: git clone --depth 1 ${{ env.QUICKJS_REPO }} quickjs
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
 
-      - name: Build LuaJIT
+      - name: Build QuickJS
         run: |
-          cd luajit
-          make -j$(nproc) BUILDMODE=dynamic
-
-      - name: Rename library
-        run: cp luajit/src/libluajit.so lua51.so
+          cmake -S quickjs -B build -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j$(nproc)
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-x64
-          path: lua51.so
+          path: build/libqjs.so
 
   build-macos-x64:
     runs-on: macos-14
@@ -67,22 +58,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clone LuaJIT
-        run: git clone --depth 1 ${{ env.LUAJIT_REPO }} luajit
+      - name: Clone QuickJS
+        run: git clone --depth 1 ${{ env.QUICKJS_REPO }} quickjs
 
-      - name: Build LuaJIT for x64
+      - name: Build QuickJS for x64
         run: |
-          cd luajit
-          make -j$(sysctl -n hw.ncpu) BUILDMODE=dynamic TARGET_FLAGS="-arch x86_64"
-
-      - name: Rename library
-        run: cp luajit/src/libluajit.so lua51.dylib
+          cmake -S quickjs -B build -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64
+          cmake --build build -j$(sysctl -n hw.ncpu)
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: osx-x64
-          path: lua51.dylib
+          path: build/libqjs.dylib
 
   build-macos-arm64:
     runs-on: macos-14
@@ -91,22 +79,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clone LuaJIT
-        run: git clone --depth 1 ${{ env.LUAJIT_REPO }} luajit
+      - name: Clone QuickJS
+        run: git clone --depth 1 ${{ env.QUICKJS_REPO }} quickjs
 
-      - name: Build LuaJIT for arm64
+      - name: Build QuickJS for arm64
         run: |
-          cd luajit
-          make -j$(sysctl -n hw.ncpu) BUILDMODE=dynamic TARGET_FLAGS="-arch arm64"
-
-      - name: Rename library
-        run: cp luajit/src/libluajit.so lua51.dylib
+          cmake -S quickjs -B build -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
+          cmake --build build -j$(sysctl -n hw.ncpu)
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: osx-arm64
-          path: lua51.dylib
+          path: build/libqjs.dylib
 
   build-ios:
     runs-on: macos-14
@@ -115,51 +100,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clone LuaJIT
-        run: git clone --depth 1 ${{ env.LUAJIT_REPO }} luajit
+      - name: Clone QuickJS
+        run: git clone --depth 1 ${{ env.QUICKJS_REPO }} quickjs
 
-      - name: Build LuaJIT for iOS arm64
+      - name: Build QuickJS for iOS arm64
         run: |
-          cd luajit/src
-
-          # iOS SDK paths and tools
-          ISDKP=$(xcrun --sdk iphoneos --show-sdk-path)
-          ICC=$(xcrun --sdk iphoneos --find clang)
-          IAR=$(xcrun --sdk iphoneos --find ar)
-          ICMN="-arch arm64 -isysroot $ISDKP -miphoneos-version-min=12.0"
-
-          # Step 1: Build host tools natively (unset iOS env vars)
-          unset IPHONEOS_DEPLOYMENT_TARGET
-          export MACOSX_DEPLOYMENT_TARGET=11.0
-          make HOST_CC=clang XCFLAGS="-DLUAJIT_DISABLE_JIT" TARGET_SYS=iOS host/minilua host/buildvm
-
-          # Step 2: Build for iOS (JIT disabled)
-          make -j$(sysctl -n hw.ncpu) \
-               XCFLAGS="-DLUAJIT_DISABLE_JIT" \
-               STATIC_CC="$ICC" \
-               TARGET_CFLAGS="$ICMN" \
-               TARGET_LDFLAGS="$ICMN" \
-               TARGET_AR="$IAR rcus" \
-               TARGET_SYS=iOS BUILDMODE=static
-
-      - name: Rename library
-        run: cp luajit/src/libluajit.a lua51.a
+          cmake -S quickjs -B build \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j$(sysctl -n hw.ncpu)
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-arm64
-          path: lua51.a
+          path: build/libqjs.a
 
   build-android-arm64:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_API: "21"
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clone LuaJIT
-        run: git clone --depth 1 ${{ env.LUAJIT_REPO }} luajit
+      - name: Clone QuickJS
+        run: git clone --depth 1 ${{ env.QUICKJS_REPO }} quickjs
 
       - name: Setup NDK
         uses: nttld/setup-ndk@v1
@@ -168,42 +134,31 @@ jobs:
           ndk-version: r26d
           add-to-path: false
 
-      - name: Build LuaJIT for Android arm64
+      - name: Build QuickJS for Android arm64
         env:
           NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          cd luajit
-          NDKBIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
-          make -j$(nproc) HOST_CC="gcc" \
-               STATIC_CC="$NDKBIN/aarch64-linux-android${ANDROID_API}-clang" \
-               DYNAMIC_CC="$NDKBIN/aarch64-linux-android${ANDROID_API}-clang -fPIC" \
-               TARGET_LD="$NDKBIN/aarch64-linux-android${ANDROID_API}-clang" \
-               TARGET_AR="$NDKBIN/llvm-ar rcus" \
-               TARGET_STRIP="$NDKBIN/llvm-strip" \
-               CROSS="$NDKBIN/aarch64-linux-android-" \
-               TARGET_SYS=Linux BUILDMODE=dynamic
-
-      - name: Rename library
-        run: cp luajit/src/libluajit.so lua51.so
+          cmake -S quickjs -B build \
+            -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-21 \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j$(nproc)
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-arm64
-          path: lua51.so
+          path: build/libqjs.so
 
   build-android-armv7:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_API: "21"
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clone LuaJIT
-        run: git clone --depth 1 ${{ env.LUAJIT_REPO }} luajit
-
-      - name: Install 32-bit toolchain
-        run: sudo apt-get update && sudo apt-get install -y gcc-multilib libc6-dev-i386
+      - name: Clone QuickJS
+        run: git clone --depth 1 ${{ env.QUICKJS_REPO }} quickjs
 
       - name: Setup NDK
         uses: nttld/setup-ndk@v1
@@ -212,42 +167,31 @@ jobs:
           ndk-version: r26d
           add-to-path: false
 
-      - name: Build LuaJIT for Android armv7
+      - name: Build QuickJS for Android armv7
         env:
           NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          cd luajit
-          NDKBIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
-          make -j$(nproc) HOST_CC="gcc -m32" \
-               STATIC_CC="$NDKBIN/armv7a-linux-androideabi${ANDROID_API}-clang" \
-               DYNAMIC_CC="$NDKBIN/armv7a-linux-androideabi${ANDROID_API}-clang -fPIC" \
-               TARGET_LD="$NDKBIN/armv7a-linux-androideabi${ANDROID_API}-clang" \
-               TARGET_AR="$NDKBIN/llvm-ar rcus" \
-               TARGET_STRIP="$NDKBIN/llvm-strip" \
-               CROSS="$NDKBIN/arm-linux-androideabi-" \
-               TARGET_SYS=Linux BUILDMODE=dynamic
-
-      - name: Rename library
-        run: cp luajit/src/libluajit.so lua51.so
+          cmake -S quickjs -B build \
+            -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=armeabi-v7a \
+            -DANDROID_PLATFORM=android-21 \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j$(nproc)
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-armv7
-          path: lua51.so
+          path: build/libqjs.so
 
   build-android-x86:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_API: "21"
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clone LuaJIT
-        run: git clone --depth 1 ${{ env.LUAJIT_REPO }} luajit
-
-      - name: Install 32-bit toolchain
-        run: sudo apt-get update && sudo apt-get install -y gcc-multilib libc6-dev-i386
+      - name: Clone QuickJS
+        run: git clone --depth 1 ${{ env.QUICKJS_REPO }} quickjs
 
       - name: Setup NDK
         uses: nttld/setup-ndk@v1
@@ -256,29 +200,23 @@ jobs:
           ndk-version: r26d
           add-to-path: false
 
-      - name: Build LuaJIT for Android x86
+      - name: Build QuickJS for Android x86
         env:
           NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          cd luajit
-          NDKBIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
-          make -j$(nproc) HOST_CC="gcc -m32" \
-               STATIC_CC="$NDKBIN/i686-linux-android${ANDROID_API}-clang" \
-               DYNAMIC_CC="$NDKBIN/i686-linux-android${ANDROID_API}-clang -fPIC" \
-               TARGET_LD="$NDKBIN/i686-linux-android${ANDROID_API}-clang" \
-               TARGET_AR="$NDKBIN/llvm-ar rcus" \
-               TARGET_STRIP="$NDKBIN/llvm-strip" \
-               CROSS="$NDKBIN/i686-linux-android-" \
-               TARGET_SYS=Linux BUILDMODE=dynamic
-
-      - name: Rename library
-        run: cp luajit/src/libluajit.so lua51.so
+          cmake -S quickjs -B build \
+            -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=x86 \
+            -DANDROID_PLATFORM=android-21 \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j$(nproc)
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-x86
-          path: lua51.so
+          path: build/libqjs.so
 
   commit-binaries:
     needs:
@@ -312,19 +250,19 @@ jobs:
           mkdir -p runtimes/android-armv7/native
           mkdir -p runtimes/android-x86/native
 
-          cp artifacts/win-x64/lua51.dll runtimes/win-x64/native/
-          cp artifacts/linux-x64/lua51.so runtimes/linux-x64/native/
-          cp artifacts/osx-x64/lua51.dylib runtimes/osx-x64/native/
-          cp artifacts/osx-arm64/lua51.dylib runtimes/osx-arm64/native/
-          cp artifacts/ios-arm64/lua51.a runtimes/ios-arm64/native/
-          cp artifacts/android-arm64/lua51.so runtimes/android-arm64/native/
-          cp artifacts/android-armv7/lua51.so runtimes/android-armv7/native/
-          cp artifacts/android-x86/lua51.so runtimes/android-x86/native/
+          cp artifacts/win-x64/qjs.dll runtimes/win-x64/native/
+          cp artifacts/linux-x64/libqjs.so runtimes/linux-x64/native/qjs.so
+          cp artifacts/osx-x64/libqjs.dylib runtimes/osx-x64/native/qjs.dylib
+          cp artifacts/osx-arm64/libqjs.dylib runtimes/osx-arm64/native/qjs.dylib
+          cp artifacts/ios-arm64/libqjs.a runtimes/ios-arm64/native/qjs.a
+          cp artifacts/android-arm64/libqjs.so runtimes/android-arm64/native/qjs.so
+          cp artifacts/android-armv7/libqjs.so runtimes/android-armv7/native/qjs.so
+          cp artifacts/android-x86/libqjs.so runtimes/android-x86/native/qjs.so
 
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add runtimes/
-          git diff --cached --quiet || git commit -m "build: update LuaJIT binaries"
+          git diff --cached --quiet || git commit -m "build: update QuickJS binaries"
           git push
