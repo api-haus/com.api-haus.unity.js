@@ -86,6 +86,7 @@ namespace UnityJS.QJS
 
 		public static JSValue NewInt32(JSContext ctx, int val) => JS_MKVAL(JS_TAG_INT, val);
 		public static JSValue NewBool(JSContext ctx, bool val) => JS_MKVAL(JS_TAG_BOOL, val ? 1 : 0);
+		public static JSValue JS_NewBool(JSContext ctx, int val) => JS_MKVAL(JS_TAG_BOOL, val);
 
 		public static unsafe JSValue NewFloat64(JSContext ctx, double val)
 		{

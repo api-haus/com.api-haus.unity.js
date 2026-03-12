@@ -1,3 +1,3 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("LuaGame.Editor.Tests")]
+[assembly: InternalsVisibleTo("UnityJS.Editor.Tests")]

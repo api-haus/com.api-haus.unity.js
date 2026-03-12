@@ -1,0 +1,299 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
+using UnityJS.Entities.Core;
+using UnityEditor;
+using UnityEngine;
+
+namespace UnityJS.Editor
+{
+	public static class JsTypeStubGenerator
+	{
+		const string OutputPath = "Assets/StreamingAssets/js/types/unity.d.ts";
+
+		static readonly Dictionary<string, string> TypeMap = new()
+		{
+			{ "System.Single", "number" },
+			{ "System.Int32", "number" },
+			{ "System.Boolean", "boolean" },
+			{ "Unity.Mathematics.float2", "{x: number, y: number}" },
+			{ "Unity.Mathematics.float3", "{x: number, y: number, z: number}" },
+			{ "Unity.Mathematics.float4", "{x: number, y: number, z: number, w: number}" },
+			{ "Unity.Mathematics.quaternion", "{x: number, y: number, z: number, w: number}" },
+		};
+
+		[InitializeOnLoadMethod]
+		static void OnDomainReload()
+		{
+			var content = GenerateContent();
+			if (File.Exists(OutputPath))
+			{
+				var existingHash = ComputeHash(File.ReadAllText(OutputPath));
+				var newHash = ComputeHash(content);
+				if (existingHash == newHash)
+					return;
+			}
+
+			WriteOutput(content);
+		}
+
+		[MenuItem("Tools/JS/Generate Type Stubs")]
+		public static void Generate()
+		{
+			var content = GenerateContent();
+			WriteOutput(content);
+		}
+
+		static void WriteOutput(string content)
+		{
+			var dir = Path.GetDirectoryName(OutputPath);
+			if (!Directory.Exists(dir))
+				Directory.CreateDirectory(dir);
+
+			File.WriteAllText(OutputPath, content);
+			AssetDatabase.Refresh();
+			Debug.Log($"[JsTypeStubs] Generated {OutputPath}");
+		}
+
+		static string ComputeHash(string text)
+		{
+			using var sha = SHA256.Create();
+			var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(text));
+			return Convert.ToBase64String(bytes);
+		}
+
+		internal static string GenerateContent()
+		{
+			var sb = new StringBuilder();
+			sb.AppendLine("// Auto-generated TypeScript type stubs for unity.js bridges");
+			sb.AppendLine("// Do not edit manually — regenerate via Tools > JS > Generate Type Stubs");
+			sb.AppendLine();
+
+			sb.AppendLine("type entity = number;");
+			sb.AppendLine();
+
+			GenerateEnums(sb);
+			GenerateBridgedComponents(sb);
+			GenerateLifecycleCallbacks(sb);
+
+			return sb.ToString();
+		}
+
+		static readonly Dictionary<Type, string> s_enumNames = new();
+
+		static void GenerateEnums(StringBuilder sb)
+		{
+			s_enumNames.Clear();
+			sb.AppendLine("// ── Enum Constants (auto-discovered) ─────────────────────");
+			sb.AppendLine();
+
+			var enums = new List<(string jsName, Type type)>();
+
+			foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+			{
+				Type[] types;
+				try { types = asm.GetTypes(); }
+				catch { continue; }
+
+				foreach (var t in types)
+				{
+					if (!t.IsEnum)
+						continue;
+					var attr = t.GetCustomAttribute<JsBridgeAttribute>();
+					if (attr == null) continue;
+					var jsName = !string.IsNullOrEmpty(attr.JsName) ? attr.JsName : ToScreamingSnakeCase(t.Name);
+					enums.Add((jsName, t));
+					s_enumNames[t] = t.Name;
+				}
+			}
+
+			enums.Sort((a, b) => string.Compare(a.jsName, b.jsName, StringComparison.Ordinal));
+
+			foreach (var (jsName, type) in enums)
+			{
+				var enumDocs = GetEnumDocs(type);
+
+				if (enumDocs != null && enumDocs.TryGetValue("", out var enumDesc))
+					sb.AppendLine($"/** {enumDesc} */");
+
+				sb.AppendLine($"declare const {jsName}: {{");
+				var enumValues = new List<string>();
+				foreach (var name in Enum.GetNames(type))
+				{
+					var val = Convert.ToInt32(Enum.Parse(type, name));
+					if (enumDocs != null && enumDocs.TryGetValue(name, out var memberDesc))
+						sb.AppendLine($"  /** {memberDesc} */");
+					sb.AppendLine($"  readonly {name}: {val};");
+					enumValues.Add(val.ToString());
+				}
+				sb.AppendLine("};");
+				sb.AppendLine();
+
+				// Emit a type alias so enum fields can reference the type by name
+				var typeName = s_enumNames[type];
+				sb.AppendLine($"type {typeName} = {string.Join(" | ", enumValues)};");
+				sb.AppendLine();
+			}
+		}
+
+		static Dictionary<string, string> GetComponentDocs(Type componentType)
+		{
+			var typeName = $"UnityJS.Entities.Generated.Js{componentType.Name}Bridge";
+			foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+			{
+				var docsType = asm.GetType(typeName);
+				if (docsType == null)
+					continue;
+				var field = docsType.GetField("Descriptions",
+					BindingFlags.Public | BindingFlags.Static);
+				return field?.GetValue(null) as Dictionary<string, string>;
+			}
+			return null;
+		}
+
+		static Dictionary<string, string> GetEnumDocs(Type enumType)
+		{
+			var typeName = $"UnityJS.Entities.Generated.Js{enumType.Name}Enum";
+			foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+			{
+				var docsType = asm.GetType(typeName);
+				if (docsType == null)
+					continue;
+				var field = docsType.GetField("Descriptions",
+					BindingFlags.Public | BindingFlags.Static);
+				return field?.GetValue(null) as Dictionary<string, string>;
+			}
+			return null;
+		}
+
+		static void GenerateBridgedComponents(StringBuilder sb)
+		{
+			sb.AppendLine("// ── Component Bridges (auto-discovered) ──────────────────");
+			sb.AppendLine();
+
+			var targets = new List<(string jsName, Type type, bool needAccessors, bool needSetters)>();
+
+			foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+			{
+				Type[] types;
+				try { types = asm.GetTypes(); }
+				catch { continue; }
+
+				foreach (var t in types)
+				{
+					if (!t.IsValueType || t.IsEnum)
+						continue;
+					var attr = t.GetCustomAttribute<JsBridgeAttribute>();
+					if (attr == null) continue;
+					var jsName = !string.IsNullOrEmpty(attr.JsName) ? attr.JsName : ToSnakeCase(t.Name);
+					targets.Add((jsName, t, attr.NeedAccessors, attr.NeedSetters));
+				}
+
+				// Assembly-level [JsBridge(typeof(T), ...)]
+				foreach (var attr in asm.GetCustomAttributes<JsBridgeAttribute>())
+				{
+					if (attr.ComponentType == null)
+						continue;
+					var jsName = !string.IsNullOrEmpty(attr.JsName) ? attr.JsName : ToSnakeCase(attr.ComponentType.Name);
+					targets.Add((jsName, attr.ComponentType, attr.NeedAccessors, attr.NeedSetters));
+				}
+			}
+
+			targets.Sort((a, b) => string.Compare(a.jsName, b.jsName, StringComparison.Ordinal));
+
+			foreach (var (jsName, type, needAccessors, needSetters) in targets)
+			{
+				var className = type.Name;
+				var docs = GetComponentDocs(type);
+
+				if (docs != null && docs.TryGetValue("", out var classDesc))
+					sb.AppendLine($"/** {classDesc} */");
+
+				sb.AppendLine($"interface {className} {{");
+				var fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
+				foreach (var field in fields)
+				{
+					var tsType = MapType(field.FieldType);
+					if (tsType == null) continue;
+					var fieldJsName = ToSnakeCase(field.Name);
+					if (docs != null && docs.TryGetValue(fieldJsName, out var fieldDesc))
+						sb.AppendLine($"  /** {fieldDesc} */");
+					sb.AppendLine($"  {fieldJsName}: {tsType};");
+				}
+				sb.AppendLine("}");
+				sb.AppendLine();
+
+				if (needAccessors || needSetters)
+				{
+					sb.AppendLine($"declare const {jsName}: {{");
+					if (needAccessors)
+						sb.AppendLine($"  get(eid: number): {className} | null;");
+					if (needSetters)
+						sb.AppendLine($"  set(eid: number, data: {className}): void;");
+					sb.AppendLine("};");
+					sb.AppendLine();
+				}
+			}
+		}
+
+		static void GenerateLifecycleCallbacks(StringBuilder sb)
+		{
+			sb.AppendLine("// ── ECS Script Lifecycle ─────────────────────────────────");
+			sb.AppendLine();
+			sb.AppendLine("/** Called once when the script is first attached to an entity. */");
+			sb.AppendLine("declare function onInit(state: {entityId: number}): void;");
+			sb.AppendLine();
+			sb.AppendLine("/** Called every tick (rate depends on script config). */");
+			sb.AppendLine("declare function onUpdate(state: {deltaTime: number, elapsedTime: number, entityId: number}): void;");
+			sb.AppendLine();
+			sb.AppendLine("/** Called before the entity is destroyed. */");
+			sb.AppendLine("declare function onDestroy(state: {entityId: number}): void;");
+			sb.AppendLine();
+			sb.AppendLine("/** Called when a command is sent to the entity. */");
+			sb.AppendLine("declare function onCommand(state: {entityId: number}, cmd: string): void;");
+		}
+
+		static string MapType(Type type)
+		{
+			if (TypeMap.TryGetValue(type.FullName ?? "", out var tsType))
+				return tsType;
+			if (type.IsEnum && s_enumNames.TryGetValue(type, out _))
+				return type.Name;
+			return null;
+		}
+
+		internal static string ToSnakeCase(string input)
+		{
+			if (string.IsNullOrEmpty(input)) return input;
+			var sb = new StringBuilder();
+			for (var i = 0; i < input.Length; i++)
+			{
+				var c = input[i];
+				if (char.IsUpper(c))
+				{
+					if (i > 0 && !char.IsUpper(input[i - 1]))
+						sb.Append('_');
+					else if (i > 0 && i < input.Length - 1 && char.IsUpper(input[i - 1]) &&
+					         char.IsLower(input[i + 1]))
+						sb.Append('_');
+					sb.Append(char.ToLowerInvariant(c));
+				}
+				else
+				{
+					sb.Append(c);
+				}
+			}
+
+			return sb.ToString();
+		}
+
+		static string ToScreamingSnakeCase(string input)
+		{
+			return ToSnakeCase(input).ToUpperInvariant();
+		}
+	}
+}

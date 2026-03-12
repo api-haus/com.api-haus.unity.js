@@ -32,5 +32,9 @@ namespace UnityJS.QJS
 		[DllImport(Lib, CallingConvention = CC)]
 		public static extern unsafe void qjs_shim_set_module_loader(
 			JSContext ctx, QJSNormalizeCallback normalize, QJSReadFileCallback readFile);
+
+		[DllImport(Lib, CallingConvention = CC)]
+		public static extern unsafe JSValue qjs_shim_eval_module(
+			JSContext ctx, byte* source, int sourceLen, byte* filename);
 	}
 }

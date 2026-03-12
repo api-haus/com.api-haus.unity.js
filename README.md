@@ -1,17 +1,17 @@
-# LuaGame
+# unity.js
 
-Lua scripting for Unity ECS. Burst-compiled bridges with Roslyn codegen, whole-component accessors, and hot reload.
+JavaScript scripting for Unity ECS. QuickJS-ng runtime with Roslyn codegen, whole-component accessors, and hot reload.
 
-## `[LuaBridge]` Attribute
+## `[JsBridge]` Attribute
 
-Unified attribute for exposing ECS types to Lua. Targets structs, enums, and assemblies.
+Unified attribute for exposing ECS types to JS. Targets structs, enums, and assemblies.
 
 ### On structs
 
-Generates `.get(eid)` / `.set(eid, table)` Lua functions that read/write the entire component as a table. Field names auto-convert `camelCase` to `snake_case`.
+Generates `.get(eid)` / `.set(eid, obj)` JS functions that read/write the entire component as an object. Field names auto-convert `camelCase` to `snake_case`.
 
 ```csharp
-[LuaBridge("slime_wander_config")]
+[JsBridge("slime_wander_config")]
 public struct SlimeWanderConfig : IComponentData
 {
     public float speed;
@@ -22,13 +22,13 @@ public struct SlimeWanderConfig : IComponentData
 }
 ```
 
-Lua usage:
+JS usage:
 
-```lua
-local cfg = slime_wander_config.get(eid)  -- returns table with all fields, or nil
-print(cfg.speed, cfg.wander_radius)       -- snake_case field names
-cfg.speed = 3.5
-slime_wander_config.set(eid, cfg)         -- write back the whole component
+```js
+const cfg = slime_wander_config.get(eid);  // returns object with all fields, or null
+log.info(cfg.speed + " " + cfg.wander_radius);  // snake_case field names
+cfg.speed = 3.5;
+slime_wander_config.set(eid, cfg);  // write back the whole component
 ```
 
 Properties:
@@ -39,21 +39,21 @@ Properties:
 | `NeedAccessors` | `true`  | Set `false` for tag components (no `.get`)       |
 
 ```csharp
-[LuaBridge("char_state", NeedSetters = false)]
+[JsBridge("char_state", NeedSetters = false)]
 public struct ECSCharacterState : IComponentData { public bool isGrounded; ... }
 ```
 
 ### On enums
 
-Generates a `SCREAMING_SNAKE` global table:
+Generates a `SCREAMING_SNAKE` global object:
 
 ```csharp
-[LuaBridge]
+[JsBridge]
 public enum WanderPlane { XY, XZ }
 ```
 
-```lua
-if cfg.wander_plane == WANDER_PLANE.XY then ... end
+```js
+if (cfg.wander_plane === WANDER_PLANE.XY) { ... }
 ```
 
 ### On assembly
@@ -61,28 +61,28 @@ if cfg.wander_plane == WANDER_PLANE.XY then ... end
 Bridges external types not owned by your code:
 
 ```csharp
-[assembly: LuaBridge(typeof(LocalTransform), "local_transform")]
+[assembly: JsBridge(typeof(LocalTransform), "local_transform")]
 ```
 
-```lua
-local lt = local_transform.get(eid)
-print(lt.position.x, lt.position.y, lt.position.z)
-local_transform.set(eid, { position = { x = 1, y = 2, z = 3 }, scale = lt.scale, rotation = lt.rotation })
+```js
+const lt = local_transform.get(eid);
+log.info(lt.position.x + " " + lt.position.y + " " + lt.position.z);
+local_transform.set(eid, { position: { x: 1, y: 2, z: 3 }, scale: lt.scale, rotation: lt.rotation });
 ```
 
-## `[LuaCompile]` Attribute
+## `[JsCompile]` Attribute
 
 Placed on static methods. Two modes depending on whether `Signature` is set.
 
 ### Auto-compiled (no `Signature`)
 
-Generates a Burst-compatible P/Invoke wrapper, auto-registration, and a type stub from the C# signature.
+Generates a shim-compatible wrapper, auto-registration, and a type stub from the C# signature.
 
 ```csharp
-[LuaCompile("math", "cross")]
+[JsCompile("math", "cross")]
 static float3 Cross(float3 a, float3 b) => math.cross(a, b);
 
-[LuaCompile("math", "dot")]
+[JsCompile("math", "dot")]
 static float Dot(float3 a, float3 b) => math.dot(a, b);
 ```
 
@@ -93,34 +93,33 @@ Supported parameter/return types: `float`, `int`, `bool`, `float3` (+ `out` vari
 For hand-written `[MonoPInvokeCallback]` methods (e.g. multi-return, string args, complex logic). Only generates the type stub — no wrapper.
 
 ```csharp
-[LuaCompile("entities", "create", Signature = "fun(pos?: vec3): entity")]
-[MonoPInvokeCallback(typeof(Lua.lua_CFunction))]
-[BurstCompile]
-static int Entities_Create(lua_State l) { ... }
+[JsCompile("entities", "create", Signature = "fun(pos?: vec3): entity")]
+[MonoPInvokeCallback(typeof(QJSShimCallback))]
+static unsafe void Entities_Create(JSContext ctx, ...) { ... }
 ```
 
-## Lua Systems
+## JS Systems
 
-Place scripts in `Assets/StreamingAssets/lua/systems/`.
+Place scripts in `Assets/StreamingAssets/js/systems/`.
 
 ### Lifecycle callbacks
 
-| Callback                          | Description                          |
-| --------------------------------- | ------------------------------------ |
-| `OnUpdate(dt)`                    | Called every frame (or tick group)    |
-| `OnInit(entity, state)`          | Called once when script is attached   |
-| `OnDestroy(entity, state)`       | Called before entity is destroyed     |
-| `OnCommand(entity, state, cmd)`  | Called when a command targets entity  |
+| Callback                    | Description                          |
+| --------------------------- | ------------------------------------ |
+| `onUpdate(state)`           | Called every frame (or tick group)    |
+| `onInit(state)`             | Called once when script is attached   |
+| `onDestroy(state)`          | Called before entity is destroyed     |
+| `onCommand(state, cmd)`     | Called when a command targets entity  |
 
 ### Tick groups
 
-Control when `OnUpdate` runs with the `@tick:` annotation at the top of the file:
+Control when `onUpdate` runs with the `@tick:` annotation at the top of the file:
 
-```lua
--- @tick: fixed
-function OnUpdate(dt)
-  -- runs at fixed timestep
-end
+```js
+// @tick: fixed
+export function onUpdate(state) {
+  // runs at fixed timestep
+}
 ```
 
 | Tick Group         | Description                             |
@@ -133,65 +132,66 @@ end
 
 ### Queries and component access
 
-```lua
-local chars = ecs.query("char_control", "char_stats", "char_state")
+```js
+const chars = ecs.query("char_control", "char_stats", "char_state");
 
-for _, eid in ipairs(chars) do
-  local ctrl = char_control.get(eid)   -- whole component as table
-  local stats = char_stats.get(eid)
-  ctrl.move_vector = { x = 1, y = 0, z = 0 }
-  ctrl.sprint = stats.stamina > 0
-  char_control.set(eid, ctrl)          -- write back
-end
+for (const eid of chars) {
+  const ctrl = char_control.get(eid);   // whole component as object
+  const stats = char_stats.get(eid);
+  ctrl.move_vector = { x: 1, y: 0, z: 0 };
+  ctrl.sprint = stats.stamina > 0;
+  char_control.set(eid, ctrl);          // write back
+}
 ```
 
 ### Example: character input
 
-```lua
--- @tick: variable
+```js
+// @tick: variable
 
-local STAMINA_DRAIN = 20
-local STAMINA_REGEN = 10
+const STAMINA_DRAIN = 20;
+const STAMINA_REGEN = 10;
 
-function OnUpdate(dt)
-  local chars = ecs.query("char_control", "char_stats", "char_state")
+export function onUpdate(state) {
+  const chars = ecs.query("char_control", "char_stats", "char_state");
 
-  for _, eid in ipairs(chars) do
-    local move = input.read_value("Move")
-    local jump_pressed = input.was_pressed("Jump")
-    local sprint_held = input.is_held("Sprint")
+  for (const eid of chars) {
+    const move = input.read_value("Move");
+    const jump_pressed = input.was_pressed("Jump");
+    const sprint_held = input.is_held("Sprint");
 
-    local mx, mz = 0, 0
-    if move then
-      mx, mz = move.x, move.y
-    end
+    let mx = 0, mz = 0;
+    if (move) {
+      mx = move.x;
+      mz = move.y;
+    }
 
-    local ctrl = char_control.get(eid)
-    ctrl.move_vector = { x = mx, y = 0, z = mz }
+    const ctrl = char_control.get(eid);
+    ctrl.move_vector = { x: mx, y: 0, z: mz };
 
-    local stats = char_stats.get(eid)
-    local sprinting = sprint_held and stats.stamina > 0 and (mx ~= 0 or mz ~= 0)
+    const stats = char_stats.get(eid);
+    const sprinting = sprint_held && stats.stamina > 0 && (mx !== 0 || mz !== 0);
 
-    if sprinting then
-      stats.stamina = math.max(0, stats.stamina - STAMINA_DRAIN * dt)
-    else
-      stats.stamina = math.min(stats.max_stamina, stats.stamina + STAMINA_REGEN * dt)
-    end
-    ctrl.sprint = sprinting
+    if (sprinting) {
+      stats.stamina = Math.max(0, stats.stamina - STAMINA_DRAIN * state.dt);
+    } else {
+      stats.stamina = Math.min(stats.max_stamina, stats.stamina + STAMINA_REGEN * state.dt);
+    }
+    ctrl.sprint = sprinting;
 
-    local state = char_state.get(eid)
-    if state.is_grounded and not state.was_grounded_last_frame then
-      stats.jump_count = 0
-    end
-    if jump_pressed and stats.jump_count < stats.max_jumps then
-      ctrl.jump = true
-      stats.jump_count = stats.jump_count + 1
-    end
+    const st = char_state.get(eid);
+    if (st.is_grounded && !st.was_grounded_last_frame) {
+      stats.jump_count = 0;
+    }
+    if (jump_pressed && stats.jump_count < stats.max_jumps) {
+      ctrl.jump = true;
+      stats.jump_count = stats.jump_count + 1;
+    }
 
-    char_control.set(eid, ctrl)
-    char_stats.set(eid, stats)
-  end
-end
+    char_control.set(eid, ctrl);
+    char_stats.set(eid, stats);
+  }
+}
 ```
 
 ## Built-in API
@@ -286,7 +286,7 @@ end
 
 ## Types
 
-| Type     | Lua representation                       |
+| Type     | JS representation                        |
 | -------- | ---------------------------------------- |
 | `entity` | integer                                  |
 | `vec2`   | `{x: number, y: number}`                |
@@ -296,4 +296,4 @@ end
 
 ## Type Stubs
 
-LuaCATS type stubs are auto-generated to `Assets/StreamingAssets/lua/types/luagame.lua`. Regenerate via **Tools > Lua > Generate Type Stubs** (also runs automatically on domain reload when changes are detected).
+TypeScript declaration stubs are auto-generated to `Assets/StreamingAssets/js/types/unity.d.ts`. Regenerate via **Tools > JS > Generate Type Stubs** (also runs automatically on domain reload when changes are detected).

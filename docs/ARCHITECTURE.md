@@ -1,25 +1,25 @@
-# LuaJIT ECS Architecture
+# QuickJS ECS Architecture
 
 > **Pre-Alpha** - This document reflects current implementation. APIs may change.
 
-This document defines the boundary between **Framework** (C#/ECS/Burst) and **Scriptable** (Lua) layers.
+This document defines the boundary between **Framework** (C#/ECS/Burst) and **Scriptable** (JS) layers.
 
 ## Design Philosophy
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      Lua Scripts                             │
+│                      JS Scripts                              │
 │   "What to do" — decisions, behaviors, state machines        │
 ├─────────────────────────────────────────────────────────────┤
 │                      ECS Bridge                              │
-│   API surface — ecs.*, input.* exposed to Lua                │
+│   API surface — ecs.*, input.* exposed to JS                 │
 ├─────────────────────────────────────────────────────────────┤
 │                   Framework (C#/Burst)                       │
 │   "How to do it" — movement, physics, queries, data          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Guiding principle:** Lua controls *intent*, C# executes *mechanics*.
+**Guiding principle:** JS controls *intent*, C# executes *mechanics*.
 
 ---
 
@@ -27,54 +27,54 @@ This document defines the boundary between **Framework** (C#/ECS/Burst) and **Sc
 
 ```
 Runtime/
-  LuaJIT/
-    LuaJIT.cs                 # P/Invoke bindings to lua51 native library
-  LuaVM/
+  QJS/
+    QJS.cs                    # P/Invoke bindings to quickjs native library
+  JsRuntime/
     Core/
-      LuaVMManager.cs         # Lua state lifecycle, script loading
-      LuaStateExtensions.cs   # Helper extensions for lua_State
+      JsRuntimeManager.cs    # JS runtime lifecycle, script loading
+      JsStateExtensions.cs   # Helper extensions for JSContext
     Burst/
-      BurstLuaContext.cs      # SharedStatic patterns for Burst
-  LuaECS/
+      BurstJsContext.cs       # SharedStatic patterns for Burst
+  JsECS/
     Core/
-      LuaECSBridge.cs         # Coordinator: registration, shared state
-      LuaEntityRegistry.cs    # O(1) entity ID lookups via SharedStatic
-      LuaScriptPathUtility.cs # Script file resolution, hash generation
+      JsECSBridge.cs          # Coordinator: registration, shared state
+      JsEntityRegistry.cs     # O(1) entity ID lookups via SharedStatic
+      JsScriptPathUtility.cs  # Script file resolution, hash generation
       Bridge/
-        LuaEntitiesBridge.cs    # entities.create, destroy, add_script, has_script
-        LuaTransformBridge.cs   # transform.get_position, set_position, move_toward
-        LuaSpatialBridge.cs     # spatial.distance, query_near, get_entity_count
-        LuaEventsBridge.cs      # events.send_attack
-        LuaLogBridge.cs         # log.info, debug, warning, error
-        LuaInputBridge.cs       # input.read_value, was_pressed, is_held, was_released
-        LuaDrawBridge.cs        # draw.line, draw.sphere (debug)
+        JsEntitiesBridge.cs     # entities.create, destroy, add_script, has_script
+        JsTransformBridge.cs    # transform.get_position, set_position, move_toward
+        JsSpatialBridge.cs      # spatial.distance, query_near, get_entity_count
+        JsEventsBridge.cs       # events.send_attack
+        JsLogBridge.cs          # log.info, debug, warning, error
+        JsInputBridge.cs        # input.read_value, was_pressed, is_held, was_released
+        JsDrawBridge.cs         # draw.line, draw.sphere (debug)
     Components/
-      LuaScriptComponent.cs   # LuaScriptRequest and LuaScript buffers
-      LuaEvent.cs             # Event dispatch to Lua
-      LuaPlayerComponents.cs  # Player tag and related components
+      JsScriptComponent.cs    # JsScriptRequest and JsScript buffers
+      JsEvent.cs               # Event dispatch to JS
+      JsPlayerComponents.cs   # Player tag and related components
     Systems/
-      LuaScriptingSystem.cs       # Orchestrator: runtime updates, events, direct ECB
+      JsScriptingSystem.cs        # Orchestrator: runtime updates, events, direct ECB
       Support/
-        LuaScriptFulfillmentSystem.cs # Request processing, script init, disabling
-        LuaEventDispatcher.cs        # Event collection, dispatch
-        LuaScriptCleanupSystem.cs    # Script state cleanup, OnDestroy
+        JsScriptFulfillmentSystem.cs  # Request processing, script init, disabling
+        JsEventDispatcher.cs          # Event collection, dispatch
+        JsScriptCleanupSystem.cs      # Script state cleanup, OnDestroy
     Authoring/
-      LuaScriptAuthoring.cs       # MonoBehaviour for script assignment
-      LuaScriptBufferAuthoring.cs # Buffer-based script authoring
+      JsScriptAuthoring.cs        # MonoBehaviour for script assignment
+      JsScriptBufferAuthoring.cs  # Buffer-based script authoring
     Demo/
-      FruitEaterDemo.cs       # Demo bootstrapper
+      FruitEaterDemo.cs        # Demo bootstrapper
 Editor/
-  LuaHotReloadSystem.cs         # FileSystemWatcher for hot reload
-  LuaScriptAssetReferenceDrawer.cs # Inspector drawer
+  JsHotReloadSystem.cs          # FileSystemWatcher for hot reload
+  JsScriptAssetReferenceDrawer.cs # Inspector drawer
 Tests/
-  LuaECS.Tests/
-    LuaScriptLifecycleTest.cs
-    LuaEntityCreationTest.cs
-    LuaSpatialQueryTest.cs
-    LuaEventDispatchTest.cs
-    LuaEntityRegistryTest.cs
-    LuaStateCleanupTest.cs
-  LuaVM.Tests/
+  JsECS.Tests/
+    JsScriptLifecycleTest.cs
+    JsEntityCreationTest.cs
+    JsSpatialQueryTest.cs
+    JsEventDispatchTest.cs
+    JsEntityRegistryTest.cs
+    JsStateCleanupTest.cs
+  JsRuntime.Tests/
     BurstIdAllocatorTests.cs
     BurstIdLookupTests.cs
     BurstOperationQueueTests.cs
@@ -98,30 +98,30 @@ See the following mermaid diagrams for detailed flow visualization:
 
 ## Script Lifecycle Architecture
 
-The Lua script system uses a **two-buffer architecture**:
+The JS script system uses a **two-buffer architecture**:
 
 ### Components
 
 | Component          | Type                        | Purpose                                    |
 | ------------------ | --------------------------- | ------------------------------------------ |
-| `LuaScriptRequest` | `IBufferElementData`        | Pending script requests with unique hashes |
-| `LuaScript`        | `ICleanupBufferElementData` | Initialized scripts with VM state          |
+| `JsScriptRequest`  | `IBufferElementData`        | Pending script requests with unique hashes |
+| `JsScript`         | `ICleanupBufferElementData` | Initialized scripts with runtime state     |
 
 ### Key Fields
 
 ```csharp
-public struct LuaScriptRequest : IBufferElementData
+public struct JsScriptRequest : IBufferElementData
 {
     public FixedString64Bytes ScriptName;
     public Hash128 RequestHash;  // xxHash3 of script name for deduplication
     public bool Fulfilled;       // True once script is created
 }
 
-public struct LuaScript : ICleanupBufferElementData
+public struct JsScript : ICleanupBufferElementData
 {
     public FixedString64Bytes ScriptName;
-    public int StateRef;         // VM registry reference (-1 if disabled)
-    public int EntityIndex;      // Lua entity ID
+    public int StateRef;         // JS registry reference (-1 if disabled)
+    public int EntityIndex;      // JS entity ID
     public Hash128 RequestHash;  // Links back to request
     public bool Disabled;        // True = skip execution, cleanup at entity end
 }
@@ -131,131 +131,131 @@ public struct LuaScript : ICleanupBufferElementData
 
 All lifecycle systems run in `InitializationSystemGroup`:
 
-| System                       | Purpose                                                                       |
-| ---------------------------- | ----------------------------------------------------------------------------- |
-| `LuaScriptFulfillmentSystem` | Processes requests, creates VM state, calls OnInit, supports script disabling |
-| `LuaScriptCleanupSystem`     | Handles entity destruction, calls OnDestroy, releases VM state                |
+| System                      | Purpose                                                                       |
+| --------------------------- | ----------------------------------------------------------------------------- |
+| `JsScriptFulfillmentSystem` | Processes requests, creates runtime state, calls onInit, supports script disabling |
+| `JsScriptCleanupSystem`     | Handles entity destruction, calls onDestroy, releases runtime state           |
 
 ---
 
 ## Framework Scope (C#/ECS)
 
-The framework provides primitives that Lua cannot efficiently implement.
+The framework provides primitives that JS cannot efficiently implement.
 
 ### Core Systems (Implemented)
 
 | System                                 | Purpose                                    | Thread | Burst |
 | -------------------------------------- | ------------------------------------------ | ------ | ----- |
-| `LuaScriptingSystem`                   | Runtime updates, event dispatch, ECB       | Main   | No    |
-| `LuaScriptFulfillmentSystem`           | Script initialization, disabling           | Main   | No    |
-| `LuaScriptCleanupSystem`              | Destruction, OnDestroy, cleanup            | Main   | No    |
+| `JsScriptingSystem`                    | Runtime updates, event dispatch, ECB       | Main   | No    |
+| `JsScriptFulfillmentSystem`            | Script initialization, disabling           | Main   | No    |
+| `JsScriptCleanupSystem`               | Destruction, onDestroy, cleanup            | Main   | No    |
 | `EndSimulationEntityCommandBufferSystem` | Unity built-in structural change playback | Main   | N/A   |
 
 ### Bridge API (Implemented)
 
-The bridge uses a **domain-oriented API** with direct ECB access. Modules are under `Runtime/LuaECS/Core/Bridge/`:
+The bridge uses a **domain-oriented API** with direct ECB access. Modules are under `Runtime/JsECS/Core/Bridge/`:
 
-| Module               | Lua Namespace | Functions                                                             | Notes                                 |
-| -------------------- | ------------- | --------------------------------------------------------------------- | ------------------------------------- |
-| `LuaEntitiesBridge`  | `entities`    | `create`, `destroy`, `add_script`, `has_script`                       | Entity lifecycle via direct ECB       |
-| `LuaTransformBridge` | `transform`   | `get_position`, `set_position`, `get_rotation`, `move_toward`         | Transform read/write + movement       |
-| `LuaSpatialBridge`   | `spatial`     | `distance`, `query_near`, `get_entity_count`                          | Distance checks, area queries         |
-| `LuaEventsBridge`    | `events`      | `send_attack`                                                         | Cross-entity event dispatch           |
-| `LuaLogBridge`       | `log`         | `info`, `debug`, `warning`, `error`                                   | Via Unity.Logging                     |
-| `LuaInputBridge`     | `input`       | `read_value`, `was_pressed`, `is_held`, `was_released`                | Unity Input System                    |
-| `LuaDrawBridge`      | `draw`        | `line`, `sphere`                                                      | Debug visualization                   |
+| Module              | JS Namespace | Functions                                                             | Notes                                 |
+| ------------------- | ------------ | --------------------------------------------------------------------- | ------------------------------------- |
+| `JsEntitiesBridge`  | `entities`   | `create`, `destroy`, `add_script`, `has_script`                       | Entity lifecycle via direct ECB       |
+| `JsTransformBridge` | `transform`  | `get_position`, `set_position`, `get_rotation`, `move_toward`         | Transform read/write + movement       |
+| `JsSpatialBridge`   | `spatial`    | `distance`, `query_near`, `get_entity_count`                          | Distance checks, area queries         |
+| `JsEventsBridge`    | `events`     | `send_attack`                                                         | Cross-entity event dispatch           |
+| `JsLogBridge`       | `log`        | `info`, `debug`, `warning`, `error`                                   | Via Unity.Logging                     |
+| `JsInputBridge`     | `input`      | `read_value`, `was_pressed`, `is_held`, `was_released`                | Unity Input System                    |
+| `JsDrawBridge`      | `draw`       | `line`, `sphere`                                                      | Debug visualization                   |
 
 ### Support Systems
 
-The scripting system delegates to specialized systems under `Runtime/LuaECS/Systems/Support/`:
+The scripting system delegates to specialized systems under `Runtime/JsECS/Systems/Support/`:
 
-| System                       | Responsibility                                     |
-| ---------------------------- | -------------------------------------------------- |
-| `LuaScriptFulfillmentSystem` | Request processing, script init, disabling         |
-| `LuaEventDispatcher`         | Event collection, clearing, and dispatch           |
-| `LuaScriptCleanupSystem`     | OnDestroy callbacks, state release, entity cleanup |
+| System                      | Responsibility                                     |
+| --------------------------- | -------------------------------------------------- |
+| `JsScriptFulfillmentSystem` | Request processing, script init, disabling         |
+| `JsEventDispatcher`         | Event collection, clearing, and dispatch           |
+| `JsScriptCleanupSystem`     | onDestroy callbacks, state release, entity cleanup |
 
-Entity ID management is handled by `LuaEntityRegistry` via SharedStatic for Burst compatibility.
+Entity ID management is handled by `JsEntityRegistry` via SharedStatic for Burst compatibility.
 
 ---
 
-## `[LuaBridge]` Codegen Pattern
+## `[JsBridge]` Codegen Pattern
 
-Components annotated with `[LuaBridge("name")]` automatically get Roslyn source-generated Lua getter/setter bridges. This is the preferred way to expose ECS data to Lua — define a component, annotate it, and the codegen handles registration.
+Components annotated with `[JsBridge("name")]` automatically get Roslyn source-generated JS getter/setter bridges. This is the preferred way to expose ECS data to JS — define a component, annotate it, and the codegen handles registration.
 
 Character controllers, stats, and gameplay systems should be implemented at the **project level** using this pattern rather than in the package.
 
 ---
 
-## Scriptable Scope (Lua)
+## Scriptable Scope (JS)
 
-What Lua scripts control — the "brain" of game entities.
+What JS scripts control — the "brain" of game entities.
 
 ### Entity Behaviors
 
-Scripts define global PascalCase functions with full IntelliSense:
+Scripts export lifecycle functions:
 
-```lua
--- Lua decides: "I should move toward the nearest fruit"
--- Framework executes: pathfinding, collision, transform updates
+```js
+// JS decides: "I should move toward the nearest fruit"
+// Framework executes: pathfinding, collision, transform updates
 
-function OnUpdate(entity, state, dt)
-    if not state.target then
-        state.target = FindNearestFruit(entity)
-    end
-    if state.target then
-        ecs.move_toward(entity, state.target, state.speed)
-    end
-end
+export function onUpdate(state) {
+    if (!state.target) {
+        state.target = findNearestFruit(state.entity);
+    }
+    if (state.target) {
+        transform.move_toward(state.entity, state.target, state.speed);
+    }
+}
 ```
 
 ### State Machines
 
-Lua owns entity state and transitions:
+JS owns entity state and transitions:
 
-```lua
-state.mode = "idle"      -- Lua decides current mode
-state.target = nil       -- Lua tracks targets
-state.cooldown = 0       -- Lua manages timers
+```js
+state.mode = "idle";      // JS decides current mode
+state.target = null;      // JS tracks targets
+state.cooldown = 0;       // JS manages timers
 
--- State transitions are script logic
-if state.mode == "gathering" and inventory_full() then
-    state.mode = "returning"
-end
+// State transitions are script logic
+if (state.mode === "gathering" && inventoryFull()) {
+    state.mode = "returning";
+}
 ```
 
 ### Event Handling
 
-Scripts respond to framework events via PascalCase callbacks:
+Scripts respond to framework events via callbacks:
 
-```lua
-function OnAttacked(entity, state, event)
-    state.threat = event.source
-    state.mode = "fleeing"
-end
+```js
+export function onAttacked(state, event) {
+    state.threat = event.source;
+    state.mode = "fleeing";
+}
 
-function OnCommand(entity, state, command)
-    if command == "stop" then
-        state.mode = "idle"
-    end
-end
+export function onCommand(state, command) {
+    if (command === "stop") {
+        state.mode = "idle";
+    }
+}
 ```
 
 ---
 
 ## Boundary Rules
 
-### Lua SHOULD control:
+### JS SHOULD control:
 - High-level decisions (what to do next)
 - State machine transitions
 - Target selection and prioritization
 - Behavior parameters (speeds, ranges, cooldowns)
 - Game data definitions
 
-### Lua SHOULD NOT control:
+### JS SHOULD NOT control:
 - Physics calculations
-- Spatial queries (use `query_entities_near`)
-- Transform math (use `move_toward`, `distance`)
+- Spatial queries (use `spatial.query_near`)
+- Transform math (use `transform.move_toward`, `spatial.distance`)
 - Rendering or animation triggers
 - Networking or persistence
 
@@ -270,34 +270,34 @@ end
 
 ## Extension Pattern
 
-When adding new framework features, prefer the `[LuaBridge]` codegen pattern:
+When adding new framework features, prefer the `[JsBridge]` codegen pattern:
 
-1. **Define the component** (C# `IComponentData`) with `[LuaBridge("name")]` attribute
+1. **Define the component** (C# `IComponentData`) with `[JsBridge("name")]` attribute
 2. **Codegen auto-generates** getter/setter bridge functions
-3. **Update type definitions** (`types/ecs.lua`)
+3. **Update type definitions** (`types/unity.d.ts`)
 
 For custom bridge functions that don't fit the codegen pattern:
 
 1. **Add bridge function** (in appropriate `Bridge/*Bridge.cs` file)
-2. **Register in `LuaECSBridge.RegisterFunctions`**
-3. **Update type definitions** (`types/ecs.lua`)
+2. **Register in `JsECSBridge.RegisterFunctions`**
+3. **Update type definitions** (`types/unity.d.ts`)
 4. **Document in this file**
 
 ---
 
 ## Architectural Decisions
 
-### Static Bridge for Burst Compatibility
+### Static Bridge for Callback Compatibility
 
-The `LuaECSBridge` uses static fields and `[MonoPInvokeCallback]` methods because:
-- Lua C function pointers cannot reference instance methods
+The `JsECSBridge` uses static fields and `[MonoPInvokeCallback]` methods because:
+- QuickJS C function pointers cannot reference instance methods
 - Static state is required for `MonoPInvokeCallback` attribute
 - This enables integration with Burst-compiled systems
 
 ### Hybrid Pattern (Static + DI)
 
-- **Static**: Bridge functions (Burst-compatible, required by Lua FFI)
-- **Instance/Singleton**: `LuaVMManager` (for testability)
+- **Static**: Bridge functions (callback-compatible, required by QuickJS)
+- **Instance/Singleton**: `JsRuntimeManager` (for testability)
 - **ECS-managed**: Systems follow standard ECS lifecycle
 
 ### Deferred Entity Operations
@@ -310,8 +310,8 @@ All structural changes use `EntityCommandBuffer` pattern:
 ### Two-Buffer Lifecycle Architecture
 
 Script initialization uses separate buffers for requests and fulfilled scripts:
-- `LuaScriptRequest` — pending requests, can be added any time
-- `LuaScript` — initialized scripts, cleanup buffer ensures proper teardown
+- `JsScriptRequest` — pending requests, can be added any time
+- `JsScript` — initialized scripts, cleanup buffer ensures proper teardown
 - `RequestHash` (xxHash3 of script name) enables deduplication
 - `Disabled` flag allows runtime script removal without entity destruction
 
@@ -329,7 +329,7 @@ Script initialization uses separate buffers for requests and fulfilled scripts:
 | Logging           | ✅         | ✅      | ✅     | Unity.Logging integration  |
 | Input             | ✅         | ✅      | ⚠️     | Unity Input System         |
 | Debug Draw        | ✅         | ✅      | ⚠️     | Line, sphere primitives    |
-| OnDestroy         | ✅         | N/A    | N/A   | Lifecycle callback         |
+| onDestroy         | ✅         | N/A    | N/A   | Lifecycle callback         |
 | Script Disabling  | ✅         | N/A    | N/A   | Runtime script removal     |
 
 Legend: ✅ Implemented | ⚠️ Partial/No Types | ❌ Not started

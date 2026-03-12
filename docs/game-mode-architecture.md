@@ -4,7 +4,7 @@
 
 ## Overview
 
-A **Game Mode** is a self-contained gameplay session backed by a Lua script. Each game mode creates its own ECS World, runs a bootstrap script, and destroys all associated entities when transitioning to another mode.
+A **Game Mode** is a self-contained gameplay session backed by a JS script. Each game mode creates its own ECS World, runs a bootstrap script, and destroys all associated entities when transitioning to another mode.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -14,8 +14,8 @@ A **Game Mode** is a self-contained gameplay session backed by a Lua script. Eac
 │                     Game Mode World                         │
 │   Isolated ECS World with all entities for this session     │
 ├─────────────────────────────────────────────────────────────┤
-│                   Game Mode Script (Lua)                    │
-│   OnInit → OnLoad → OnUpdate → OnBeforeUnload               │
+│                   Game Mode Script (JS)                     │
+│   onInit → onLoad → onUpdate → onBeforeUnload               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -56,7 +56,7 @@ Mode A                          Mode B
 | Networking | Unity Netcode creates world per session; mode transitions align with session boundaries |
 | Shared assets | Assets (prefabs, materials) are orthogonal to worlds; no issue |
 | Creation overhead | Minimal (~1ms), acceptable during loading screen |
-| System registration | All systems registered via `LuaGameBootstrap.GetLuaSystems()`; self-activate via `RequireForUpdate` |
+| System registration | All systems registered via `JsGameBootstrap.GetJsSystems()`; self-activate via `RequireForUpdate` |
 
 ### Rejected Alternative
 
@@ -76,12 +76,12 @@ Mode A                          Mode B
 | Persistent entities | None | Entities are "alive" units; persistence is data tables, not entities |
 | Mode parameters | None (v1) | Future key-value store will handle cross-mode data |
 | Return data | None | Clean separation between modes |
-| Main menu | Not a game mode | Will use GUI scripting (Lua+UXML) |
+| Main menu | Not a game mode | Will use GUI scripting (JS+UXML) |
 | Mode stacking | Not supported | Flat replacement only; UI is within mode |
 | Transitions | Async with progress | Long operation, supports callbacks |
-| Scene integration | Orthogonal | Scenes scriptable from Lua, not tied to mode |
-| Lua VM | Shared VM, world-scoped state | Simpler implementation, single VM instance |
-| Script location | `StreamingAssets/lua/GameModes/` | Uses existing script loading infrastructure |
+| Scene integration | Orthogonal | Scenes scriptable from JS, not tied to mode |
+| JS VM | Shared VM, world-scoped state | Simpler implementation, single VM instance |
+| Script location | `StreamingAssets/js/GameModes/` | Uses existing script loading infrastructure |
 | Default world | Null when no mode | No implicit world; explicit mode loading required |
 | System activation | Self-activating via `RequireForUpdate` | Systems run when their entity types are present |
 
@@ -94,7 +94,7 @@ LoadMode("roguelike")
        │
        ▼
 ┌──────────────────┐
-│ OnBeforeUnload   │  ← Previous mode (if any)
+│ onBeforeUnload   │  ← Previous mode (if any)
 │ (previous mode)  │    Cleanup callbacks, save state
 └────────┬─────────┘
          │
@@ -112,7 +112,7 @@ LoadMode("roguelike")
          │
          ▼
 ┌──────────────────┐
-│ OnInit           │  Schedule asset loading, spawn initial entities
+│ onInit           │  Schedule asset loading, spawn initial entities
 │ (new mode)       │  Progress: 0% → N%
 └────────┬─────────┘
          │
@@ -124,13 +124,13 @@ LoadMode("roguelike")
          │
          ▼
 ┌──────────────────┐
-│ OnLoad           │  All scheduled loading complete
+│ onLoad           │  All scheduled loading complete
 │                  │  Mode is now playable
 └────────┬─────────┘
          │
          ▼
 ┌──────────────────┐
-│ OnUpdate         │  Called every frame
+│ onUpdate         │  Called every frame
 │ (game loop)      │  Until mode switch
 └──────────────────┘
 ```
@@ -139,63 +139,59 @@ LoadMode("roguelike")
 
 ## Script Callbacks
 
-Game mode scripts are Lua files in `StreamingAssets/lua/GameModes/`:
+Game mode scripts are JS files in `StreamingAssets/js/GameModes/`:
 
-```lua
--- GameModes/roguelike.lua
+```js
+// GameModes/roguelike.js
 
----@type OnInit
-function OnInit(mode, state)
-    -- Called before loading starts
-    -- Schedule asset loading, create initial entities
-    -- 'mode' is the game mode entity
-    -- 'state' is persistent Lua table for this mode
+export function onInit(mode, state) {
+    // Called before loading starts
+    // Schedule asset loading, create initial entities
+    // 'mode' is the game mode entity
+    // 'state' is persistent object for this mode
 
-    state.level = 1
-    state.score = 0
+    state.level = 1;
+    state.score = 0;
 
-    -- Spawn world entities
-    for i = 1, 10 do
-        local enemy = ecs.create_entity({ x = math.random() * 20, y = 0, z = math.random() * 20 })
-        ecs.add_script(enemy, "enemy_basic")
-    end
+    // Spawn world entities
+    for (let i = 0; i < 10; i++) {
+        const enemy = entities.create({ x: Math.random() * 20, y: 0, z: Math.random() * 20 });
+        entities.add_script(enemy, "enemy_basic");
+    }
 
-    log.info("Roguelike mode initializing...")
-end
+    log.info("Roguelike mode initializing...");
+}
 
----@type OnLoad
-function OnLoad(mode, state)
-    -- Called when all OnInit-scheduled loading is complete
-    -- Mode is now fully playable
+export function onLoad(mode, state) {
+    // Called when all onInit-scheduled loading is complete
+    // Mode is now fully playable
 
-    log.info("Roguelike mode loaded! Starting level %s", state.level)
-end
+    log.info("Roguelike mode loaded! Starting level " + state.level);
+}
 
----@type OnUpdate
-function OnUpdate(mode, state, dt)
-    -- Called every frame
-    -- Main game loop for this mode
+export function onUpdate(mode, state, dt) {
+    // Called every frame
+    // Main game loop for this mode
 
-    state.elapsed = (state.elapsed or 0) + dt
-end
+    state.elapsed = (state.elapsed || 0) + dt;
+}
 
----@type OnBeforeUnload
-function OnBeforeUnload(mode, state)
-    -- Called before world destruction
-    -- Save state, cleanup external resources
+export function onBeforeUnload(mode, state) {
+    // Called before world destruction
+    // Save state, cleanup external resources
 
-    log.info("Roguelike mode unloading. Final score: %s", state.score)
-end
+    log.info("Roguelike mode unloading. Final score: " + state.score);
+}
 ```
 
 ### Callback Summary
 
 | Callback | When | Purpose |
 |----------|------|---------|
-| `OnInit(mode, state)` | World created, before loading | Schedule loading, spawn entities |
-| `OnLoad(mode, state)` | All loading complete | Mode is playable, finalize setup |
-| `OnUpdate(mode, state, dt)` | Every frame | Main game loop |
-| `OnBeforeUnload(mode, state)` | Before world destruction | Cleanup, save state |
+| `onInit(mode, state)` | World created, before loading | Schedule loading, spawn entities |
+| `onLoad(mode, state)` | All loading complete | Mode is playable, finalize setup |
+| `onUpdate(mode, state, dt)` | Every frame | Main game loop |
+| `onBeforeUnload(mode, state)` | Before world destruction | Cleanup, save state |
 
 ---
 
@@ -206,7 +202,7 @@ end
 Primary C# interface for mode management:
 
 ```csharp
-namespace Pala.LuaGame
+namespace UnityJS.Entities
 {
     /// <summary>
     /// Manages game mode lifecycle: loading, transitions, world ownership.
@@ -282,19 +278,19 @@ public class MainMenuController : MonoBehaviour
 
 ---
 
-## Lua API
+## JS API
 
-### Mode Switching from Lua
+### Mode Switching from JS
 
-```lua
--- Switch to another game mode from within Lua
-gamemode.load("base_building")
+```js
+// Switch to another game mode from within JS
+gamemode.load("base_building");
 
--- Get current mode name
-local current = gamemode.current()  -- "roguelike"
+// Get current mode name
+const current = gamemode.current();  // "roguelike"
 
--- Check if loading
-local is_loading = gamemode.is_loading()  -- false
+// Check if loading
+const isLoading = gamemode.is_loading();  // false
 ```
 
 ### Bridge Functions
@@ -302,7 +298,7 @@ local is_loading = gamemode.is_loading()  -- false
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
 | `gamemode.load(name)` | `string` | `void` | Request mode switch (async) |
-| `gamemode.current()` | - | `string?` | Current mode name or nil |
+| `gamemode.current()` | - | `string?` | Current mode name or null |
 | `gamemode.is_loading()` | - | `boolean` | True during transitions |
 
 ---
@@ -313,24 +309,24 @@ local is_loading = gamemode.is_loading()  -- false
 
 ```
 Runtime/
-  LuaGame/
+  JsECS/
     GameMode/
       GameModeManager.cs        # Main manager, world lifecycle
       GameModeState.cs          # Mode state container
       GameModeWorld.cs          # World setup, system registration
-      LuaGameModeBridge.cs      # Lua API for mode switching
+      JsGameModeBridge.cs       # JS API for mode switching
     Systems/
-      GameModeUpdateSystem.cs   # Drives OnUpdate for mode script
+      GameModeUpdateSystem.cs   # Drives onUpdate for mode script
 ```
 
 ### Integration Points
 
 | Component | Integration |
 |-----------|-------------|
-| `LuaVMManager` | Shared VM; mode state isolated via Lua tables |
-| `LuaEntityRegistry` | Clear on world destruction, reinitialize for new world |
-| `LuaECSBridge` | Rebind `EntityManager` reference to new world |
-| Lua Systems | Self-activate via `RequireForUpdate<T>` when relevant entities exist |
+| `JsRuntimeManager` | Shared VM; mode state isolated via JS objects |
+| `JsEntityRegistry` | Clear on world destruction, reinitialize for new world |
+| `JsECSBridge` | Rebind `EntityManager` reference to new world |
+| JS Systems | Self-activate via `RequireForUpdate<T>` when relevant entities exist |
 
 ### World Setup Sequence
 
@@ -344,23 +340,23 @@ private async Task<World> CreateModeWorld(string modeName)
     world.GetOrCreateSystemManaged<InitializationSystemGroup>();
     world.GetOrCreateSystemManaged<SimulationSystemGroup>();
 
-    // 3. Add all Lua systems - they self-activate via RequireForUpdate
+    // 3. Add all JS systems - they self-activate via RequireForUpdate
     DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(
         world,
-        LuaGameBootstrap.GetLuaSystems()
+        JsGameBootstrap.GetJsSystems()
     );
 
     // 4. Rebind bridge to new world
-    LuaECSBridge.SetWorld(world);
-    LuaEntityRegistry.Clear();
+    JsECSBridge.SetWorld(world);
+    JsEntityRegistry.Clear();
 
     // 5. Create mode entity with script
     var modeEntity = world.EntityManager.CreateEntity();
-    var buffer = world.EntityManager.AddBuffer<LuaScriptRequest>(modeEntity);
-    buffer.Add(new LuaScriptRequest
+    var buffer = world.EntityManager.AddBuffer<JsScriptRequest>(modeEntity);
+    buffer.Add(new JsScriptRequest
     {
         ScriptName = $"GameModes/{modeName}",
-        RequestHash = LuaScriptPathUtility.ComputeHash($"GameModes/{modeName}")
+        RequestHash = JsScriptPathUtility.ComputeHash($"GameModes/{modeName}")
     });
 
     return world;
@@ -373,12 +369,12 @@ Systems use `RequireForUpdate` to only run when their entity types exist:
 
 ```csharp
 [BurstCompile]
-public partial struct LuaHealthSystem : ISystem
+public partial struct JsHealthSystem : ISystem
 {
     public void OnCreate(ref SystemState state)
     {
-        // System only updates when LuaHealth entities exist
-        state.RequireForUpdate<LuaHealth>();
+        // System only updates when JsHealth entities exist
+        state.RequireForUpdate<JsHealth>();
     }
 
     public void OnUpdate(ref SystemState state)
@@ -389,33 +385,33 @@ public partial struct LuaHealthSystem : ISystem
 ```
 
 This means:
-- All Lua systems are registered in every game mode world
+- All JS systems are registered in every game mode world
 - Systems with no matching entities have zero overhead (skip update)
 - Game modes implicitly enable systems by creating relevant entities
 
 ### Shared VM with World-Scoped State
 
-Single Lua VM instance, but each world's entities have isolated state:
+Single JS VM instance, but each world's entities have isolated state:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Lua VM (Single)                      │
+│                    JS VM (Single)                        │
 ├─────────────────────────────────────────────────────────┤
-│  Global Tables:                                         │
-│    ecs.*, gamemode.*, log.*, etc.                      │
+│  Global Objects:                                         │
+│    ecs.*, gamemode.*, log.*, etc.                       │
 ├─────────────────────────────────────────────────────────┤
 │  Per-Entity State (via registry refs):                  │
-│    Entity 1 → { state table }                          │
-│    Entity 2 → { state table }                          │
+│    Entity 1 → { state object }                          │
+│    Entity 2 → { state object }                          │
 │    ...                                                  │
 └─────────────────────────────────────────────────────────┘
 ```
 
 On world destruction:
 1. All entities in that world are destroyed
-2. `LuaScriptCleanupSystem` calls `OnDestroy` for each script
-3. Registry refs released → Lua GC collects state tables
-4. `LuaEntityRegistry.Clear()` resets ID mappings
+2. `JsScriptCleanupSystem` calls `onDestroy` for each script
+3. Registry refs released → JS GC collects state objects
+4. `JsEntityRegistry.Clear()` resets ID mappings
 
 The VM itself persists, but all world-specific state is cleaned up through normal entity destruction flow.
 
@@ -444,13 +440,13 @@ Tests can run without game modes by creating worlds directly.
 ### Core Functionality
 - [ ] `GameModeManager.LoadModeAsync()` creates isolated world
 - [ ] Previous world destroyed on mode switch
-- [ ] All four callbacks fire in correct order: OnInit → OnLoad → OnUpdate → OnBeforeUnload
-- [ ] `gamemode.load()` works from Lua
+- [ ] All four callbacks fire in correct order: onInit → onLoad → onUpdate → onBeforeUnload
+- [ ] `gamemode.load()` works from JS
 - [ ] Loading progress reported correctly
 
 ### Integration
-- [ ] `LuaEntityRegistry` cleared between modes
-- [ ] `LuaECSBridge` rebinds to new world
+- [ ] `JsEntityRegistry` cleared between modes
+- [ ] `JsECSBridge` rebinds to new world
 - [ ] Systems registered correctly in new world
 
 ### Testing
@@ -466,35 +462,35 @@ Tests can run without game modes by creating worlds directly.
 
 ### v2: Persistent Key-Value Store
 Cross-mode data via typed key-value store with optional persistence:
-```lua
--- In roguelike mode
-persist.set("blueprints_unlocked", state.blueprints)
+```js
+// In roguelike mode
+persist.set("blueprints_unlocked", state.blueprints);
 
--- In base_building mode
-local blueprints = persist.get("blueprints_unlocked", {})
+// In base_building mode
+const blueprints = persist.get("blueprints_unlocked", {});
 ```
 
 ### v2: Asset Loading Integration
 Formalized asset loading with sectioned progress:
-```lua
-function OnInit(mode, state)
-    assets.load("prefabs/enemies", { progress_id = "enemies" })
-    assets.load("prefabs/environment", { progress_id = "environment" })
-end
+```js
+export function onInit(mode, state) {
+    assets.load("prefabs/enemies", { progress_id: "enemies" });
+    assets.load("prefabs/environment", { progress_id: "environment" });
+}
 ```
 
 ### v2: Scene Integration
 Optional scene loading as part of mode initialization:
-```lua
-function OnInit(mode, state)
-    scene.load("Levels/Forest")
-end
+```js
+export function onInit(mode, state) {
+    scene.load("Levels/Forest");
+}
 ```
 
 ---
 
 ## See Also
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Overall LuaGame architecture
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Overall unity.js architecture
 - [Entity Cleanup Flow](entity-cleanup-flow.md) - Entity lifecycle
-- [fruit_demo_bootstrap.lua](../../../Assets/StreamingAssets/lua/scripts/fruit_demo_bootstrap.lua) - Example bootstrap pattern
+- [fruit_demo_bootstrap.js](../../../Assets/StreamingAssets/js/scripts/fruit_demo_bootstrap.js) - Example bootstrap pattern

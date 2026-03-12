@@ -99,3 +99,27 @@ SHIM_API void qjs_shim_set_module_loader(JSContext *ctx,
     JS_SetModuleLoaderFunc(JS_GetRuntime(ctx),
                            normalize_trampoline, loader_trampoline, NULL);
 }
+
+SHIM_API JSValue qjs_shim_eval_module(JSContext *ctx,
+                                       const char *source, int source_len,
+                                       const char *filename)
+{
+    JSValue compiled = JS_Eval(ctx, source, source_len, filename,
+                               JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
+    if (JS_IsException(compiled))
+        return compiled;
+
+    JSModuleDef *m = (JSModuleDef *)JS_VALUE_GET_PTR(compiled);
+
+    if (JS_ResolveModule(ctx, compiled) < 0) {
+        JS_FreeValue(ctx, compiled);
+        return JS_ThrowInternalError(ctx, "module resolve failed");
+    }
+
+    JSValue eval_result = JS_EvalFunction(ctx, compiled);
+    if (JS_IsException(eval_result))
+        return eval_result;
+    JS_FreeValue(ctx, eval_result);
+
+    return JS_GetModuleNamespace(ctx, m);
+}
