@@ -12,6 +12,11 @@ namespace UnityJS.Runtime
 	/// </summary>
 	public class JsRuntimeManager : IDisposable
 	{
+		/// <summary>
+		/// Whether the native shim callback table needs reset before next VM creation.
+		/// Set true after the first VM is disposed; checked in the constructor.
+		/// </summary>
+		static bool s_shimDirty;
 		static JsRuntimeManager s_Instance;
 		public static JsRuntimeManager Instance => s_Instance;
 
@@ -26,8 +31,19 @@ namespace UnityJS.Runtime
 		public JSContext Context => m_Context;
 		public bool IsValid => !m_Context.IsNull;
 
+		/// <summary>
+		/// Returns true if a script module with this ID is already loaded.
+		/// </summary>
+		public bool HasScript(string scriptId) => m_ScriptRefs.ContainsKey(scriptId);
+
 		public JsRuntimeManager(string basePath = null)
 		{
+			if (s_shimDirty)
+			{
+				QJSShim.qjs_shim_reset();
+				s_shimDirty = false;
+			}
+
 			m_Runtime = QJS.JS_NewRuntime();
 			m_Context = QJS.JS_NewContext(m_Runtime);
 
@@ -417,6 +433,8 @@ namespace UnityJS.Runtime
 
 			if (s_Instance == this)
 				s_Instance = null;
+
+			s_shimDirty = true;
 		}
 
 		unsafe void LogException(string context)

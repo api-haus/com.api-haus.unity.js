@@ -35,17 +35,37 @@ namespace UnityJS.Entities.Systems
 
 		protected override void OnStartRunning()
 		{
-			m_Vm = JsRuntimeManager.GetOrCreate();
+			EnsureVmReady();
+		}
 
-			if (!m_BridgesRegistered)
-			{
-				m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
-				m_Vm.RegisterBridgeNow(JsSystemBridge.Register);
-				m_Vm.RegisterBridgeNow(JsQueryBridge.Register);
-				m_Vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
-				m_Vm.RegisterBridgeNow(JsComponentStore.Register);
-				m_BridgesRegistered = true;
-			}
+		/// <summary>
+		/// Checks whether the VM is alive and belongs to this runner.
+		/// If the VM was disposed (e.g. JsScriptingSystem.OnDestroy during
+		/// subscene loading or play-mode re-entry) and a new one exists,
+		/// resets all cached state and re-discovers system scripts.
+		/// Returns true if the VM is ready for use.
+		/// </summary>
+		bool EnsureVmReady()
+		{
+			var vm = JsRuntimeManager.Instance;
+			if (vm == null || !vm.IsValid)
+				return false;
+
+			if (vm == m_Vm && m_BridgesRegistered)
+				return true;
+
+			// VM changed — old script refs and state refs point to a dead context.
+			m_SystemNames.Clear();
+			m_SystemStateRefs.Clear();
+			m_BridgesRegistered = false;
+			m_Vm = vm;
+
+			m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
+			m_Vm.RegisterBridgeNow(JsSystemBridge.Register);
+			m_Vm.RegisterBridgeNow(JsQueryBridge.Register);
+			m_Vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
+			m_Vm.RegisterBridgeNow(JsComponentStore.Register);
+			m_BridgesRegistered = true;
 
 			var scriptingSystem = World.GetOrCreateSystemManaged<JsScriptingSystem>();
 			JsECSBridge.Initialize(World);
@@ -59,6 +79,7 @@ namespace UnityJS.Entities.Systems
 			}
 
 			DiscoverAndLoadSystems();
+			return true;
 		}
 
 		protected override void OnDestroy()
@@ -94,13 +115,18 @@ namespace UnityJS.Entities.Systems
 
 		void LoadSystem(string systemName, string filePath)
 		{
-			var source = File.ReadAllText(filePath);
 			var scriptId = "system:" + systemName;
 
-			if (!m_Vm.LoadScriptAsModule(scriptId, source, filePath))
+			// If the VM already has this module (e.g. world was recreated but VM persists),
+			// skip re-evaluation — QuickJS caches modules and re-eval returns stale namespace.
+			if (!m_Vm.HasScript(scriptId))
 			{
-				Log.Error("[JsSystemRunner] Failed to load system '{0}'", systemName);
-				return;
+				var source = File.ReadAllText(filePath);
+				if (!m_Vm.LoadScriptAsModule(scriptId, source, filePath))
+				{
+					Log.Error("[JsSystemRunner] Failed to load system '{0}'", systemName);
+					return;
+				}
 			}
 
 			// System scripts have no entity (entityId = -1)
@@ -134,7 +160,7 @@ namespace UnityJS.Entities.Systems
 
 		protected override void OnUpdate()
 		{
-			if (m_Vm == null || !m_Vm.IsValid)
+			if (!EnsureVmReady())
 				return;
 
 			if (m_SystemNames.Count == 0)

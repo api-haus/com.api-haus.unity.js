@@ -62,8 +62,6 @@ namespace UnityJS.Entities.Systems
 			if (m_Vm == null)
 			{
 				m_Vm = JsRuntimeManager.GetOrCreate();
-
-				m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
 				JsECSBridge.Initialize(World);
 			}
 
