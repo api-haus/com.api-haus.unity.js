@@ -1,217 +1,217 @@
 namespace UnityJS.Runtime
 {
-	using System;
-	using System.IO;
-	using Unity.Collections;
-	using UnityEngine;
+  using System;
+  using System.IO;
+  using Unity.Collections;
+  using UnityEngine;
 
-	public enum JsScriptSourceType : byte
-	{
-		NONE = 0,
-		STRING = 1,
-		STREAMING_ASSETS = 2,
-		FILE_PATH = 3,
-	}
+  public enum JsScriptSourceType : byte
+  {
+    NONE = 0,
+    STRING = 1,
+    STREAMING_ASSETS = 2,
+    FILE_PATH = 3,
+  }
 
-	/// <summary>
-	/// Burst-compatible result structure for script loading operations.
-	/// </summary>
-	public struct JsScriptLoadResult
-	{
-		public FixedString64Bytes scriptId;
-		public FixedString512Bytes filePath;
-		public JsScriptSourceType sourceType;
-		public bool isValid;
-		public FixedString128Bytes error;
+  /// <summary>
+  /// Burst-compatible result structure for script loading operations.
+  /// </summary>
+  public struct JsScriptLoadResult
+  {
+    public FixedString64Bytes scriptId;
+    public FixedString512Bytes filePath;
+    public JsScriptSourceType sourceType;
+    public bool isValid;
+    public FixedString128Bytes error;
 
-		public static JsScriptLoadResult Success(
-			FixedString64Bytes scriptId,
-			JsScriptSourceType sourceType,
-			FixedString512Bytes filePath = default
-		)
-		{
-			return new JsScriptLoadResult
-			{
-				scriptId = scriptId,
-				filePath = filePath,
-				sourceType = sourceType,
-				isValid = true,
-				error = default,
-			};
-		}
+    public static JsScriptLoadResult Success(
+      FixedString64Bytes scriptId,
+      JsScriptSourceType sourceType,
+      FixedString512Bytes filePath = default
+    )
+    {
+      return new JsScriptLoadResult
+      {
+        scriptId = scriptId,
+        filePath = filePath,
+        sourceType = sourceType,
+        isValid = true,
+        error = default,
+      };
+    }
 
-		public static JsScriptLoadResult Failure(FixedString128Bytes error)
-		{
-			return new JsScriptLoadResult
-			{
-				scriptId = default,
-				filePath = default,
-				sourceType = JsScriptSourceType.NONE,
-				isValid = false,
-				error = error,
-			};
-		}
-	}
+    public static JsScriptLoadResult Failure(FixedString128Bytes error)
+    {
+      return new JsScriptLoadResult
+      {
+        scriptId = default,
+        filePath = default,
+        sourceType = JsScriptSourceType.NONE,
+        isValid = false,
+        error = error,
+      };
+    }
+  }
 
-	/// <summary>
-	/// Centralized utility for loading JS scripts from various sources.
-	/// </summary>
-	public static class JsScriptLoader
-	{
-		static readonly string s_streamingAssetsJsPath = Path.Combine(
-			Application.streamingAssetsPath,
-			"unity.js"
-		);
+  /// <summary>
+  /// Centralized utility for loading JS scripts from various sources.
+  /// </summary>
+  public static class JsScriptLoader
+  {
+    static readonly string s_streamingAssetsJsPath = Path.Combine(
+      Application.streamingAssetsPath,
+      "unity.js"
+    );
 
-		public static JsScriptLoadResult ValidateScriptId(string scriptId)
-		{
-			if (string.IsNullOrEmpty(scriptId))
-				return JsScriptLoadResult.Failure("Script ID cannot be empty");
+    public static JsScriptLoadResult ValidateScriptId(string scriptId)
+    {
+      if (string.IsNullOrEmpty(scriptId))
+        return JsScriptLoadResult.Failure("Script ID cannot be empty");
 
-			if (scriptId.Length > FixedString64Bytes.UTF8MaxLengthInBytes)
-				return JsScriptLoadResult.Failure("Script ID too long (max 64 bytes)");
+      if (scriptId.Length > FixedString64Bytes.UTF8MaxLengthInBytes)
+        return JsScriptLoadResult.Failure("Script ID too long (max 64 bytes)");
 
-			return JsScriptLoadResult.Success(
-				new FixedString64Bytes(scriptId),
-				JsScriptSourceType.STRING
-			);
-		}
+      return JsScriptLoadResult.Success(
+        new FixedString64Bytes(scriptId),
+        JsScriptSourceType.STRING
+      );
+    }
 
-		public static JsScriptLoadResult FromStreamingAssets(string relativePath)
-		{
-			if (string.IsNullOrEmpty(relativePath))
-				return JsScriptLoadResult.Failure("Relative path cannot be empty");
+    public static JsScriptLoadResult FromStreamingAssets(string relativePath)
+    {
+      if (string.IsNullOrEmpty(relativePath))
+        return JsScriptLoadResult.Failure("Relative path cannot be empty");
 
-			var normalized = NormalizePath(relativePath);
-			if (normalized.Length > FixedString64Bytes.UTF8MaxLengthInBytes)
-				return JsScriptLoadResult.Failure("Script ID too long (max 64 bytes)");
+      var normalized = NormalizePath(relativePath);
+      if (normalized.Length > FixedString64Bytes.UTF8MaxLengthInBytes)
+        return JsScriptLoadResult.Failure("Script ID too long (max 64 bytes)");
 
-			var filePath = Path.Combine(s_streamingAssetsJsPath, normalized + ".js");
+      var filePath = Path.Combine(s_streamingAssetsJsPath, normalized + ".js");
 
-			if (!File.Exists(filePath))
-				return JsScriptLoadResult.Failure($"File not found: {normalized}");
+      if (!File.Exists(filePath))
+        return JsScriptLoadResult.Failure($"File not found: {normalized}");
 
-			if (filePath.Length > FixedString512Bytes.UTF8MaxLengthInBytes)
-				return JsScriptLoadResult.Failure("File path too long (max 512 bytes)");
+      if (filePath.Length > FixedString512Bytes.UTF8MaxLengthInBytes)
+        return JsScriptLoadResult.Failure("File path too long (max 512 bytes)");
 
-			return JsScriptLoadResult.Success(
-				new FixedString64Bytes(normalized),
-				JsScriptSourceType.STREAMING_ASSETS,
-				filePath: new FixedString512Bytes(filePath)
-			);
-		}
+      return JsScriptLoadResult.Success(
+        new FixedString64Bytes(normalized),
+        JsScriptSourceType.STREAMING_ASSETS,
+        filePath: new FixedString512Bytes(filePath)
+      );
+    }
 
-		public static JsScriptLoadResult FromFile(string filePath)
-		{
-			if (string.IsNullOrEmpty(filePath))
-				return JsScriptLoadResult.Failure("File path cannot be empty");
+    public static JsScriptLoadResult FromFile(string filePath)
+    {
+      if (string.IsNullOrEmpty(filePath))
+        return JsScriptLoadResult.Failure("File path cannot be empty");
 
-			var resolvedPath = ResolvePath(filePath);
-			if (string.IsNullOrEmpty(resolvedPath))
-				return JsScriptLoadResult.Failure("Failed to resolve path");
+      var resolvedPath = ResolvePath(filePath);
+      if (string.IsNullOrEmpty(resolvedPath))
+        return JsScriptLoadResult.Failure("Failed to resolve path");
 
-			if (!File.Exists(resolvedPath))
-				return JsScriptLoadResult.Failure($"File not found: {filePath}");
+      if (!File.Exists(resolvedPath))
+        return JsScriptLoadResult.Failure($"File not found: {filePath}");
 
-			var scriptId = Path.GetFileNameWithoutExtension(resolvedPath);
-			if (string.IsNullOrEmpty(scriptId))
-				return JsScriptLoadResult.Failure("Could not extract script ID from path");
+      var scriptId = Path.GetFileNameWithoutExtension(resolvedPath);
+      if (string.IsNullOrEmpty(scriptId))
+        return JsScriptLoadResult.Failure("Could not extract script ID from path");
 
-			if (scriptId.Length > FixedString64Bytes.UTF8MaxLengthInBytes)
-				return JsScriptLoadResult.Failure("Script ID too long (max 64 bytes)");
+      if (scriptId.Length > FixedString64Bytes.UTF8MaxLengthInBytes)
+        return JsScriptLoadResult.Failure("Script ID too long (max 64 bytes)");
 
-			if (resolvedPath.Length > FixedString512Bytes.UTF8MaxLengthInBytes)
-				return JsScriptLoadResult.Failure("File path too long (max 512 bytes)");
+      if (resolvedPath.Length > FixedString512Bytes.UTF8MaxLengthInBytes)
+        return JsScriptLoadResult.Failure("File path too long (max 512 bytes)");
 
-			return JsScriptLoadResult.Success(
-				new FixedString64Bytes(scriptId),
-				JsScriptSourceType.FILE_PATH,
-				filePath: new FixedString512Bytes(resolvedPath)
-			);
-		}
+      return JsScriptLoadResult.Success(
+        new FixedString64Bytes(scriptId),
+        JsScriptSourceType.FILE_PATH,
+        filePath: new FixedString512Bytes(resolvedPath)
+      );
+    }
 
-		public static JsScriptLoadResult FromSearchPaths(string relativePath)
-		{
-			if (string.IsNullOrEmpty(relativePath))
-				return JsScriptLoadResult.Failure("Relative path cannot be empty");
+    public static JsScriptLoadResult FromSearchPaths(string relativePath)
+    {
+      if (string.IsNullOrEmpty(relativePath))
+        return JsScriptLoadResult.Failure("Relative path cannot be empty");
 
-			var normalized = NormalizePath(relativePath);
-			if (normalized.Length > FixedString64Bytes.UTF8MaxLengthInBytes)
-				return JsScriptLoadResult.Failure("Script ID too long (max 64 bytes)");
+      var normalized = NormalizePath(relativePath);
+      if (normalized.Length > FixedString64Bytes.UTF8MaxLengthInBytes)
+        return JsScriptLoadResult.Failure("Script ID too long (max 64 bytes)");
 
-			var relativeFilePath = normalized + ".js";
+      var relativeFilePath = normalized + ".js";
 
-			if (!JsScriptSearchPaths.TryFindScript(relativeFilePath, out var filePath, out _))
-				return JsScriptLoadResult.Failure($"File not found in any search path: {normalized}");
+      if (!JsScriptSearchPaths.TryFindScript(relativeFilePath, out var filePath, out _))
+        return JsScriptLoadResult.Failure($"File not found in any search path: {normalized}");
 
-			if (filePath.Length > FixedString512Bytes.UTF8MaxLengthInBytes)
-				return JsScriptLoadResult.Failure("File path too long (max 512 bytes)");
+      if (filePath.Length > FixedString512Bytes.UTF8MaxLengthInBytes)
+        return JsScriptLoadResult.Failure("File path too long (max 512 bytes)");
 
-			return JsScriptLoadResult.Success(
-				new FixedString64Bytes(normalized),
-				JsScriptSourceType.FILE_PATH,
-				filePath: new FixedString512Bytes(filePath)
-			);
-		}
+      return JsScriptLoadResult.Success(
+        new FixedString64Bytes(normalized),
+        JsScriptSourceType.FILE_PATH,
+        filePath: new FixedString512Bytes(filePath)
+      );
+    }
 
-		public static bool TryReadSource(in JsScriptLoadResult result, out string source)
-		{
-			source = null;
+    public static bool TryReadSource(in JsScriptLoadResult result, out string source)
+    {
+      source = null;
 
-			if (!result.isValid)
-				return false;
+      if (!result.isValid)
+        return false;
 
-			if (
-				result.sourceType != JsScriptSourceType.STREAMING_ASSETS
-				&& result.sourceType != JsScriptSourceType.FILE_PATH
-			)
-				return false;
+      if (
+        result.sourceType != JsScriptSourceType.STREAMING_ASSETS
+        && result.sourceType != JsScriptSourceType.FILE_PATH
+      )
+        return false;
 
-			var filePath = result.filePath.ToString();
-			if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
-				return false;
+      var filePath = result.filePath.ToString();
+      if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+        return false;
 
-			try
-			{
-				source = File.ReadAllText(filePath);
-				return true;
-			}
-			catch (Exception)
-			{
-				return false;
-			}
-		}
+      try
+      {
+        source = File.ReadAllText(filePath);
+        return true;
+      }
+      catch (Exception)
+      {
+        return false;
+      }
+    }
 
-		static string NormalizePath(string path)
-		{
-			if (string.IsNullOrEmpty(path))
-				return string.Empty;
+    static string NormalizePath(string path)
+    {
+      if (string.IsNullOrEmpty(path))
+        return string.Empty;
 
-			var normalized = path.Replace('\\', '/').Trim('/');
+      var normalized = path.Replace('\\', '/').Trim('/');
 
-			if (normalized.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
-				normalized = normalized[..^3];
+      if (normalized.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+        normalized = normalized[..^3];
 
-			return normalized;
-		}
+      return normalized;
+    }
 
-		static string ResolvePath(string path)
-		{
-			if (string.IsNullOrEmpty(path))
-				return null;
+    static string ResolvePath(string path)
+    {
+      if (string.IsNullOrEmpty(path))
+        return null;
 
-			if (Path.IsPathRooted(path))
-				return path;
+      if (Path.IsPathRooted(path))
+        return path;
 
-			var fromProject = Path.Combine(Application.dataPath, "..", path);
-			if (File.Exists(fromProject))
-				return Path.GetFullPath(fromProject);
+      var fromProject = Path.Combine(Application.dataPath, "..", path);
+      if (File.Exists(fromProject))
+        return Path.GetFullPath(fromProject);
 
-			var fromAssets = Path.Combine(Application.dataPath, path);
-			if (File.Exists(fromAssets))
-				return Path.GetFullPath(fromAssets);
+      var fromAssets = Path.Combine(Application.dataPath, path);
+      if (File.Exists(fromAssets))
+        return Path.GetFullPath(fromAssets);
 
-			return Path.GetFullPath(path);
-		}
-	}
+      return Path.GetFullPath(path);
+    }
+  }
 }

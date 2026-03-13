@@ -1,224 +1,294 @@
 namespace UnityJS.QJS
 {
-	using System;
-	using System.Runtime.InteropServices;
+  using System;
+  using System.Runtime.InteropServices;
 
-	/// <summary>
-	/// QuickJS tagged value. 128-bit on 64-bit platforms: { JSValueUnion u; int64_t tag; }
-	/// </summary>
-	[StructLayout(LayoutKind.Sequential)]
-	public struct JSValue : IEquatable<JSValue>
-	{
-		public long u;
-		public long tag;
+  /// <summary>
+  /// QuickJS tagged value. 128-bit on 64-bit platforms: { JSValueUnion u; int64_t tag; }
+  /// </summary>
+  [StructLayout(LayoutKind.Sequential)]
+  public struct JSValue : IEquatable<JSValue>
+  {
+    public long u;
+    public long tag;
 
-		public readonly bool Equals(JSValue other) => u == other.u && tag == other.tag;
-		public override readonly bool Equals(object obj) => obj is JSValue v && Equals(v);
-		public override readonly int GetHashCode() => HashCode.Combine(u, tag);
-		public static bool operator ==(JSValue a, JSValue b) => a.Equals(b);
-		public static bool operator !=(JSValue a, JSValue b) => !a.Equals(b);
-	}
+    public readonly bool Equals(JSValue other) => u == other.u && tag == other.tag;
 
-	public struct JSRuntime : IEquatable<JSRuntime>
-	{
-		public nuint Handle;
-		public readonly bool IsNull => Handle == 0;
-		public readonly bool Equals(JSRuntime other) => Handle == other.Handle;
-		public override readonly bool Equals(object obj) => obj is JSRuntime r && Equals(r);
-		public override readonly int GetHashCode() => Handle.GetHashCode();
-	}
+    public override readonly bool Equals(object obj) => obj is JSValue v && Equals(v);
 
-	public struct JSContext : IEquatable<JSContext>
-	{
-		public nuint Handle;
-		public readonly bool IsNull => Handle == 0;
-		public readonly bool Equals(JSContext other) => Handle == other.Handle;
-		public override readonly bool Equals(object obj) => obj is JSContext c && Equals(c);
-		public override readonly int GetHashCode() => Handle.GetHashCode();
-	}
+    public override readonly int GetHashCode() => HashCode.Combine(u, tag);
 
-	public unsafe delegate JSValue JSCFunction(JSContext ctx, JSValue thisVal, int argc, JSValue* argv);
-	public unsafe delegate byte* JSModuleNormalizeFunc(JSContext ctx, byte* base_name, byte* name, void* opaque);
-	public unsafe delegate JSValue JSModuleLoaderFunc(JSContext ctx, byte* name, void* opaque);
+    public static bool operator ==(JSValue a, JSValue b) => a.Equals(b);
 
-	public struct JSModuleDef
-	{
-		public nuint Handle;
-	}
+    public static bool operator !=(JSValue a, JSValue b) => !a.Equals(b);
+  }
 
-	public static class QJS
-	{
-		const string Lib = "qjs";
-		const CallingConvention CC = CallingConvention.Cdecl;
+  public struct JSRuntime : IEquatable<JSRuntime>
+  {
+    public nuint Handle;
+    public readonly bool IsNull => Handle == 0;
 
-		// ── Tag constants (from quickjs.h) ──
-		public const long JS_TAG_INT = 0;
-		public const long JS_TAG_BOOL = 1;
-		public const long JS_TAG_NULL = 2;
-		public const long JS_TAG_UNDEFINED = 3;
-		public const long JS_TAG_EXCEPTION = 6;
-		public const long JS_TAG_FLOAT64 = 8;
-		public const long JS_TAG_OBJECT = -1;
-		public const long JS_TAG_STRING = -7;
-		public const long JS_TAG_SYMBOL = -8;
-		public const long JS_TAG_BIG_INT = -9;
+    public readonly bool Equals(JSRuntime other) => Handle == other.Handle;
 
-		// ── Eval flags ──
-		public const int JS_EVAL_TYPE_GLOBAL = 0;
-		public const int JS_EVAL_TYPE_MODULE = 1;
-		public const int JS_EVAL_FLAG_COMPILE_ONLY = 1 << 5;
+    public override readonly bool Equals(object obj) => obj is JSRuntime r && Equals(r);
 
-		// ── Inline reimplementations (NOT exported from .so) ──
+    public override readonly int GetHashCode() => Handle.GetHashCode();
+  }
 
-		public static JSValue JS_MKVAL(long tag, int val) => new() { u = val, tag = tag };
-		public static JSValue JS_NULL => JS_MKVAL(JS_TAG_NULL, 0);
-		public static JSValue JS_UNDEFINED => JS_MKVAL(JS_TAG_UNDEFINED, 0);
-		public static JSValue JS_TRUE => JS_MKVAL(JS_TAG_BOOL, 1);
-		public static JSValue JS_FALSE => JS_MKVAL(JS_TAG_BOOL, 0);
+  public struct JSContext : IEquatable<JSContext>
+  {
+    public nuint Handle;
+    public readonly bool IsNull => Handle == 0;
 
-		public static bool IsException(JSValue v) => v.tag == JS_TAG_EXCEPTION;
-		public static bool IsNumber(JSValue v) => v.tag == JS_TAG_INT || v.tag == JS_TAG_FLOAT64;
-		public static bool IsString(JSValue v) => v.tag == JS_TAG_STRING;
-		public static bool IsObject(JSValue v) => v.tag == JS_TAG_OBJECT;
-		public static bool IsUndefined(JSValue v) => v.tag == JS_TAG_UNDEFINED;
-		public static bool IsNull(JSValue v) => v.tag == JS_TAG_NULL;
-		public static bool IsBool(JSValue v) => v.tag == JS_TAG_BOOL;
+    public readonly bool Equals(JSContext other) => Handle == other.Handle;
 
-		public static JSValue NewInt32(JSContext ctx, int val) => JS_MKVAL(JS_TAG_INT, val);
-		public static JSValue NewBool(JSContext ctx, bool val) => JS_MKVAL(JS_TAG_BOOL, val ? 1 : 0);
-		public static JSValue JS_NewBool(JSContext ctx, int val) => JS_MKVAL(JS_TAG_BOOL, val);
+    public override readonly bool Equals(object obj) => obj is JSContext c && Equals(c);
 
-		public static unsafe JSValue NewFloat64(JSContext ctx, double val)
-		{
-			JSValue v;
-			v.tag = JS_TAG_FLOAT64;
-			v.u = *(long*)&val;
-			return v;
-		}
+    public override readonly int GetHashCode() => Handle.GetHashCode();
+  }
 
-		// ── Exported functions (DllImport) ──
+  public unsafe delegate JSValue JSCFunction(
+    JSContext ctx,
+    JSValue thisVal,
+    int argc,
+    JSValue* argv
+  );
+  public unsafe delegate byte* JSModuleNormalizeFunc(
+    JSContext ctx,
+    byte* base_name,
+    byte* name,
+    void* opaque
+  );
+  public unsafe delegate JSValue JSModuleLoaderFunc(JSContext ctx, byte* name, void* opaque);
 
-		// Runtime lifecycle
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern JSRuntime JS_NewRuntime();
+  public struct JSModuleDef
+  {
+    public nuint Handle;
+  }
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern void JS_FreeRuntime(JSRuntime rt);
+  public static class QJS
+  {
+    const string Lib = "qjs";
+    const CallingConvention CC = CallingConvention.Cdecl;
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern JSContext JS_NewContext(JSRuntime rt);
+    // ── Tag constants (from quickjs.h) ──
+    public const long JS_TAG_INT = 0;
+    public const long JS_TAG_BOOL = 1;
+    public const long JS_TAG_NULL = 2;
+    public const long JS_TAG_UNDEFINED = 3;
+    public const long JS_TAG_EXCEPTION = 6;
+    public const long JS_TAG_FLOAT64 = 8;
+    public const long JS_TAG_OBJECT = -1;
+    public const long JS_TAG_STRING = -7;
+    public const long JS_TAG_SYMBOL = -8;
+    public const long JS_TAG_BIG_INT = -9;
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern JSRuntime JS_GetRuntime(JSContext ctx);
+    // ── Eval flags ──
+    public const int JS_EVAL_TYPE_GLOBAL = 0;
+    public const int JS_EVAL_TYPE_MODULE = 1;
+    public const int JS_EVAL_FLAG_COMPILE_ONLY = 1 << 5;
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern void JS_FreeContext(JSContext ctx);
+    // ── Inline reimplementations (NOT exported from .so) ──
 
-		// Eval
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern unsafe JSValue JS_Eval(
-			JSContext ctx, byte* input, nint input_len, byte* filename, int eval_flags);
+    public static JSValue JS_MKVAL(long tag, int val) => new() { u = val, tag = tag };
 
-		// Module loader
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern unsafe void JS_SetModuleLoaderFunc(
-			JSRuntime rt, nint normalize_func, nint loader_func, void* opaque);
+    public static JSValue JS_NULL => JS_MKVAL(JS_TAG_NULL, 0);
+    public static JSValue JS_UNDEFINED => JS_MKVAL(JS_TAG_UNDEFINED, 0);
+    public static JSValue JS_TRUE => JS_MKVAL(JS_TAG_BOOL, 1);
+    public static JSValue JS_FALSE => JS_MKVAL(JS_TAG_BOOL, 0);
 
-		// Value creation (exported ones only)
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern unsafe JSValue JS_NewStringLen(JSContext ctx, byte* str, nint len);
+    public static bool IsException(JSValue v) => v.tag == JS_TAG_EXCEPTION;
 
-		public static unsafe JSValue JS_NewString(JSContext ctx, byte* str)
-		{
-			int len = 0;
-			if (str != null) while (str[len] != 0) len++;
-			return JS_NewStringLen(ctx, str, len);
-		}
+    public static bool IsNumber(JSValue v) => v.tag == JS_TAG_INT || v.tag == JS_TAG_FLOAT64;
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern JSValue JS_NewObject(JSContext ctx);
+    public static bool IsString(JSValue v) => v.tag == JS_TAG_STRING;
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern JSValue JS_NewArray(JSContext ctx);
+    public static bool IsObject(JSValue v) => v.tag == JS_TAG_OBJECT;
 
-		public static JSValue JS_NewInt64(JSContext ctx, long val)
-		{
-			if (val >= int.MinValue && val <= int.MaxValue)
-				return NewInt32(ctx, (int)val);
-			return NewFloat64(ctx, (double)val);
-		}
+    public static bool IsUndefined(JSValue v) => v.tag == JS_TAG_UNDEFINED;
 
-		// Value extraction
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern unsafe int JS_ToInt32(JSContext ctx, int* pres, JSValue val);
+    public static bool IsNull(JSValue v) => v.tag == JS_TAG_NULL;
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern unsafe int JS_ToInt64(JSContext ctx, long* pres, JSValue val);
+    public static bool IsBool(JSValue v) => v.tag == JS_TAG_BOOL;
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern unsafe int JS_ToFloat64(JSContext ctx, double* pres, JSValue val);
+    public static JSValue NewInt32(JSContext ctx, int val) => JS_MKVAL(JS_TAG_INT, val);
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern int JS_ToBool(JSContext ctx, JSValue val);
+    public static JSValue NewBool(JSContext ctx, bool val) => JS_MKVAL(JS_TAG_BOOL, val ? 1 : 0);
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern unsafe byte* JS_ToCStringLen2(JSContext ctx, nint* plen, JSValue val, int cesu8);
+    public static JSValue JS_NewBool(JSContext ctx, int val) => JS_MKVAL(JS_TAG_BOOL, val);
 
-		public static unsafe byte* JS_ToCString(JSContext ctx, JSValue val)
-			=> JS_ToCStringLen2(ctx, null, val, 0);
+    public static unsafe JSValue NewFloat64(JSContext ctx, double val)
+    {
+      JSValue v;
+      v.tag = JS_TAG_FLOAT64;
+      v.u = *(long*)&val;
+      return v;
+    }
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern unsafe void JS_FreeCString(JSContext ctx, byte* ptr);
+    // ── Exported functions (DllImport) ──
 
-		// Properties
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern unsafe JSValue JS_GetPropertyStr(
-			JSContext ctx, JSValue this_obj, byte* prop);
+    // Runtime lifecycle
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern JSRuntime JS_NewRuntime();
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern unsafe int JS_SetPropertyStr(
-			JSContext ctx, JSValue this_obj, byte* prop, JSValue val);
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern void JS_FreeRuntime(JSRuntime rt);
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern JSValue JS_GetPropertyUint32(
-			JSContext ctx, JSValue this_obj, uint idx);
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern JSContext JS_NewContext(JSRuntime rt);
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern int JS_SetPropertyUint32(
-			JSContext ctx, JSValue this_obj, uint idx, JSValue val);
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern JSRuntime JS_GetRuntime(JSContext ctx);
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern JSValue JS_GetGlobalObject(JSContext ctx);
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern void JS_FreeContext(JSContext ctx);
 
-		// Functions
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern unsafe JSValue JS_NewCFunction2(
-			JSContext ctx, nint func, byte* name, int length, int cproto, int magic);
+    // Eval
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe JSValue JS_Eval(
+      JSContext ctx,
+      byte* input,
+      nint input_len,
+      byte* filename,
+      int eval_flags
+    );
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern unsafe JSValue JS_Call(
-			JSContext ctx, JSValue func_obj, JSValue this_obj, int argc, JSValue* argv);
+    // Module loader
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe void JS_SetModuleLoaderFunc(
+      JSRuntime rt,
+      nint normalize_func,
+      nint loader_func,
+      void* opaque
+    );
 
-		// Lifecycle
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern void JS_FreeValue(JSContext ctx, JSValue val);
+    // Value creation (exported ones only)
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe JSValue JS_NewStringLen(JSContext ctx, byte* str, nint len);
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern JSValue JS_DupValue(JSContext ctx, JSValue val);
+    public static unsafe JSValue JS_NewString(JSContext ctx, byte* str)
+    {
+      int len = 0;
+      if (str != null)
+        while (str[len] != 0)
+          len++;
+      return JS_NewStringLen(ctx, str, len);
+    }
 
-		// Type checks (exported)
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern int JS_IsArray(JSContext ctx, JSValue val);
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern JSValue JS_NewObject(JSContext ctx);
 
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern int JS_IsFunction(JSContext ctx, JSValue val);
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern JSValue JS_NewArray(JSContext ctx);
 
-		// Exceptions
-		[DllImport(Lib, CallingConvention = CC)]
-		public static extern JSValue JS_GetException(JSContext ctx);
+    public static JSValue JS_NewInt64(JSContext ctx, long val)
+    {
+      if (val >= int.MinValue && val <= int.MaxValue)
+        return NewInt32(ctx, (int)val);
+      return NewFloat64(ctx, (double)val);
+    }
 
-		// Convenience
-		public static unsafe JSValue JS_NewCFunction(JSContext ctx, nint func, byte* name, int length)
-			=> JS_NewCFunction2(ctx, func, name, length, 0, 0);
-	}
+    // Value extraction
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe int JS_ToInt32(JSContext ctx, int* pres, JSValue val);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe int JS_ToInt64(JSContext ctx, long* pres, JSValue val);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe int JS_ToFloat64(JSContext ctx, double* pres, JSValue val);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern int JS_ToBool(JSContext ctx, JSValue val);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe byte* JS_ToCStringLen2(
+      JSContext ctx,
+      nint* plen,
+      JSValue val,
+      int cesu8
+    );
+
+    public static unsafe byte* JS_ToCString(JSContext ctx, JSValue val) =>
+      JS_ToCStringLen2(ctx, null, val, 0);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe void JS_FreeCString(JSContext ctx, byte* ptr);
+
+    // Properties
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe JSValue JS_GetPropertyStr(
+      JSContext ctx,
+      JSValue this_obj,
+      byte* prop
+    );
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe int JS_SetPropertyStr(
+      JSContext ctx,
+      JSValue this_obj,
+      byte* prop,
+      JSValue val
+    );
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern JSValue JS_GetPropertyUint32(JSContext ctx, JSValue this_obj, uint idx);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern int JS_SetPropertyUint32(
+      JSContext ctx,
+      JSValue this_obj,
+      uint idx,
+      JSValue val
+    );
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern JSValue JS_GetGlobalObject(JSContext ctx);
+
+    // Functions
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe JSValue JS_NewCFunction2(
+      JSContext ctx,
+      nint func,
+      byte* name,
+      int length,
+      int cproto,
+      int magic
+    );
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe JSValue JS_Call(
+      JSContext ctx,
+      JSValue func_obj,
+      JSValue this_obj,
+      int argc,
+      JSValue* argv
+    );
+
+    // Lifecycle
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern void JS_FreeValue(JSContext ctx, JSValue val);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern JSValue JS_DupValue(JSContext ctx, JSValue val);
+
+    // Type checks (exported)
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern int JS_IsArray(JSContext ctx, JSValue val);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern int JS_IsFunction(JSContext ctx, JSValue val);
+
+    // Exceptions
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern JSValue JS_GetException(JSContext ctx);
+
+    // Convenience
+    public static unsafe JSValue JS_NewCFunction(
+      JSContext ctx,
+      nint func,
+      byte* name,
+      int length
+    ) => JS_NewCFunction2(ctx, func, name, length, 0, 0);
+  }
 }

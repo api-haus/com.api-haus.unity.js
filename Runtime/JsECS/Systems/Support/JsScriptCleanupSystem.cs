@@ -1,81 +1,81 @@
 namespace UnityJS.Entities.Systems.Support
 {
-	using Components;
-	using UnityJS.Runtime;
-	using Unity.Collections;
-	using Unity.Entities;
-	using Unity.Logging;
+  using Components;
+  using Unity.Collections;
+  using Unity.Entities;
+  using Unity.Logging;
+  using UnityJS.Runtime;
 
-	[UpdateInGroup(typeof(InitializationSystemGroup))]
-	[UpdateAfter(typeof(JsScriptFulfillmentSystem))]
-	public partial class JsScriptCleanupSystem : SystemBase
-	{
-		JsRuntimeManager m_Vm;
+  [UpdateInGroup(typeof(InitializationSystemGroup))]
+  [UpdateAfter(typeof(JsScriptFulfillmentSystem))]
+  public partial class JsScriptCleanupSystem : SystemBase
+  {
+    JsRuntimeManager m_Vm;
 
-		protected override void OnStartRunning()
-		{
-			m_Vm = JsRuntimeManager.Instance ?? JsRuntimeManager.GetOrCreate();
-		}
+    protected override void OnStartRunning()
+    {
+      m_Vm = JsRuntimeManager.Instance ?? JsRuntimeManager.GetOrCreate();
+    }
 
-		protected override void OnUpdate()
-		{
-			if (m_Vm == null || !m_Vm.IsValid)
-			{
-				if (JsRuntimeManager.Instance != null && JsRuntimeManager.Instance.IsValid)
-					m_Vm = JsRuntimeManager.Instance;
-				else
-					return;
-			}
+    protected override void OnUpdate()
+    {
+      if (m_Vm == null || !m_Vm.IsValid)
+      {
+        if (JsRuntimeManager.Instance != null && JsRuntimeManager.Instance.IsValid)
+          m_Vm = JsRuntimeManager.Instance;
+        else
+          return;
+      }
 
-			var vm = m_Vm;
-			var entityManager = EntityManager;
+      var vm = m_Vm;
+      var entityManager = EntityManager;
 
-			var query = GetEntityQuery(
-				ComponentType.Exclude<JsEntityId>(),
-				ComponentType.ReadWrite<JsScript>()
-			);
+      var query = GetEntityQuery(
+        ComponentType.Exclude<JsEntityId>(),
+        ComponentType.ReadWrite<JsScript>()
+      );
 
-			if (query.IsEmptyIgnoreFilter)
-				return;
+      if (query.IsEmptyIgnoreFilter)
+        return;
 
-			var entities = query.ToEntityArray(Allocator.Temp);
+      var entities = query.ToEntityArray(Allocator.Temp);
 
-			if (entities.Length > 0)
-			{
-				Log.Verbose("[JsCleanup] Found {0} entities for cleanup", entities.Length);
-			}
+      if (entities.Length > 0)
+      {
+        Log.Verbose("[JsCleanup] Found {0} entities for cleanup", entities.Length);
+      }
 
-			for (var i = 0; i < entities.Length; i++)
-			{
-				var scripts = entityManager.GetBuffer<JsScript>(entities[i]);
+      for (var i = 0; i < entities.Length; i++)
+      {
+        var scripts = entityManager.GetBuffer<JsScript>(entities[i]);
 
-				for (var j = 0; j < scripts.Length; j++)
-				{
-					var script = scripts[j];
+        for (var j = 0; j < scripts.Length; j++)
+        {
+          var script = scripts[j];
 
-					if (script.stateRef < 0 || script.disabled)
-						continue;
+          if (script.stateRef < 0 || script.disabled)
+            continue;
 
-					var scriptName = script.scriptName.ToString();
+          var scriptName = script.scriptName.ToString();
 
-					vm.CallFunction(scriptName, "onDestroy", script.stateRef);
+          vm.CallFunction(scriptName, "onDestroy", script.stateRef);
 
-					Log.Verbose(
-						"[JsCleanup] Releasing state for {0}:{1} ref={2}",
-						scriptName,
-						script.entityIndex,
-						script.stateRef
-					);
-					vm.ReleaseEntityState(script.stateRef);
-				}
+          Log.Verbose(
+            "[JsCleanup] Releasing state for {0}:{1} ref={2}",
+            scriptName,
+            script.entityIndex,
+            script.stateRef
+          );
+          vm.ReleaseEntityState(script.stateRef);
+        }
 
-				Log.Verbose("[JsCleanup] Destroying entity {0}", entities[i].Index);
-				entityManager.DestroyEntity(entities[i]);
+        Log.Verbose("[JsCleanup] Destroying entity {0}", entities[i].Index);
+        entityManager.DestroyEntity(entities[i]);
 
-				entityManager.RemoveComponent<JsScript>(entities[i]);
-			}
+        entityManager.RemoveComponent<JsScript>(entities[i]);
+      }
 
-			entities.Dispose();
-		}
-	}
+      entities.Dispose();
+    }
+  }
 }

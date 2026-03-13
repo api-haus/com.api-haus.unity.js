@@ -1,8 +1,8 @@
 namespace UnityJS.Entities.Components
 {
-	using Unity.Entities;
+  using Unity.Entities;
 
-	public struct AgentTag : IComponentData { }
+  public struct AgentTag : IComponentData { }
 
-	public struct FruitTag : IComponentData { }
+  public struct FruitTag : IComponentData { }
 }
