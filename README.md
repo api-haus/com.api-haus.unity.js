@@ -178,37 +178,14 @@ SlimeWanderConfig.set(eid, cfg);
 | `entities.hasScript(eid, scriptName)`      | Check if entity has script      |
 | `entities.removeComponent(eid, name)`      | Remove component from entity    |
 
-### `transform`
-
-| Function                                      | Description                |
-| --------------------------------------------- | -------------------------- |
-| `transform.getPosition(eid)`                  | Returns `float3`           |
-| `transform.setPosition(eid, x, y, z)`         | Set world position         |
-| `transform.getRotation(eid)`                  | Returns euler `float3`     |
-| `transform.moveToward(eid, target, speed)`    | Move toward entity or vec3 |
-
-### `spatial`
-
-| Function                             | Description                         |
-| ------------------------------------ | ----------------------------------- |
-| `spatial.distance(a, b)`            | Distance (entity or float3)         |
-| `spatial.queryNear(center, radius)`  | Returns array of nearby entity IDs  |
-| `spatial.getEntityCount()`           | Total entity count                  |
-
 ### `input`
 
-| Function                      | Description                              |
-| ----------------------------- | ---------------------------------------- |
-| `input.read_value(action)`    | Read action value (`number`/`float3`/`boolean`) |
-| `input.was_pressed(action)`   | True if pressed this frame               |
-| `input.is_held(action)`       | True if currently held                   |
-| `input.was_released(action)`  | True if released this frame              |
-
-### `events`
-
-| Function                                    | Description                       |
-| ------------------------------------------- | --------------------------------- |
-| `events.sendAttack(source, target, damage)` | Queue attack event on target      |
+| Function                       | Description                              |
+| ------------------------------ | ---------------------------------------- |
+| `input.readValue(action)`      | Read action value (`number`/`float3`/`boolean`) |
+| `input.wasPressed(action)`     | True if pressed this frame               |
+| `input.isHeld(action)`         | True if currently held                   |
+| `input.wasReleased(action)`    | True if released this frame              |
 
 ### `draw`
 
@@ -217,15 +194,15 @@ SlimeWanderConfig.set(eid, cfg);
 | `draw.line(from, to)`                     | Debug line                     |
 | `draw.ray(origin, direction)`             | Debug ray                      |
 | `draw.arrow(from, to)`                    | Debug arrow                    |
-| `draw.wire_sphere(center, radius)`        | Wireframe sphere               |
-| `draw.wire_box(center, size)`             | Wireframe box                  |
-| `draw.wire_capsule(start, end_pos, r)`    | Wireframe capsule              |
-| `draw.solid_box(center, size)`            | Solid box                      |
-| `draw.solid_circle(center, normal, r)`    | Solid circle                   |
-| `draw.circle_xz(center, radius)`          | Circle on XZ plane             |
-| `draw.label_2d(position, text)`           | 2D text label                  |
-| `draw.set_color(r, g, b, a?)`            | Set draw color                 |
-| `draw.with_duration(duration)`            | Set duration for next draws    |
+| `draw.wireSphere(center, radius)`         | Wireframe sphere               |
+| `draw.wireBox(center, size)`              | Wireframe box                  |
+| `draw.wireCapsule(start, end, r)`         | Wireframe capsule              |
+| `draw.solidBox(center, size)`             | Solid box                      |
+| `draw.solidCircle(center, normal, r)`     | Solid circle                   |
+| `draw.circleXz(center, radius)`           | Circle on XZ plane             |
+| `draw.label2d(position, text)`            | 2D text label                  |
+| `draw.setColor(r, g, b, a?)`             | Set draw color                 |
+| `draw.withDuration(duration)`             | Set duration for next draws    |
 
 ### `math`
 
