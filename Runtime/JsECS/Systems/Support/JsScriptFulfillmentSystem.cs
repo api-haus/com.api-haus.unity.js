@@ -27,6 +27,7 @@ namespace UnityJS.Entities.Systems.Support
 		protected override void OnStartRunning()
 		{
 			m_Vm = JsRuntimeManager.Instance ?? JsRuntimeManager.GetOrCreate();
+			JsScriptSearchPaths.Initialize();
 
 			m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
 		}
@@ -108,20 +109,15 @@ namespace UnityJS.Entities.Systems.Support
 						continue;
 					}
 
-					if (!JsScriptPathUtility.ScriptExists(scriptName))
+					if (!JsScriptSourceRegistry.TryReadScript(scriptName, out var source, out var resolvedId))
 					{
-						Log.Error(
-							"[JsFulfillment] Script file missing: {0}",
-							JsScriptPathUtility.GetScriptFilePath(scriptName)
-						);
+						Log.Error("[JsFulfillment] Script not found in any source: {0}", scriptName);
 						request.fulfilled = true;
 						requests[i] = request;
 						continue;
 					}
 
-		var scriptPath = JsScriptPathUtility.GetScriptFilePath(scriptName);
-					var source = System.IO.File.ReadAllText(scriptPath);
-					if (!m_Vm.LoadScriptAsModule(scriptName, source, scriptPath))
+					if (!m_Vm.LoadScriptAsModule(scriptName, source, resolvedId))
 					{
 						Log.Error("[JsFulfillment] Failed to load script: {0}", scriptName);
 						request.fulfilled = true;

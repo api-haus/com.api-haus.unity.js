@@ -126,7 +126,7 @@ namespace JsGameCodegen
                 }
 
                 if (string.IsNullOrEmpty(jsName))
-                    jsName = SnakeCaseHelper.ToSnakeCase(symbol.Name);
+                    jsName = symbol.Name;
 
                 var fields = GetSupportedFields(symbol, needAccessors, needSetters, ct);
                 if (fields.Length == 0)
@@ -198,7 +198,7 @@ namespace JsGameCodegen
             }
 
             if (string.IsNullOrEmpty(jsName))
-                jsName = SnakeCaseHelper.ToSnakeCase(targetType.Name);
+                jsName = targetType.Name;
 
             var fields = GetSupportedFields(targetType, needAccessors, needSetters, ct);
             if (fields.Length == 0)
@@ -274,7 +274,7 @@ namespace JsGameCodegen
                 if (jsType == JsFieldType.Enum)
                     enumTypeName = field.Type.ToDisplayString();
                 var desc = DocExtractor.GetSummary(field, ct);
-                builder.Add(new FieldInfo(field.Name, SnakeCaseHelper.ToSnakeCase(field.Name), jsType, needAccessors, needSetters, enumTypeName, desc));
+                builder.Add(new FieldInfo(field.Name, field.Name, jsType, needAccessors, needSetters, enumTypeName, desc));
             }
             return builder.ToImmutable();
         }
@@ -372,18 +372,19 @@ namespace JsGameCodegen
                 EmitByteArray(sb, "s_get", "get");
             if (needSetters)
                 EmitByteArray(sb, "s_set", "set");
+            EmitByteArray(sb, "s___name", "__name");
             sb.AppendLine();
 
-            // Auto-register
+            // Auto-register (deferred — TypeManager may not be initialized yet at AfterAssembliesLoaded)
             sb.AppendLine("#if UNITY_EDITOR");
             sb.AppendLine("\t\t[UnityEditor.InitializeOnLoadMethod]");
             sb.AppendLine("#endif");
             sb.AppendLine("\t\t[UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.AfterAssembliesLoaded)]");
             sb.AppendLine("\t\tstatic void AutoRegister()");
             sb.AppendLine("\t\t{");
-            sb.AppendLine("\t\t\tJsComponentRegistry.RegisterBridge(");
+            sb.AppendLine("\t\t\tJsComponentRegistry.RegisterBridgeDeferred(");
             sb.AppendLine("\t\t\t\t\"" + jsName + "\",");
-            sb.AppendLine("\t\t\t\tComponentType.ReadWrite<" + fullTypeName + ">(),");
+            sb.AppendLine("\t\t\t\t() => ComponentType.ReadWrite<" + fullTypeName + ">(),");
             sb.AppendLine("\t\t\t\tRegister,");
             sb.AppendLine("\t\t\t\tUpdateLookup");
             sb.AppendLine("\t\t\t);");
@@ -412,8 +413,11 @@ namespace JsGameCodegen
             }
             sb.AppendLine("\t\t\tvar global = QJS.JS_GetGlobalObject(ctx);");
             sb.AppendLine("\t\t\tvar pNameBytes = System.Text.Encoding.UTF8.GetBytes(\"" + jsName + "\\0\");");
-            sb.AppendLine("\t\t\tfixed (byte* pName = pNameBytes)");
+            sb.AppendLine("\t\t\tfixed (byte* pName = pNameBytes, pN = s___name)");
+            sb.AppendLine("\t\t\t{");
+            sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pN, QJS.JS_NewString(ctx, pName));");
             sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, global, pName, ns);");
+            sb.AppendLine("\t\t\t}");
             sb.AppendLine("\t\t\tQJS.JS_FreeValue(ctx, global);");
             sb.AppendLine("\t\t}");
             sb.AppendLine();

@@ -19,6 +19,10 @@ namespace UnityJS.Entities.PlayModeTests
 		World m_World;
 		EntityManager m_EntityManager;
 
+
+		static readonly string s_testsPath = System.IO.Path.Combine(
+			Application.streamingAssetsPath, "unity.js", "tests");
+
 		[UnitySetUp]
 		public IEnumerator SetUp()
 		{
@@ -28,6 +32,8 @@ namespace UnityJS.Entities.PlayModeTests
 			m_Vm = JsRuntimeManager.GetOrCreate();
 			m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
 			JsECSBridge.Initialize(m_World);
+
+			JsScriptSearchPaths.AddSearchPath(s_testsPath, priority: 0);
 
 			if (!JsEntityRegistry.IsCreated)
 				JsEntityRegistry.Initialize(16);
@@ -46,6 +52,7 @@ namespace UnityJS.Entities.PlayModeTests
 		public IEnumerator TearDown()
 		{
 			JsEntityRegistry.Clear();
+			JsScriptSearchPaths.RemoveSearchPath(s_testsPath);
 			var query = m_EntityManager.CreateEntityQuery(typeof(JsEntityId));
 			m_EntityManager.DestroyEntity(query);
 

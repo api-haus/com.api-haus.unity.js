@@ -19,6 +19,56 @@ namespace UnityJS.Entities.Systems
 	[UpdateAfter(typeof(JsScriptingSystem))]
 	public partial class JsSystemRunner : SystemBase
 	{
+		const string QueryBuilderSource = @"
+const _nativeQuery = globalThis.ecs.query;
+globalThis.ecs.query = function() {
+  return new QueryBuilder([], []);
+};
+
+function QueryBuilder(all, none) {
+  this._all = all;
+  this._none = none;
+}
+
+QueryBuilder.prototype.withAll = function(...accessors) {
+  return new QueryBuilder([...this._all, ...accessors], this._none);
+};
+
+QueryBuilder.prototype.withNone = function(...accessors) {
+  return new QueryBuilder(this._all, [...this._none, ...accessors]);
+};
+
+QueryBuilder.prototype.build = function() {
+  const accessors = this._all;
+  const allNames = accessors.map(a => a.__name);
+  const noneNames = this._none.map(a => a.__name);
+  return new BuiltQuery(accessors, allNames, noneNames);
+};
+
+function BuiltQuery(accessors, allNames, noneNames) {
+  this._accessors = accessors;
+  this._allNames = allNames;
+  this._noneNames = noneNames;
+}
+
+BuiltQuery.prototype[Symbol.iterator] = function() {
+  const accessors = this._accessors;
+  const entities = this._noneNames.length > 0
+    ? _nativeQuery({ all: this._allNames, none: this._noneNames })
+    : _nativeQuery(...this._allNames);
+  let i = 0;
+  return {
+    next() {
+      if (i >= entities.length) return { done: true, value: undefined };
+      const eid = entities[i++];
+      const tuple = [eid];
+      for (let j = 0; j < accessors.length; j++) tuple.push(accessors[j].get(eid));
+      return { done: false, value: tuple };
+    }
+  };
+};
+";
+
 		JsRuntimeManager m_Vm;
 		readonly List<string> m_SystemNames = new();
 		readonly Dictionary<string, int> m_SystemStateRefs = new();
@@ -66,6 +116,7 @@ namespace UnityJS.Entities.Systems
 			m_Vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
 			m_Vm.RegisterBridgeNow(JsComponentStore.Register);
 			m_BridgesRegistered = true;
+			m_Vm.LoadScriptFromString("__ecs_query_builder", QueryBuilderSource);
 
 			var scriptingSystem = World.GetOrCreateSystemManaged<JsScriptingSystem>();
 			JsECSBridge.Initialize(World);
@@ -90,30 +141,32 @@ namespace UnityJS.Entities.Systems
 
 		void DiscoverAndLoadSystems()
 		{
-			var systemsPath = Path.Combine(Application.streamingAssetsPath, "js", "systems");
-			if (!Directory.Exists(systemsPath))
+			JsScriptSearchPaths.Initialize();
+			var systems = JsScriptSourceRegistry.DiscoverAllSystems();
+			if (systems.Count == 0)
 			{
-				Log.Warning("[JsSystemRunner] No systems directory at {0}", systemsPath);
+				Log.Warning("[JsSystemRunner] No system scripts found in any registered source");
 				ref var manifest = ref SystemAPI.GetSingletonRW<JsSystemManifest>().ValueRW;
 				manifest.initialized = true;
 				return;
 			}
 
-			var files = Directory.GetFiles(systemsPath, "*.js", SearchOption.AllDirectories);
-			foreach (var file in files)
+			foreach (var (systemName, source) in systems)
 			{
-				var systemName = Path.GetFileNameWithoutExtension(file);
 				if (m_SystemStateRefs.ContainsKey(systemName))
 					continue;
 
-				LoadSystem(systemName, file);
+				if (!source.TryReadScript("systems/" + systemName, out var code, out var resolvedId))
+					continue;
+
+				LoadSystem(systemName, code, resolvedId);
 			}
 
 			ref var m = ref SystemAPI.GetSingletonRW<JsSystemManifest>().ValueRW;
 			m.initialized = true;
 		}
 
-		void LoadSystem(string systemName, string filePath)
+		void LoadSystem(string systemName, string source, string resolvedId)
 		{
 			var scriptId = "system:" + systemName;
 
@@ -121,8 +174,7 @@ namespace UnityJS.Entities.Systems
 			// skip re-evaluation — QuickJS caches modules and re-eval returns stale namespace.
 			if (!m_Vm.HasScript(scriptId))
 			{
-				var source = File.ReadAllText(filePath);
-				if (!m_Vm.LoadScriptAsModule(scriptId, source, filePath))
+				if (!m_Vm.LoadScriptAsModule(scriptId, source, resolvedId))
 				{
 					Log.Error("[JsSystemRunner] Failed to load system '{0}'", systemName);
 					return;
@@ -150,11 +202,9 @@ namespace UnityJS.Entities.Systems
 				m_SystemNames.Remove(systemName);
 			}
 
-			var systemsPath = Path.Combine(Application.streamingAssetsPath, "js", "systems");
-			var filePath = Path.Combine(systemsPath, systemName + ".js");
-			if (File.Exists(filePath))
+			if (JsScriptSourceRegistry.TryReadScript("systems/" + systemName, out var source, out var resolvedId))
 			{
-				LoadSystem(systemName, filePath);
+				LoadSystem(systemName, source, resolvedId);
 			}
 		}
 

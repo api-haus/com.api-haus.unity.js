@@ -39,11 +39,8 @@ namespace UnityJS.Editor.Tests
 		[Test]
 		public void GenerateContent_HasLifecycleSection()
 		{
-			StringAssert.Contains("ECS Script Lifecycle", m_Content);
-			StringAssert.Contains("declare function onInit(state:", m_Content);
-			StringAssert.Contains("declare function onUpdate(state:", m_Content);
-			StringAssert.Contains("declare function onDestroy(state:", m_Content);
-			StringAssert.Contains("declare function onCommand(state:", m_Content);
+			StringAssert.Contains("ECS System Lifecycle", m_Content);
+			StringAssert.Contains("interface UpdateState", m_Content);
 		}
 
 		// ── Bridged Components ───────────────────────────────────────
@@ -269,8 +266,8 @@ namespace UnityJS.Editor.Tests
 				return;
 			}
 
-			var tsDir = System.IO.Path.Combine(projectRoot, "Assets/StreamingAssets/js/types");
-			var tsconfigDir = System.IO.Path.Combine(projectRoot, "Assets/StreamingAssets/js");
+			var tsDir = System.IO.Path.Combine(projectRoot, "Assets/StreamingAssets/unity.js/types");
+			var tsconfigDir = System.IO.Path.Combine(projectRoot, "Assets/StreamingAssets/unity.js");
 
 			// Ensure the stub is up-to-date
 			var stubPath = System.IO.Path.Combine(tsDir, "unity.d.ts");

@@ -15,7 +15,7 @@ namespace UnityJS.Entities.Core
 
 	public static class JsScriptPathUtility
 	{
-		public const string SCRIPTS_FOLDER_RELATIVE = "Assets/StreamingAssets/js";
+		public const string SCRIPTS_FOLDER_RELATIVE = "Assets/StreamingAssets/unity.js";
 
 		/// <summary>
 		/// Computes a stable Hash128 for a script name using xxHash3.

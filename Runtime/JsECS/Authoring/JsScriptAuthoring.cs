@@ -6,7 +6,7 @@ namespace UnityJS.Entities.Authoring
 	[RequireComponent(typeof(JsScriptBufferAuthoring))]
 	public class JsScriptAuthoring : MonoBehaviour
 	{
-		[Tooltip("File name without .js extension, relative to Assets/StreamingAssets/js")]
+		[Tooltip("File name without .js extension, relative to Assets/StreamingAssets/unity.js")]
 		public JsScriptAssetReference script;
 
 		void Reset()

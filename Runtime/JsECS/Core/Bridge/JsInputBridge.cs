@@ -12,7 +12,7 @@ namespace UnityJS.Entities.Core
 
 	/// <summary>
 	/// Bridge functions for input operations.
-	/// JS API: input.read_value(), input.was_pressed(), input.is_held(), input.was_released()
+	/// JS API: input.readValue(), input.wasPressed(), input.isHeld(), input.wasReleased()
 	/// </summary>
 	static partial class JsECSBridge
 	{
@@ -142,25 +142,25 @@ namespace UnityJS.Entities.Core
 		{
 			var ns = QJS.JS_NewObject(ctx);
 
-			var pReadValueBytes = Encoding.UTF8.GetBytes("read_value\0");
+			var pReadValueBytes = Encoding.UTF8.GetBytes("readValue\0");
 			fixed (byte* pReadValue = pReadValueBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Input_ReadValue, pReadValue, 1);
 				QJS.JS_SetPropertyStr(ctx, ns, pReadValue, fn);
 			}
-			var pWasPressedBytes = Encoding.UTF8.GetBytes("was_pressed\0");
+			var pWasPressedBytes = Encoding.UTF8.GetBytes("wasPressed\0");
 			fixed (byte* pWasPressed = pWasPressedBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Input_WasPressed, pWasPressed, 1);
 				QJS.JS_SetPropertyStr(ctx, ns, pWasPressed, fn);
 			}
-			var pIsHeldBytes = Encoding.UTF8.GetBytes("is_held\0");
+			var pIsHeldBytes = Encoding.UTF8.GetBytes("isHeld\0");
 			fixed (byte* pIsHeld = pIsHeldBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Input_IsHeld, pIsHeld, 1);
 				QJS.JS_SetPropertyStr(ctx, ns, pIsHeld, fn);
 			}
-			var pWasReleasedBytes = Encoding.UTF8.GetBytes("was_released\0");
+			var pWasReleasedBytes = Encoding.UTF8.GetBytes("wasReleased\0");
 			fixed (byte* pWasReleased = pWasReleasedBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Input_WasReleased, pWasReleased, 1);

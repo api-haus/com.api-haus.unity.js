@@ -60,7 +60,7 @@ namespace UnityJS.Runtime
 	{
 		static readonly string s_streamingAssetsJsPath = Path.Combine(
 			Application.streamingAssetsPath,
-			"js"
+			"unity.js"
 		);
 
 		public static JsScriptLoadResult ValidateScriptId(string scriptId)

@@ -30,17 +30,37 @@ namespace UnityJS.Runtime
 				if (nameStr.StartsWith("./") || nameStr.StartsWith("../"))
 				{
 					var baseStr = Marshal.PtrToStringUTF8((nint)baseName) ?? "";
-					var baseDir = Path.GetDirectoryName(baseStr) ?? "";
-					resolved = Path.GetFullPath(Path.Combine(baseDir, nameStr));
+
+					if (baseStr.StartsWith("bundle://"))
+					{
+						// Virtual path — resolve manually without Path.GetFullPath
+						var baseDir = baseStr.Substring(0, baseStr.LastIndexOf('/'));
+						var relative = nameStr;
+						while (relative.StartsWith("../"))
+						{
+							baseDir = baseDir.Substring(0, baseDir.LastIndexOf('/'));
+							relative = relative.Substring(3);
+						}
+						if (relative.StartsWith("./"))
+							relative = relative.Substring(2);
+						resolved = baseDir + "/" + relative;
+					}
+					else
+					{
+						var baseDir = Path.GetDirectoryName(baseStr) ?? "";
+						resolved = Path.GetFullPath(Path.Combine(baseDir, nameStr));
+					}
 				}
 				else
 				{
-					// Try search paths
+					// Bare module import — try registry then search paths
 					var searchName = nameStr;
 					if (!searchName.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
 						searchName += ".js";
 
-					if (JsScriptSearchPaths.TryFindScript(searchName, out var foundPath, out _))
+					if (JsScriptSourceRegistry.TryFindModule(searchName, out var resolvedPath))
+						resolved = resolvedPath;
+					else if (JsScriptSearchPaths.TryFindScript(searchName, out var foundPath, out _))
 						resolved = foundPath;
 					else
 						resolved = nameStr;
@@ -68,7 +88,27 @@ namespace UnityJS.Runtime
 			try
 			{
 				var nameStr = Marshal.PtrToStringUTF8((nint)name);
-				if (string.IsNullOrEmpty(nameStr) || !File.Exists(nameStr))
+				if (string.IsNullOrEmpty(nameStr))
+					return 0;
+
+				// Handle bundle:// virtual paths
+				if (nameStr.StartsWith("bundle://"))
+				{
+					if (!JsScriptSourceRegistry.TryReadModuleBytes(nameStr, out var bundleData))
+						return 0;
+
+					if (outBuf == null)
+						return bundleData.Length;
+
+					if (bundleData.Length > outBufLen)
+						return 0;
+
+					Marshal.Copy(bundleData, 0, (nint)outBuf, bundleData.Length);
+					return bundleData.Length;
+				}
+
+				// Filesystem path
+				if (!File.Exists(nameStr))
 					return 0;
 
 				var data = File.ReadAllBytes(nameStr);

@@ -34,7 +34,7 @@ namespace UnityJS.Entities.Core
 
 			var ns = QJS.JS_NewObject(ctx);
 
-			var pDeltaTimeBytes = Encoding.UTF8.GetBytes("delta_time\0");
+			var pDeltaTimeBytes = Encoding.UTF8.GetBytes("deltaTime\0");
 			fixed (byte* pDeltaTime = pDeltaTimeBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, System_DeltaTime, pDeltaTime, 0);
@@ -52,7 +52,7 @@ namespace UnityJS.Entities.Core
 				var fn = QJSShim.qjs_shim_new_function(ctx, System_Random, pRandom, 2);
 				QJS.JS_SetPropertyStr(ctx, ns, pRandom, fn);
 			}
-			var pRandomIntBytes = Encoding.UTF8.GetBytes("random_int\0");
+			var pRandomIntBytes = Encoding.UTF8.GetBytes("randomInt\0");
 			fixed (byte* pRandomInt = pRandomIntBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, System_RandomInt, pRandomInt, 2);

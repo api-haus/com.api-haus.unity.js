@@ -8,7 +8,7 @@ namespace UnityJS.Entities.Core
 
 	/// <summary>
 	/// Bridge functions for transform operations.
-	/// JS API: transform.get_position(), transform.set_position(), transform.get_rotation(), transform.move_toward()
+	/// JS API: transform.getPosition(), transform.setPosition(), transform.getRotation(), transform.moveToward()
 	/// </summary>
 	static partial class JsECSBridge
 	{
@@ -148,25 +148,25 @@ namespace UnityJS.Entities.Core
 		{
 			var ns = QJS.JS_NewObject(ctx);
 
-			var pGetPosBytes = Encoding.UTF8.GetBytes("get_position\0");
+			var pGetPosBytes = Encoding.UTF8.GetBytes("getPosition\0");
 			fixed (byte* pGetPos = pGetPosBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Transform_GetPosition, pGetPos, 1);
 				QJS.JS_SetPropertyStr(ctx, ns, pGetPos, fn);
 			}
-			var pSetPosBytes = Encoding.UTF8.GetBytes("set_position\0");
+			var pSetPosBytes = Encoding.UTF8.GetBytes("setPosition\0");
 			fixed (byte* pSetPos = pSetPosBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Transform_SetPosition, pSetPos, 4);
 				QJS.JS_SetPropertyStr(ctx, ns, pSetPos, fn);
 			}
-			var pGetRotBytes = Encoding.UTF8.GetBytes("get_rotation\0");
+			var pGetRotBytes = Encoding.UTF8.GetBytes("getRotation\0");
 			fixed (byte* pGetRot = pGetRotBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Transform_GetRotation, pGetRot, 1);
 				QJS.JS_SetPropertyStr(ctx, ns, pGetRot, fn);
 			}
-			var pMoveTowardBytes = Encoding.UTF8.GetBytes("move_toward\0");
+			var pMoveTowardBytes = Encoding.UTF8.GetBytes("moveToward\0");
 			fixed (byte* pMoveToward = pMoveTowardBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Transform_MoveToward, pMoveToward, 3);

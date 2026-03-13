@@ -203,25 +203,25 @@ namespace UnityJS.Entities.Core
 					var fn = QJSShim.qjs_shim_new_function(ctx, Math_Lerp, p, 3);
 					QJS.JS_SetPropertyStr(ctx, ns, p, fn);
 				}
-				pBytes = Encoding.UTF8.GetBytes("rgb_to_hsv\0");
+				pBytes = Encoding.UTF8.GetBytes("rgbToHsv\0");
 				fixed (byte* p = pBytes)
 				{
 					var fn = QJSShim.qjs_shim_new_function(ctx, Math_RgbToHsv, p, 1);
 					QJS.JS_SetPropertyStr(ctx, ns, p, fn);
 				}
-				pBytes = Encoding.UTF8.GetBytes("hsv_to_rgb\0");
+				pBytes = Encoding.UTF8.GetBytes("hsvToRgb\0");
 				fixed (byte* p = pBytes)
 				{
 					var fn = QJSShim.qjs_shim_new_function(ctx, Math_HsvToRgb, p, 3);
 					QJS.JS_SetPropertyStr(ctx, ns, p, fn);
 				}
-				pBytes = Encoding.UTF8.GetBytes("oklab_to_rgb\0");
+				pBytes = Encoding.UTF8.GetBytes("oklabToRgb\0");
 				fixed (byte* p = pBytes)
 				{
 					var fn = QJSShim.qjs_shim_new_function(ctx, Math_OklabToRgb, p, 1);
 					QJS.JS_SetPropertyStr(ctx, ns, p, fn);
 				}
-				pBytes = Encoding.UTF8.GetBytes("rgb_to_oklab\0");
+				pBytes = Encoding.UTF8.GetBytes("rgbToOklab\0");
 				fixed (byte* p = pBytes)
 				{
 					var fn = QJSShim.qjs_shim_new_function(ctx, Math_RgbToOklab, p, 1);

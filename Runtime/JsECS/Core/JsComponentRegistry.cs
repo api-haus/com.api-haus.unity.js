@@ -10,6 +10,7 @@ namespace UnityJS.Entities.Core
 	public static class JsComponentRegistry
 	{
 		static readonly Dictionary<string, ComponentType> s_components = new();
+		static readonly Dictionary<string, Func<ComponentType>> s_deferredComponents = new();
 		static readonly List<Action<JSContext>> s_bridgeRegistrations = new();
 		static readonly List<JsLookupUpdater> s_lookupUpdaters = new();
 
@@ -30,6 +31,22 @@ namespace UnityJS.Entities.Core
 			s_lookupUpdaters.Add(updateLookupFunc);
 		}
 
+		/// <summary>
+		/// Deferred registration — the ComponentType factory is called lazily after TypeManager is initialized.
+		/// Use this from [AfterAssembliesLoaded] where TypeManager is not yet ready.
+		/// </summary>
+		public static void RegisterBridgeDeferred(
+			string jsName,
+			Func<ComponentType> componentTypeFactory,
+			Action<JSContext> registerFunc,
+			JsLookupUpdater updateLookupFunc
+		)
+		{
+			s_deferredComponents[jsName] = componentTypeFactory;
+			s_bridgeRegistrations.Add(registerFunc);
+			s_lookupUpdaters.Add(updateLookupFunc);
+		}
+
 		public static void RegisterEnum(Action<JSContext> registerFunc)
 		{
 			s_bridgeRegistrations.Add(registerFunc);
@@ -37,11 +54,32 @@ namespace UnityJS.Entities.Core
 
 		public static bool TryGetComponentType(string jsName, out ComponentType componentType)
 		{
-			return s_components.TryGetValue(jsName, out componentType);
+			if (s_components.TryGetValue(jsName, out componentType))
+				return true;
+
+			// Resolve deferred registrations on first access
+			if (s_deferredComponents.TryGetValue(jsName, out var factory))
+			{
+				componentType = factory();
+				s_components[jsName] = componentType;
+				s_deferredComponents.Remove(jsName);
+				return true;
+			}
+
+			componentType = default;
+			return false;
 		}
 
 		public static void RegisterAllBridges(JSContext ctx)
 		{
+			// Resolve all deferred components now (TypeManager should be ready by this point)
+			if (s_deferredComponents.Count > 0)
+			{
+				foreach (var kvp in s_deferredComponents)
+					s_components[kvp.Key] = kvp.Value();
+				s_deferredComponents.Clear();
+			}
+
 			foreach (var reg in s_bridgeRegistrations)
 			{
 				reg(ctx);

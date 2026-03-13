@@ -10,9 +10,9 @@ namespace UnityJS.Entities.Core
 
 	/// <summary>
 	/// Bridge functions for debug drawing.
-	/// JS API: draw.set_color(), draw.with_duration(), draw.line(), draw.ray(), draw.arrow(),
-	///         draw.wire_sphere(), draw.wire_box(), draw.wire_capsule(), draw.circle_xz(),
-	///         draw.solid_box(), draw.solid_circle(), draw.label_2d()
+	/// JS API: draw.setColor(), draw.withDuration(), draw.line(), draw.ray(), draw.arrow(),
+	///         draw.wireSphere(), draw.wireBox(), draw.wireCapsule(), draw.circleXz(),
+	///         draw.solidBox(), draw.solidCircle(), draw.label2d()
 	/// </summary>
 	static partial class JsECSBridge
 	{
@@ -208,13 +208,13 @@ namespace UnityJS.Entities.Core
 		{
 			var ns = QJS.JS_NewObject(ctx);
 
-			var pBytes = Encoding.UTF8.GetBytes("set_color\0");
+			var pBytes = Encoding.UTF8.GetBytes("setColor\0");
 			fixed (byte* p = pBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Draw_SetColor, p, 4);
 				QJS.JS_SetPropertyStr(ctx, ns, p, fn);
 			}
-			pBytes = Encoding.UTF8.GetBytes("with_duration\0");
+			pBytes = Encoding.UTF8.GetBytes("withDuration\0");
 			fixed (byte* p = pBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Draw_WithDuration, p, 1);
@@ -238,43 +238,43 @@ namespace UnityJS.Entities.Core
 				var fn = QJSShim.qjs_shim_new_function(ctx, Draw_Arrow, p, 2);
 				QJS.JS_SetPropertyStr(ctx, ns, p, fn);
 			}
-			pBytes = Encoding.UTF8.GetBytes("wire_sphere\0");
+			pBytes = Encoding.UTF8.GetBytes("wireSphere\0");
 			fixed (byte* p = pBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Draw_WireSphere, p, 2);
 				QJS.JS_SetPropertyStr(ctx, ns, p, fn);
 			}
-			pBytes = Encoding.UTF8.GetBytes("wire_box\0");
+			pBytes = Encoding.UTF8.GetBytes("wireBox\0");
 			fixed (byte* p = pBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Draw_WireBox, p, 2);
 				QJS.JS_SetPropertyStr(ctx, ns, p, fn);
 			}
-			pBytes = Encoding.UTF8.GetBytes("wire_capsule\0");
+			pBytes = Encoding.UTF8.GetBytes("wireCapsule\0");
 			fixed (byte* p = pBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Draw_WireCapsule, p, 3);
 				QJS.JS_SetPropertyStr(ctx, ns, p, fn);
 			}
-			pBytes = Encoding.UTF8.GetBytes("circle_xz\0");
+			pBytes = Encoding.UTF8.GetBytes("circleXz\0");
 			fixed (byte* p = pBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Draw_CircleXZ, p, 2);
 				QJS.JS_SetPropertyStr(ctx, ns, p, fn);
 			}
-			pBytes = Encoding.UTF8.GetBytes("solid_box\0");
+			pBytes = Encoding.UTF8.GetBytes("solidBox\0");
 			fixed (byte* p = pBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Draw_SolidBox, p, 2);
 				QJS.JS_SetPropertyStr(ctx, ns, p, fn);
 			}
-			pBytes = Encoding.UTF8.GetBytes("solid_circle\0");
+			pBytes = Encoding.UTF8.GetBytes("solidCircle\0");
 			fixed (byte* p = pBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Draw_SolidCircle, p, 3);
 				QJS.JS_SetPropertyStr(ctx, ns, p, fn);
 			}
-			pBytes = Encoding.UTF8.GetBytes("label_2d\0");
+			pBytes = Encoding.UTF8.GetBytes("label2d\0");
 			fixed (byte* p = pBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Draw_Label2D, p, 2);

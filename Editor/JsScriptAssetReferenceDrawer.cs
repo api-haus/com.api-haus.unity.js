@@ -11,7 +11,7 @@ namespace UnityJS.Editor
 	{
 		static readonly GUIContent s_scriptFieldContent = new(
 			"JS Script",
-			"Drag a .js file from Assets/StreamingAssets/js/scripts"
+			"Drag a .js file from Assets/StreamingAssets/unity.js/scripts"
 		);
 
 		public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)

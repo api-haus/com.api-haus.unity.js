@@ -11,14 +11,16 @@ namespace UnityJS.Runtime
 
 	/// <summary>
 	/// Static registry for JS script search paths.
-	/// Allows registering multiple directories to search for scripts.
+	/// Delegates to JsScriptSourceRegistry internally. Public API unchanged.
 	/// </summary>
 	public static class JsScriptSearchPaths
 	{
-		static readonly List<string> s_searchPaths = new();
 		static readonly object s_searchPathLock = new object();
 		static bool s_initialized;
 		static string s_defaultScriptsPath;
+
+		// Track which search paths we've registered as FileSystemScriptSources
+		static readonly Dictionary<string, string> s_pathToSourceId = new();
 
 		public static string DefaultScriptsPath
 		{
@@ -26,7 +28,7 @@ namespace UnityJS.Runtime
 			{
 				if (s_defaultScriptsPath == null)
 				{
-					s_defaultScriptsPath = Path.Combine(Application.streamingAssetsPath, "js");
+					s_defaultScriptsPath = Path.Combine(Application.streamingAssetsPath, "unity.js");
 				}
 				return s_defaultScriptsPath;
 			}
@@ -38,8 +40,14 @@ namespace UnityJS.Runtime
 			{
 				if (s_initialized)
 					return;
-				s_searchPaths.Clear();
-				s_searchPaths.Add(DefaultScriptsPath);
+
+				RegisterPathAsSource(DefaultScriptsPath, "default", 100);
+
+#if UNITY_EDITOR
+				var tscBuildPath = Path.Combine(Application.dataPath, "..", "Library", "TscBuild");
+				RegisterPathAsSource(tscBuildPath, "tsc-build", 50);
+#endif
+
 				s_initialized = true;
 			}
 		}
@@ -53,10 +61,11 @@ namespace UnityJS.Runtime
 				if (string.IsNullOrEmpty(absolutePath))
 					return;
 
-				s_searchPaths.Remove(absolutePath);
+				// Remove existing registration for this path
+				RemovePathSource(absolutePath);
 
-				var index = Math.Min(priority, Math.Max(0, s_searchPaths.Count - 1));
-				s_searchPaths.Insert(index, absolutePath);
+				var sourceId = "searchpath:" + absolutePath;
+				RegisterPathAsSource(absolutePath, sourceId, priority);
 			}
 		}
 
@@ -64,8 +73,9 @@ namespace UnityJS.Runtime
 		{
 			lock (s_searchPathLock)
 			{
-				if (absolutePath != DefaultScriptsPath)
-					s_searchPaths.Remove(absolutePath);
+				if (absolutePath == DefaultScriptsPath)
+					return;
+				RemovePathSource(absolutePath);
 			}
 		}
 
@@ -73,8 +83,14 @@ namespace UnityJS.Runtime
 		{
 			lock (s_searchPathLock)
 			{
-				s_searchPaths.Clear();
-				s_searchPaths.Add(DefaultScriptsPath);
+				// Remove all non-default sources registered through this API
+				var toRemove = new List<string>(s_pathToSourceId.Keys);
+				foreach (var path in toRemove)
+				{
+					if (path == DefaultScriptsPath)
+						continue;
+					RemovePathSource(path);
+				}
 			}
 		}
 
@@ -84,7 +100,15 @@ namespace UnityJS.Runtime
 			{
 				if (!s_initialized)
 					Initialize();
-				return s_searchPaths.ToArray();
+
+				var paths = new List<string>();
+				var sources = JsScriptSourceRegistry.GetSources();
+				foreach (var source in sources)
+				{
+					if (source is FileSystemScriptSource fs)
+						paths.Add(fs.BasePath);
+				}
+				return paths;
 			}
 		}
 
@@ -104,18 +128,24 @@ namespace UnityJS.Runtime
 			{
 				if (!s_initialized)
 					Initialize();
+			}
 
-				foreach (var basePath in s_searchPaths)
+			// Delegate to registry — search through all filesystem sources
+			var sources = JsScriptSourceRegistry.GetSources();
+			foreach (var source in sources)
+			{
+				if (source is not FileSystemScriptSource fs)
+					continue;
+
+				var fullPath = Path.Combine(fs.BasePath, relativePath);
+				if (File.Exists(fullPath))
 				{
-					var fullPath = Path.Combine(basePath, relativePath);
-					if (File.Exists(fullPath))
-					{
-						foundPath = fullPath;
-						searchedBasePath = basePath;
-						return true;
-					}
+					foundPath = fullPath;
+					searchedBasePath = fs.BasePath;
+					return true;
 				}
 			}
+
 			return false;
 		}
 
@@ -139,9 +169,26 @@ namespace UnityJS.Runtime
 		{
 			lock (s_searchPathLock)
 			{
-				s_searchPaths.Clear();
+				s_pathToSourceId.Clear();
+				JsScriptSourceRegistry.Reset();
 				s_initialized = false;
 				s_defaultScriptsPath = null;
+			}
+		}
+
+		static void RegisterPathAsSource(string absolutePath, string sourceId, int priority)
+		{
+			var source = new FileSystemScriptSource(sourceId, absolutePath, priority);
+			JsScriptSourceRegistry.Register(source);
+			s_pathToSourceId[absolutePath] = sourceId;
+		}
+
+		static void RemovePathSource(string absolutePath)
+		{
+			if (s_pathToSourceId.TryGetValue(absolutePath, out var sourceId))
+			{
+				JsScriptSourceRegistry.Unregister(sourceId);
+				s_pathToSourceId.Remove(absolutePath);
 			}
 		}
 	}

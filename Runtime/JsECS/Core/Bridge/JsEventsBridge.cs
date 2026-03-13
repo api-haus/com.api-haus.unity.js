@@ -9,7 +9,7 @@ namespace UnityJS.Entities.Core
 
 	/// <summary>
 	/// Bridge functions for cross-entity event operations.
-	/// JS API: events.send_attack()
+	/// JS API: events.sendAttack()
 	/// </summary>
 	static partial class JsECSBridge
 	{
@@ -61,7 +61,7 @@ namespace UnityJS.Entities.Core
 		{
 			var ns = QJS.JS_NewObject(ctx);
 
-			var pSendAttackBytes = Encoding.UTF8.GetBytes("send_attack\0");
+			var pSendAttackBytes = Encoding.UTF8.GetBytes("sendAttack\0");
 			fixed (byte* pSendAttack = pSendAttackBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Events_SendAttack, pSendAttack, 3);

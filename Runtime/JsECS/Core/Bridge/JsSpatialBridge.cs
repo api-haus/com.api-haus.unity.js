@@ -12,7 +12,7 @@ namespace UnityJS.Entities.Core
 
 	/// <summary>
 	/// Bridge functions for spatial queries.
-	/// JS API: spatial.distance(), spatial.query_near(), spatial.get_entity_count()
+	/// JS API: spatial.distance(), spatial.queryNear(), spatial.getEntityCount()
 	/// </summary>
 	static partial class JsECSBridge
 	{
@@ -174,13 +174,13 @@ namespace UnityJS.Entities.Core
 				var fn = QJSShim.qjs_shim_new_function(ctx, Spatial_Distance, pDistance, 2);
 				QJS.JS_SetPropertyStr(ctx, ns, pDistance, fn);
 			}
-			var pQueryNearBytes = Encoding.UTF8.GetBytes("query_near\0");
+			var pQueryNearBytes = Encoding.UTF8.GetBytes("queryNear\0");
 			fixed (byte* pQueryNear = pQueryNearBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Spatial_QueryNear, pQueryNear, 2);
 				QJS.JS_SetPropertyStr(ctx, ns, pQueryNear, fn);
 			}
-			var pGetEntityCountBytes = Encoding.UTF8.GetBytes("get_entity_count\0");
+			var pGetEntityCountBytes = Encoding.UTF8.GetBytes("getEntityCount\0");
 			fixed (byte* pGetEntityCount = pGetEntityCountBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Spatial_GetEntityCount, pGetEntityCount, 0);

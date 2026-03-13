@@ -14,7 +14,7 @@ namespace UnityJS.Entities.Core
 
 	/// <summary>
 	/// Bridge functions for entity lifecycle operations.
-	/// JS API: entities.create(), entities.destroy(), entities.add_script(), entities.has_script(), entities.remove_component()
+	/// JS API: entities.create(), entities.destroy(), entities.addScript(), entities.hasScript(), entities.removeComponent()
 	/// </summary>
 	static partial class JsECSBridge
 	{
@@ -257,19 +257,19 @@ namespace UnityJS.Entities.Core
 				var fn = QJSShim.qjs_shim_new_function(ctx, Entities_Destroy, pDestroy, 1);
 				QJS.JS_SetPropertyStr(ctx, ns, pDestroy, fn);
 			}
-			var pAddScriptBytes = Encoding.UTF8.GetBytes("add_script\0");
+			var pAddScriptBytes = Encoding.UTF8.GetBytes("addScript\0");
 			fixed (byte* pAddScript = pAddScriptBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Entities_AddScript, pAddScript, 2);
 				QJS.JS_SetPropertyStr(ctx, ns, pAddScript, fn);
 			}
-			var pHasScriptBytes = Encoding.UTF8.GetBytes("has_script\0");
+			var pHasScriptBytes = Encoding.UTF8.GetBytes("hasScript\0");
 			fixed (byte* pHasScript = pHasScriptBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Entities_HasScript, pHasScript, 2);
 				QJS.JS_SetPropertyStr(ctx, ns, pHasScript, fn);
 			}
-			var pRemoveComponentBytes = Encoding.UTF8.GetBytes("remove_component\0");
+			var pRemoveComponentBytes = Encoding.UTF8.GetBytes("removeComponent\0");
 			fixed (byte* pRemoveComponent = pRemoveComponentBytes)
 			{
 				var fn = QJSShim.qjs_shim_new_function(ctx, Entities_RemoveComponent, pRemoveComponent, 2);

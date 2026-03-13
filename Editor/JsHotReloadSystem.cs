@@ -30,18 +30,20 @@ namespace UnityJS.Editor
 			if (m_Initialized)
 				return;
 
-			var jsPath = Path.Combine(Application.streamingAssetsPath, "js");
+			var jsPath = Path.Combine(Application.streamingAssetsPath, "unity.js");
 			var scriptsPath = Path.Combine(jsPath, "scripts");
 			var dataPath = Path.Combine(jsPath, "data");
-			var systemsPath = Path.Combine(jsPath, "systems");
+			var systemsPath = Path.Combine(Application.dataPath, "..", "Library", "TscBuild", "systems");
 
 			if (!Directory.Exists(jsPath))
 			{
 				Directory.CreateDirectory(jsPath);
 				Directory.CreateDirectory(scriptsPath);
 				Directory.CreateDirectory(dataPath);
-				Directory.CreateDirectory(systemsPath);
 			}
+
+			if (!Directory.Exists(systemsPath))
+				Directory.CreateDirectory(systemsPath);
 
 			if (Directory.Exists(scriptsPath))
 			{
