@@ -1,10 +1,70 @@
 namespace UnityJS.Entities.Tests
 {
   using NUnit.Framework;
+  using UnityJS.QJS;
+  using UnityJS.Runtime;
 
   [TestFixture]
   public unsafe class JsMathBridgeTests : JsBridgeTestFixture
   {
+    // ── C# bridge → JS prototype integration tests ──
+
+    [Test]
+    public void CSharpFloat3_HasSwizzleXY()
+    {
+      var val = JsStateExtensions.Float3ToJsObject(Ctx, new Unity.Mathematics.float3(1, 2, 3));
+      var global = QJS.JS_GetGlobalObject(Ctx);
+      var nameBytes = System.Text.Encoding.UTF8.GetBytes("__testVec\0");
+      fixed (byte* pName = nameBytes)
+        QJS.JS_SetPropertyStr(Ctx, global, pName, val);
+      QJS.JS_FreeValue(Ctx, global);
+
+      var x = EvalGlobalFloat("__testVec.xy.x");
+      Assert.AreEqual(1.0, x, 0.001);
+    }
+
+    [Test]
+    public void CSharpFloat3_HasSwizzleXZ()
+    {
+      var val = JsStateExtensions.Float3ToJsObject(Ctx, new Unity.Mathematics.float3(1, 2, 3));
+      var global = QJS.JS_GetGlobalObject(Ctx);
+      var nameBytes = System.Text.Encoding.UTF8.GetBytes("__testVec\0");
+      fixed (byte* pName = nameBytes)
+        QJS.JS_SetPropertyStr(Ctx, global, pName, val);
+      QJS.JS_FreeValue(Ctx, global);
+
+      var y = EvalGlobalFloat("__testVec.xz.y");
+      Assert.AreEqual(3.0, y, 0.001);
+    }
+
+    [Test]
+    public void CSharpFloat2_HasSwizzleYX()
+    {
+      var val = JsStateExtensions.Float2ToJsObject(Ctx, new Unity.Mathematics.float2(5, 7));
+      var global = QJS.JS_GetGlobalObject(Ctx);
+      var nameBytes = System.Text.Encoding.UTF8.GetBytes("__testVec2\0");
+      fixed (byte* pName = nameBytes)
+        QJS.JS_SetPropertyStr(Ctx, global, pName, val);
+      QJS.JS_FreeValue(Ctx, global);
+
+      var x = EvalGlobalFloat("__testVec2.yx.x");
+      Assert.AreEqual(7.0, x, 0.001);
+    }
+
+    [Test]
+    public void CSharpFloat3_HasEqualsMethod()
+    {
+      var val = JsStateExtensions.Float3ToJsObject(Ctx, new Unity.Mathematics.float3(1, 2, 3));
+      var global = QJS.JS_GetGlobalObject(Ctx);
+      var nameBytes = System.Text.Encoding.UTF8.GetBytes("__testVec\0");
+      fixed (byte* pName = nameBytes)
+        QJS.JS_SetPropertyStr(Ctx, global, pName, val);
+      QJS.JS_FreeValue(Ctx, global);
+
+      var eq = EvalGlobalBool("__testVec.equals(float3(1, 2, 3))");
+      Assert.IsTrue(eq);
+    }
+
     [Test]
     public void Cross_KnownVectors_ReturnsCorrect()
     {
@@ -118,6 +178,30 @@ namespace UnityJS.Entities.Tests
     {
       var v = EvalGlobalFloat("math.lerp(0, 10, 0.25)");
       Assert.AreEqual(2.5, v, 0.001);
+    }
+
+    [Test]
+    public void Lerp_VectorT_PerComponent()
+    {
+      var y = EvalGlobalFloat(
+        "math.lerp({x:0,y:0,z:0},{x:10,y:20,z:30},{x:0.5,y:0.25,z:1.0}).y");
+      Assert.AreEqual(5.0, y, 0.001);
+    }
+
+    [Test]
+    public void Lerp_VectorT_ZComponent()
+    {
+      var z = EvalGlobalFloat(
+        "math.lerp({x:0,y:0,z:0},{x:10,y:20,z:30},{x:0.5,y:0.25,z:1.0}).z");
+      Assert.AreEqual(30.0, z, 0.001);
+    }
+
+    [Test]
+    public void Lerp_ScalarT_WithVectors_StillWorks()
+    {
+      var x = EvalGlobalFloat(
+        "math.lerp({x:0,y:0,z:0},{x:10,y:0,z:0},0.5).x");
+      Assert.AreEqual(5.0, x, 0.001);
     }
 
     [Test]

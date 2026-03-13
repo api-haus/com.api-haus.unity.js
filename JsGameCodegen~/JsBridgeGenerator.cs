@@ -387,6 +387,7 @@ namespace JsGameCodegen
       sb.AppendLine("\tusing Unity.Burst;");
       sb.AppendLine("\tusing Unity.Entities;");
       sb.AppendLine("\tusing Unity.Mathematics;");
+      sb.AppendLine("\tusing UnityJS.Runtime;");
       sb.AppendLine();
 
       sb.AppendLine("\tpublic static class " + className);
@@ -615,102 +616,33 @@ namespace JsGameCodegen
             break;
           case JsFieldType.Float2:
             sb.AppendLine("\t\t\t{");
-            sb.AppendLine("\t\t\t\tvar sub = QJS.JS_NewObject(ctx);");
-            sb.AppendLine("\t\t\t\tfixed (byte* px = s_x, py = s_y)");
-            sb.AppendLine("\t\t\t\t{");
             sb.AppendLine(
-              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, sub, px, QJS.NewFloat64(ctx, comp."
-                + field.Name
-                + ".x));"
+              "\t\t\t\tvar sub = JsStateExtensions.Float2ToJsObject(ctx, comp." + field.Name + ");"
             );
-            sb.AppendLine(
-              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, sub, py, QJS.NewFloat64(ctx, comp."
-                + field.Name
-                + ".y));"
-            );
-            sb.AppendLine("\t\t\t\t}");
             sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, obj, p_" + field.JsName + ", sub);");
             sb.AppendLine("\t\t\t}");
             break;
           case JsFieldType.Float3:
             sb.AppendLine("\t\t\t{");
-            sb.AppendLine("\t\t\t\tvar sub = QJS.JS_NewObject(ctx);");
-            sb.AppendLine("\t\t\t\tfixed (byte* px = s_x, py = s_y, pz = s_z)");
-            sb.AppendLine("\t\t\t\t{");
             sb.AppendLine(
-              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, sub, px, QJS.NewFloat64(ctx, comp."
-                + field.Name
-                + ".x));"
+              "\t\t\t\tvar sub = JsStateExtensions.Float3ToJsObject(ctx, comp." + field.Name + ");"
             );
-            sb.AppendLine(
-              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, sub, py, QJS.NewFloat64(ctx, comp."
-                + field.Name
-                + ".y));"
-            );
-            sb.AppendLine(
-              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, sub, pz, QJS.NewFloat64(ctx, comp."
-                + field.Name
-                + ".z));"
-            );
-            sb.AppendLine("\t\t\t\t}");
             sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, obj, p_" + field.JsName + ", sub);");
             sb.AppendLine("\t\t\t}");
             break;
           case JsFieldType.Float4:
             sb.AppendLine("\t\t\t{");
-            sb.AppendLine("\t\t\t\tvar sub = QJS.JS_NewObject(ctx);");
-            sb.AppendLine("\t\t\t\tfixed (byte* px = s_x, py = s_y, pz = s_z, pw = s_w)");
-            sb.AppendLine("\t\t\t\t{");
             sb.AppendLine(
-              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, sub, px, QJS.NewFloat64(ctx, comp."
-                + field.Name
-                + ".x));"
+              "\t\t\t\tvar sub = JsStateExtensions.Float4ToJsObject(ctx, comp." + field.Name + ");"
             );
-            sb.AppendLine(
-              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, sub, py, QJS.NewFloat64(ctx, comp."
-                + field.Name
-                + ".y));"
-            );
-            sb.AppendLine(
-              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, sub, pz, QJS.NewFloat64(ctx, comp."
-                + field.Name
-                + ".z));"
-            );
-            sb.AppendLine(
-              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, sub, pw, QJS.NewFloat64(ctx, comp."
-                + field.Name
-                + ".w));"
-            );
-            sb.AppendLine("\t\t\t\t}");
             sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, obj, p_" + field.JsName + ", sub);");
             sb.AppendLine("\t\t\t}");
             break;
           case JsFieldType.Quaternion:
             sb.AppendLine("\t\t\t{");
-            sb.AppendLine("\t\t\t\tvar sub = QJS.JS_NewObject(ctx);");
-            sb.AppendLine("\t\t\t\tfixed (byte* px = s_x, py = s_y, pz = s_z, pw = s_w)");
-            sb.AppendLine("\t\t\t\t{");
             sb.AppendLine(
-              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, sub, px, QJS.NewFloat64(ctx, comp."
-                + field.Name
-                + ".value.x));"
+              "\t\t\t\tvar sub = JsStateExtensions.QuaternionToJsObject(ctx, comp." + field.Name + ");"
             );
-            sb.AppendLine(
-              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, sub, py, QJS.NewFloat64(ctx, comp."
-                + field.Name
-                + ".value.y));"
-            );
-            sb.AppendLine(
-              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, sub, pz, QJS.NewFloat64(ctx, comp."
-                + field.Name
-                + ".value.z));"
-            );
-            sb.AppendLine(
-              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, sub, pw, QJS.NewFloat64(ctx, comp."
-                + field.Name
-                + ".value.w));"
-            );
-            sb.AppendLine("\t\t\t\t}");
             sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, obj, p_" + field.JsName + ", sub);");
             sb.AppendLine("\t\t\t}");
             break;

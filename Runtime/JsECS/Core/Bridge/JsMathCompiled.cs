@@ -368,7 +368,7 @@ namespace UnityJS.Entities.Core
   [JsCompile("math", "step")]
   static float4 step_f4(float4 a, float4 b) => math.step(a, b);
 
-  // ── Interpolation (a,b match type; t always scalar) ──
+  // ── Interpolation (a,b match type; t scalar or matching type) ──
 
   [JsCompile("math", "lerp")]
   static float lerp_f(float a, float b, float t) => math.lerp(a, b, t);
@@ -381,6 +381,15 @@ namespace UnityJS.Entities.Core
 
   [JsCompile("math", "lerp")]
   static float4 lerp_f4(float4 a, float4 b, float t) => math.lerp(a, b, t);
+
+  [JsCompile("math", "lerp")]
+  static float2 lerp_f2v(float2 a, float2 b, float2 t) => math.lerp(a, b, t);
+
+  [JsCompile("math", "lerp")]
+  static float3 lerp_f3v(float3 a, float3 b, float3 t) => math.lerp(a, b, t);
+
+  [JsCompile("math", "lerp")]
+  static float4 lerp_f4v(float4 a, float4 b, float4 t) => math.lerp(a, b, t);
 
   [JsCompile("math", "clamp")]
   static float clamp_f(float x, float a, float b) => math.clamp(x, a, b);

@@ -397,6 +397,9 @@ namespace UnityJS.Entities.Core
     if (a.z !== undefined) return Math.abs(a.x-b.x) < 1e-6 && Math.abs(a.y-b.y) < 1e-6 && Math.abs(a.z-b.z) < 1e-6;
     return Math.abs(a.x-b.x) < 1e-6 && Math.abs(a.y-b.y) < 1e-6;
   };
+  globalThis.__F2P = F2P;
+  globalThis.__F3P = F3P;
+  globalThis.__F4P = F4P;
 })();";
 
       var codeBytes = System.Text.Encoding.UTF8.GetBytes(bootstrap + '\0');
@@ -425,6 +428,20 @@ namespace UnityJS.Entities.Core
         }
         QJS.JS_FreeValue(ctx, result);
       }
+
+      // Cache vector prototypes for JsStateExtensions
+      var f2pBytes = System.Text.Encoding.UTF8.GetBytes("__F2P\0");
+      var f3pBytes = System.Text.Encoding.UTF8.GetBytes("__F3P\0");
+      var f4pBytes = System.Text.Encoding.UTF8.GetBytes("__F4P\0");
+      var global = QJS.JS_GetGlobalObject(ctx);
+      fixed (byte* pF2 = f2pBytes, pF3 = f3pBytes, pF4 = f4pBytes)
+      {
+        var f2p = QJS.JS_GetPropertyStr(ctx, global, pF2);
+        var f3p = QJS.JS_GetPropertyStr(ctx, global, pF3);
+        var f4p = QJS.JS_GetPropertyStr(ctx, global, pF4);
+        JsStateExtensions.SetVectorPrototypes(f2p, f3p, f4p);
+      }
+      QJS.JS_FreeValue(ctx, global);
     }
 
     /// <summary>

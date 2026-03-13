@@ -179,6 +179,9 @@ namespace UnityJS.QJS
     public static extern JSValue JS_NewObject(JSContext ctx);
 
     [DllImport(Lib, CallingConvention = CC)]
+    public static extern JSValue JS_NewObjectProto(JSContext ctx, JSValue proto);
+
+    [DllImport(Lib, CallingConvention = CC)]
     public static extern JSValue JS_NewArray(JSContext ctx);
 
     public static JSValue JS_NewInt64(JSContext ctx, long val)

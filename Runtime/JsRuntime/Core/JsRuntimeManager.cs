@@ -541,6 +541,7 @@ namespace UnityJS.Runtime
 
       if (!m_Context.IsNull)
       {
+        JsStateExtensions.ClearVectorPrototypes(m_Context);
         QJS.JS_FreeContext(m_Context);
         m_Context = default;
       }

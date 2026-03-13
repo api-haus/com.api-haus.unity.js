@@ -14,9 +14,39 @@ namespace UnityJS.Runtime
     static readonly byte[] s_z = { (byte)'z', 0 };
     static readonly byte[] s_w = { (byte)'w', 0 };
 
+    static JSValue s_float2Proto;
+    static JSValue s_float3Proto;
+    static JSValue s_float4Proto;
+    static bool s_protosSet;
+
+    public static void SetVectorPrototypes(JSValue f2p, JSValue f3p, JSValue f4p)
+    {
+      s_float2Proto = f2p;
+      s_float3Proto = f3p;
+      s_float4Proto = f4p;
+      s_protosSet = true;
+    }
+
+    public static void ClearVectorPrototypes(JSContext ctx)
+    {
+      if (!s_protosSet) return;
+      QJS.JS_FreeValue(ctx, s_float2Proto);
+      QJS.JS_FreeValue(ctx, s_float3Proto);
+      QJS.JS_FreeValue(ctx, s_float4Proto);
+      s_float2Proto = default;
+      s_float3Proto = default;
+      s_float4Proto = default;
+      s_protosSet = false;
+    }
+
+    static JSValue NewObjectWithProto(JSContext ctx, JSValue proto)
+    {
+      return s_protosSet ? QJS.JS_NewObjectProto(ctx, proto) : QJS.JS_NewObject(ctx);
+    }
+
     public static JSValue Float2ToJsObject(JSContext ctx, float2 value)
     {
-      var obj = QJS.JS_NewObject(ctx);
+      var obj = NewObjectWithProto(ctx, s_float2Proto);
       fixed (
         byte* px = s_x,
           py = s_y
@@ -58,7 +88,7 @@ namespace UnityJS.Runtime
 
     public static JSValue Float3ToJsObject(JSContext ctx, float3 value)
     {
-      var obj = QJS.JS_NewObject(ctx);
+      var obj = NewObjectWithProto(ctx, s_float3Proto);
       fixed (
         byte* px = s_x,
           py = s_y,
@@ -111,7 +141,7 @@ namespace UnityJS.Runtime
 
     public static JSValue Float4ToJsObject(JSContext ctx, float4 value)
     {
-      var obj = QJS.JS_NewObject(ctx);
+      var obj = NewObjectWithProto(ctx, s_float4Proto);
       fixed (
         byte* px = s_x,
           py = s_y,
@@ -175,7 +205,7 @@ namespace UnityJS.Runtime
 
     public static JSValue QuaternionToJsObject(JSContext ctx, quaternion value)
     {
-      var obj = QJS.JS_NewObject(ctx);
+      var obj = NewObjectWithProto(ctx, s_float4Proto);
       fixed (
         byte* px = s_x,
           py = s_y,

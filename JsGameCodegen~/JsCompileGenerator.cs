@@ -481,10 +481,10 @@ namespace JsGameCodegen
     )
     {
       // Categorize overloads by first param type
-      CompiledMethod? floatOverload = null;
-      CompiledMethod? float2Overload = null;
-      CompiledMethod? float3Overload = null;
-      CompiledMethod? float4Overload = null;
+      var floatOverloads = new List<CompiledMethod>();
+      var float2Overloads = new List<CompiledMethod>();
+      var float3Overloads = new List<CompiledMethod>();
+      var float4Overloads = new List<CompiledMethod>();
 
       foreach (var m in overloads)
       {
@@ -494,16 +494,16 @@ namespace JsGameCodegen
         switch (firstType)
         {
           case JsParamType.Float:
-            floatOverload = m;
+            floatOverloads.Add(m);
             break;
           case JsParamType.Float2:
-            float2Overload = m;
+            float2Overloads.Add(m);
             break;
           case JsParamType.Float3:
-            float3Overload = m;
+            float3Overloads.Add(m);
             break;
           case JsParamType.Float4:
-            float4Overload = m;
+            float4Overloads.Add(m);
             break;
         }
       }
@@ -518,45 +518,45 @@ namespace JsGameCodegen
       sb.AppendLine("\t\t{");
 
       // Check if first arg is a number → scalar overload
-      if (floatOverload != null)
+      if (floatOverloads.Count > 0)
       {
         sb.AppendLine("\t\t\tif (QJS.IsNumber(argv[0]))");
         sb.AppendLine("\t\t\t{");
-        EmitInlineCall(sb, floatOverload.Value, "\t\t\t\t");
+        EmitOverloadBranch(sb, floatOverloads, "\t\t\t\t");
         sb.AppendLine("\t\t\t\treturn;");
         sb.AppendLine("\t\t\t}");
       }
 
       // Vector dispatch
       var hasVecOverloads =
-        float2Overload != null || float3Overload != null || float4Overload != null;
+        float2Overloads.Count > 0 || float3Overloads.Count > 0 || float4Overloads.Count > 0;
       if (hasVecOverloads)
       {
         sb.AppendLine("\t\t\tvar _sz = DetectVecSize(ctx, argv[0]);");
 
-        if (float4Overload != null)
+        if (float4Overloads.Count > 0)
         {
           sb.AppendLine("\t\t\tif (_sz == 4)");
           sb.AppendLine("\t\t\t{");
-          EmitInlineCall(sb, float4Overload.Value, "\t\t\t\t");
+          EmitOverloadBranch(sb, float4Overloads, "\t\t\t\t");
           sb.AppendLine("\t\t\t}");
           sb.Append("\t\t\telse ");
         }
 
-        if (float3Overload != null)
+        if (float3Overloads.Count > 0)
         {
           sb.AppendLine("if (_sz == 3)");
           sb.AppendLine("\t\t\t{");
-          EmitInlineCall(sb, float3Overload.Value, "\t\t\t\t");
+          EmitOverloadBranch(sb, float3Overloads, "\t\t\t\t");
           sb.AppendLine("\t\t\t}");
           sb.Append("\t\t\telse ");
         }
 
-        if (float2Overload != null)
+        if (float2Overloads.Count > 0)
         {
           sb.AppendLine();
           sb.AppendLine("\t\t\t{");
-          EmitInlineCall(sb, float2Overload.Value, "\t\t\t\t");
+          EmitOverloadBranch(sb, float2Overloads, "\t\t\t\t");
           sb.AppendLine("\t\t\t}");
         }
         else
@@ -564,8 +564,8 @@ namespace JsGameCodegen
           // Fallback to float3 if no float2
           sb.AppendLine();
           sb.AppendLine("\t\t\t{");
-          if (float3Overload != null)
-            EmitInlineCall(sb, float3Overload.Value, "\t\t\t\t");
+          if (float3Overloads.Count > 0)
+            EmitOverloadBranch(sb, float3Overloads, "\t\t\t\t");
           else
           {
             sb.AppendLine("\t\t\t\t*outU = QJS.JS_UNDEFINED.u;");
@@ -577,6 +577,67 @@ namespace JsGameCodegen
 
       sb.AppendLine("\t\t}");
       sb.AppendLine();
+    }
+
+    static int FindDifferingParamIndex(List<CompiledMethod> overloads, int startFrom = 0)
+    {
+      var paramCount = overloads[0].Parameters.Length;
+      for (var idx = startFrom; idx < paramCount; idx++)
+      {
+        var firstType = overloads[0].Parameters[idx].Type;
+        for (var i = 1; i < overloads.Count; i++)
+        {
+          if (overloads[i].Parameters[idx].Type != firstType)
+            return idx;
+        }
+      }
+      return -1;
+    }
+
+    static void EmitOverloadBranch(StringBuilder sb, List<CompiledMethod> overloads, string indent)
+    {
+      if (overloads.Count == 1)
+      {
+        EmitInlineCall(sb, overloads[0], indent);
+        return;
+      }
+
+      var diffIdx = FindDifferingParamIndex(overloads);
+      if (diffIdx < 0)
+      {
+        // No differing param found — just emit the first overload
+        EmitInlineCall(sb, overloads[0], indent);
+        return;
+      }
+
+      // Compute argv index by counting non-out params before diffIdx
+      var argvIdx = 0;
+      for (var i = 0; i < diffIdx; i++)
+      {
+        if (!overloads[0].Parameters[i].IsOut)
+          argvIdx++;
+      }
+
+      // Split into scalar vs non-scalar groups
+      var scalarGroup = new List<CompiledMethod>();
+      var nonScalarGroup = new List<CompiledMethod>();
+      foreach (var m in overloads)
+      {
+        var t = m.Parameters[diffIdx].Type;
+        if (t == JsParamType.Float || t == JsParamType.Int)
+          scalarGroup.Add(m);
+        else
+          nonScalarGroup.Add(m);
+      }
+
+      sb.AppendLine(indent + "if (QJS.IsNumber(argv[" + argvIdx + "]))");
+      sb.AppendLine(indent + "{");
+      EmitOverloadBranch(sb, scalarGroup.Count > 0 ? scalarGroup : overloads, indent + "\t");
+      sb.AppendLine(indent + "}");
+      sb.AppendLine(indent + "else");
+      sb.AppendLine(indent + "{");
+      EmitOverloadBranch(sb, nonScalarGroup.Count > 0 ? nonScalarGroup : overloads, indent + "\t");
+      sb.AppendLine(indent + "}");
     }
 
     static void EmitInlineCall(StringBuilder sb, CompiledMethod m, string indent)
