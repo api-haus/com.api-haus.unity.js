@@ -255,9 +255,6 @@ namespace UnityJS.Entities.Core
     public static void RegisterFunctions(JSContext ctx)
     {
       RegisterEntitiesFunctions(ctx);
-      RegisterTransformFunctions(ctx);
-      RegisterSpatialFunctions(ctx);
-      RegisterEventsFunctions(ctx);
       RegisterLogFunctions(ctx);
       RegisterInputFunctions(ctx);
       RegisterDrawFunctions(ctx);
@@ -282,9 +279,11 @@ namespace UnityJS.Entities.Core
     add: function(b) { return typeof b === 'number' ? float2(this.x+b, this.y+b) : float2(this.x+b.x, this.y+b.y); },
     sub: function(b) { return typeof b === 'number' ? float2(this.x-b, this.y-b) : float2(this.x-b.x, this.y-b.y); },
     mul: function(b) { return typeof b === 'number' ? float2(this.x*b, this.y*b) : float2(this.x*b.x, this.y*b.y); },
-    div: function(b) { return typeof b === 'number' ? float2(this.x/b, this.y/b) : float2(this.x/b.x, this.y/b.y); }
+    div: function(b) { return typeof b === 'number' ? float2(this.x/b, this.y/b) : float2(this.x/b.x, this.y/b.y); },
+    equals: function(b) { if (typeof b === 'number') b = {x:b, y:b}; return Math.abs(this.x-b.x) < 1e-6 && Math.abs(this.y-b.y) < 1e-6; }
   };
   globalThis.float2 = function(x, y) {
+    if (x === undefined) x = 0;
     var o = Object.create(F2P);
     if (typeof x === 'object') { o.x = x.x; o.y = x.y; }
     else { o.x = x; o.y = y !== undefined ? y : x; }
@@ -295,9 +294,11 @@ namespace UnityJS.Entities.Core
     add: function(b) { return typeof b === 'number' ? float3(this.x+b, this.y+b, this.z+b) : float3(this.x+b.x, this.y+b.y, this.z+b.z); },
     sub: function(b) { return typeof b === 'number' ? float3(this.x-b, this.y-b, this.z-b) : float3(this.x-b.x, this.y-b.y, this.z-b.z); },
     mul: function(b) { return typeof b === 'number' ? float3(this.x*b, this.y*b, this.z*b) : float3(this.x*b.x, this.y*b.y, this.z*b.z); },
-    div: function(b) { return typeof b === 'number' ? float3(this.x/b, this.y/b, this.z/b) : float3(this.x/b.x, this.y/b.y, this.z/b.z); }
+    div: function(b) { return typeof b === 'number' ? float3(this.x/b, this.y/b, this.z/b) : float3(this.x/b.x, this.y/b.y, this.z/b.z); },
+    equals: function(b) { if (typeof b === 'number') b = {x:b, y:b, z:b}; return Math.abs(this.x-b.x) < 1e-6 && Math.abs(this.y-b.y) < 1e-6 && Math.abs(this.z-b.z) < 1e-6; }
   };
   globalThis.float3 = function(x, y, z) {
+    if (x === undefined) x = 0;
     var o = Object.create(F3P);
     if (typeof x === 'object') { o.x = x.x; o.y = x.y; o.z = x.z; }
     else { o.x = x; o.y = y !== undefined ? y : x; o.z = z !== undefined ? z : x; }
@@ -308,14 +309,57 @@ namespace UnityJS.Entities.Core
     add: function(b) { return typeof b === 'number' ? float4(this.x+b, this.y+b, this.z+b, this.w+b) : float4(this.x+b.x, this.y+b.y, this.z+b.z, this.w+b.w); },
     sub: function(b) { return typeof b === 'number' ? float4(this.x-b, this.y-b, this.z-b, this.w-b) : float4(this.x-b.x, this.y-b.y, this.z-b.z, this.w-b.w); },
     mul: function(b) { return typeof b === 'number' ? float4(this.x*b, this.y*b, this.z*b, this.w*b) : float4(this.x*b.x, this.y*b.y, this.z*b.z, this.w*b.w); },
-    div: function(b) { return typeof b === 'number' ? float4(this.x/b, this.y/b, this.z/b, this.w/b) : float4(this.x/b.x, this.y/b.y, this.z/b.z, this.w/b.w); }
+    div: function(b) { return typeof b === 'number' ? float4(this.x/b, this.y/b, this.z/b, this.w/b) : float4(this.x/b.x, this.y/b.y, this.z/b.z, this.w/b.w); },
+    equals: function(b) { if (typeof b === 'number') b = {x:b, y:b, z:b, w:b}; return Math.abs(this.x-b.x) < 1e-6 && Math.abs(this.y-b.y) < 1e-6 && Math.abs(this.z-b.z) < 1e-6 && Math.abs(this.w-b.w) < 1e-6; }
   };
   globalThis.float4 = function(x, y, z, w) {
+    if (x === undefined) x = 0;
     var o = Object.create(F4P);
     if (typeof x === 'object') { o.x = x.x; o.y = x.y; o.z = x.z; o.w = x.w; }
     else { o.x = x; o.y = y !== undefined ? y : x; o.z = z !== undefined ? z : x; o.w = w !== undefined ? w : x; }
     return o;
   };
+
+  (function() {
+    function _uniq() {
+      for (var i = 0; i < arguments.length; i++)
+        for (var j = i + 1; j < arguments.length; j++)
+          if (arguments[i] === arguments[j]) return false;
+      return true;
+    }
+    function _swz(proto, comps) {
+      var n = comps.length;
+      for (let i = 0; i < n; i++)
+        for (let j = 0; j < n; j++) {
+          let a = comps[i], b = comps[j];
+          var desc2 = {get:function(){return float2(this[a],this[b])}};
+          if (_uniq(i,j)) desc2.set = function(v){this[a]=v.x;this[b]=v.y};
+          Object.defineProperty(proto, a+b, desc2);
+          for (let k = 0; k < n; k++) {
+            let c = comps[k];
+            var desc3 = {get:function(){return float3(this[a],this[b],this[c])}};
+            if (_uniq(i,j,k)) desc3.set = function(v){this[a]=v.x;this[b]=v.y;this[c]=v.z};
+            Object.defineProperty(proto, a+b+c, desc3);
+            for (let l = 0; l < n; l++) {
+              let d = comps[l];
+              var desc4 = {get:function(){return float4(this[a],this[b],this[c],this[d])}};
+              if (_uniq(i,j,k,l)) desc4.set = function(v){this[a]=v.x;this[b]=v.y;this[c]=v.z;this[d]=v.w};
+              Object.defineProperty(proto, a+b+c+d, desc4);
+            }
+          }
+        }
+    }
+    _swz(F2P, ['x','y']);
+    _swz(F3P, ['x','y','z']);
+    _swz(F4P, ['x','y','z','w']);
+  })();
+
+  float2.zero = float2(0, 0);
+  float3.zero = float3(0, 0, 0);
+  float4.zero = float4(0, 0, 0, 0);
+  float2.one = float2(1, 1);
+  float3.one = float3(1, 1, 1);
+  float4.one = float4(1, 1, 1, 1);
 
   function _isNum(v) { return typeof v === 'number'; }
   globalThis.add = function(a, b) {
@@ -345,6 +389,13 @@ namespace UnityJS.Entities.Core
     if (a.w !== undefined) return float4(a.x/b.x, a.y/b.y, a.z/b.z, a.w/b.w);
     if (a.z !== undefined) return float3(a.x/b.x, a.y/b.y, a.z/b.z);
     return float2(a.x/b.x, a.y/b.y);
+  };
+  globalThis.eq = function(a, b) {
+    if (_isNum(a)) a = { x: a, y: a, z: a, w: a };
+    if (_isNum(b)) b = { x: b, y: b, z: b, w: b };
+    if (a.w !== undefined) return Math.abs(a.x-b.x) < 1e-6 && Math.abs(a.y-b.y) < 1e-6 && Math.abs(a.z-b.z) < 1e-6 && Math.abs(a.w-b.w) < 1e-6;
+    if (a.z !== undefined) return Math.abs(a.x-b.x) < 1e-6 && Math.abs(a.y-b.y) < 1e-6 && Math.abs(a.z-b.z) < 1e-6;
+    return Math.abs(a.x-b.x) < 1e-6 && Math.abs(a.y-b.y) < 1e-6;
   };
 })();";
 

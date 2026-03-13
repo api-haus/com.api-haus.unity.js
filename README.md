@@ -8,10 +8,10 @@ Unified attribute for exposing ECS types to JS. Targets structs, enums, and asse
 
 ### On structs
 
-Generates `.get(eid)` / `.set(eid, obj)` JS functions that read/write the entire component as an object. Field names auto-convert `camelCase` to `snake_case`.
+Generates `.get(eid)` / `.set(eid, obj)` JS functions that read/write the entire component as an object. Field names keep their C# casing (camelCase). The JS accessor name defaults to the struct name when omitted.
 
 ```csharp
-[JsBridge("slime_wander_config")]
+[JsBridge]
 public struct SlimeWanderConfig : IComponentData
 {
     public float speed;
@@ -25,10 +25,10 @@ public struct SlimeWanderConfig : IComponentData
 JS usage:
 
 ```js
-const cfg = slime_wander_config.get(eid);  // returns object with all fields, or null
-log.info(cfg.speed + " " + cfg.wander_radius);  // snake_case field names
+const cfg = SlimeWanderConfig.get(eid);  // returns object with all fields, or null
+log.info(cfg.speed + " " + cfg.wanderRadius);  // camelCase field names
 cfg.speed = 3.5;
-slime_wander_config.set(eid, cfg);  // write back the whole component
+SlimeWanderConfig.set(eid, cfg);  // write back the whole component
 ```
 
 Properties:
@@ -39,7 +39,7 @@ Properties:
 | `NeedAccessors` | `true`  | Set `false` for tag components (no `.get`)       |
 
 ```csharp
-[JsBridge("char_state", NeedSetters = false)]
+[JsBridge(NeedSetters = false)]
 public struct ECSCharacterState : IComponentData { public bool isGrounded; ... }
 ```
 
@@ -53,7 +53,7 @@ public enum WanderPlane { XY, XZ }
 ```
 
 ```js
-if (cfg.wander_plane === WANDER_PLANE.XY) { ... }
+if (cfg.wanderPlane === WANDER_PLANE.XY) { ... }
 ```
 
 ### On assembly
@@ -61,13 +61,13 @@ if (cfg.wander_plane === WANDER_PLANE.XY) { ... }
 Bridges external types not owned by your code:
 
 ```csharp
-[assembly: JsBridge(typeof(LocalTransform), "local_transform")]
+[assembly: JsBridge(typeof(LocalTransform))]
 ```
 
 ```js
-const lt = local_transform.get(eid);
-log.info(lt.position.x + " " + lt.position.y + " " + lt.position.z);
-local_transform.set(eid, { position: { x: 1, y: 2, z: 3 }, scale: lt.scale, rotation: lt.rotation });
+const lt = LocalTransform.get(eid);
+log.info(lt.Position.x + " " + lt.Position.y + " " + lt.Position.z);
+LocalTransform.set(eid, { Position: float3(1, 2, 3), Scale: lt.Scale, Rotation: lt.Rotation });
 ```
 
 ## `[JsCompile]` Attribute
@@ -132,111 +132,83 @@ export function onUpdate(state) {
 
 ### Queries and component access
 
-```js
-const chars = ecs.query("char_control", "char_stats", "char_state");
+Build queries with the fluent API, then iterate with destructuring. Components are automatically written back at each iteration boundary — no manual `.set()` needed.
 
-for (const eid of chars) {
-  const ctrl = char_control.get(eid);   // whole component as object
-  const stats = char_stats.get(eid);
-  ctrl.move_vector = { x: 1, y: 0, z: 0 };
-  ctrl.sprint = stats.stamina > 0;
-  char_control.set(eid, ctrl);          // write back
+```js
+const q = ecs.query()
+  .withAll(ECSCharacterControl, ECSCharacterStats, ECSCharacterState)
+  .withNone(DeadTag)
+  .build();
+
+for (const [eid, ctrl, stats, st] of q) {
+  ctrl.moveVector = float3(1, 0, 0);  // mutate in-place
+  stats.stamina = math.max(0, stats.stamina - 10 * state.dt);
+  // no .set() call needed — changes are flushed automatically
 }
 ```
 
-### Example: character input
+Component accessors (the bridged objects like `ECSCharacterControl`) are passed to `.withAll()` directly — not as strings. The iterator yields `[eid, comp1, comp2, ...]` tuples matching the order of `.withAll()` arguments.
+
+You can still use `.get()` / `.set()` directly for one-off reads/writes outside of queries:
 
 ```js
-// @tick: variable
-
-const STAMINA_DRAIN = 20;
-const STAMINA_REGEN = 10;
-
-export function onUpdate(state) {
-  const chars = ecs.query("char_control", "char_stats", "char_state");
-
-  for (const eid of chars) {
-    const move = input.read_value("Move");
-    const jump_pressed = input.was_pressed("Jump");
-    const sprint_held = input.is_held("Sprint");
-
-    let mx = 0, mz = 0;
-    if (move) {
-      mx = move.x;
-      mz = move.y;
-    }
-
-    const ctrl = char_control.get(eid);
-    ctrl.move_vector = { x: mx, y: 0, z: mz };
-
-    const stats = char_stats.get(eid);
-    const sprinting = sprint_held && stats.stamina > 0 && (mx !== 0 || mz !== 0);
-
-    if (sprinting) {
-      stats.stamina = Math.max(0, stats.stamina - STAMINA_DRAIN * state.dt);
-    } else {
-      stats.stamina = Math.min(stats.max_stamina, stats.stamina + STAMINA_REGEN * state.dt);
-    }
-    ctrl.sprint = sprinting;
-
-    const st = char_state.get(eid);
-    if (st.is_grounded && !st.was_grounded_last_frame) {
-      stats.jump_count = 0;
-    }
-    if (jump_pressed && stats.jump_count < stats.max_jumps) {
-      ctrl.jump = true;
-      stats.jump_count = stats.jump_count + 1;
-    }
-
-    char_control.set(eid, ctrl);
-    char_stats.set(eid, stats);
-  }
-}
+const cfg = SlimeWanderConfig.get(eid);
+cfg.speed = 3.5;
+SlimeWanderConfig.set(eid, cfg);
 ```
 
 ## Built-in API
 
 ### `ecs`
 
-| Function                           | Description                         |
-| ---------------------------------- | ----------------------------------- |
-| `ecs.query("comp1", "comp2", ...)` | Returns array of matching entity IDs |
+| Function                                          | Description                                    |
+| ------------------------------------------------- | ---------------------------------------------- |
+| `ecs.query()`                                     | Returns a `QueryBuilder`                       |
+| `QueryBuilder.withAll(...accessors)`              | Filter to entities with these components        |
+| `QueryBuilder.withNone(...accessors)`             | Exclude entities with these components          |
+| `QueryBuilder.build()`                            | Returns iterable `BuiltQuery`                   |
 
 ### `entities`
 
-| Function                                  | Description                     |
-| ----------------------------------------- | ------------------------------- |
-| `entities.create(pos?)`                   | Create entity, returns ID       |
-| `entities.destroy(eid)`                   | Destroy entity, returns success |
-| `entities.add_script(eid, script_name)`   | Add script to entity            |
-| `entities.has_script(eid, script_name)`   | Check if entity has script      |
-| `entities.remove_component(eid, name)`    | Remove component from entity    |
+| Function                                   | Description                     |
+| ------------------------------------------ | ------------------------------- |
+| `entities.create(pos?)`                    | Create entity, returns ID       |
+| `entities.destroy(eid)`                    | Destroy entity, returns success |
+| `entities.addScript(eid, scriptName)`      | Add script to entity            |
+| `entities.hasScript(eid, scriptName)`      | Check if entity has script      |
+| `entities.removeComponent(eid, name)`      | Remove component from entity    |
 
 ### `transform`
 
 | Function                                      | Description                |
 | --------------------------------------------- | -------------------------- |
-| `transform.get_position(eid)`                 | Returns `vec3`             |
-| `transform.set_position(eid, x, y, z)`        | Set world position         |
-| `transform.get_rotation(eid)`                 | Returns euler `vec3`       |
-| `transform.move_toward(eid, target, speed)`   | Move toward entity or vec3 |
+| `transform.getPosition(eid)`                  | Returns `float3`           |
+| `transform.setPosition(eid, x, y, z)`         | Set world position         |
+| `transform.getRotation(eid)`                  | Returns euler `float3`     |
+| `transform.moveToward(eid, target, speed)`    | Move toward entity or vec3 |
 
 ### `spatial`
 
-| Function                            | Description                         |
-| ----------------------------------- | ----------------------------------- |
-| `spatial.distance(a, b)`            | Distance (entity or vec3)           |
-| `spatial.query_near(center, radius)`| Returns array of nearby entity IDs  |
-| `spatial.get_entity_count()`        | Total entity count                  |
+| Function                             | Description                         |
+| ------------------------------------ | ----------------------------------- |
+| `spatial.distance(a, b)`            | Distance (entity or float3)         |
+| `spatial.queryNear(center, radius)`  | Returns array of nearby entity IDs  |
+| `spatial.getEntityCount()`           | Total entity count                  |
 
 ### `input`
 
 | Function                      | Description                              |
 | ----------------------------- | ---------------------------------------- |
-| `input.read_value(action)`    | Read action value (`number`/`vec3`/`boolean`) |
+| `input.read_value(action)`    | Read action value (`number`/`float3`/`boolean`) |
 | `input.was_pressed(action)`   | True if pressed this frame               |
 | `input.is_held(action)`       | True if currently held                   |
 | `input.was_released(action)`  | True if released this frame              |
+
+### `events`
+
+| Function                                    | Description                       |
+| ------------------------------------------- | --------------------------------- |
+| `events.sendAttack(source, target, damage)` | Queue attack event on target      |
 
 ### `draw`
 
@@ -257,22 +229,106 @@ export function onUpdate(state) {
 
 ### `math`
 
-| Function                               | Description                       |
-| -------------------------------------- | --------------------------------- |
-| `math.cross(a, b)`                    | Cross product (vec3)              |
-| `math.dot(a, b)`                      | Dot product (vec3)                |
-| `math.normalize(v)`                   | Safe normalize (vec3)             |
-| `math.distance(a, b)`                 | Distance (vec3)                   |
-| `math.length(v)`                      | Length (vec3)                     |
-| `math.length_sq(v)`                   | Squared length (vec3)             |
-| `math.lerp(a, b, t)`                  | Linear interpolation              |
-| `math.clamp_length(v, max_len)`       | Clamp vector length               |
-| `math.project_on_plane(v, normal)`    | Project onto plane                |
-| `math.reorient_on_plane(v, n, dir)`   | Reorient on plane                 |
-| `math.rgb_to_hsv(rgb)`                | Returns h, s, v                   |
-| `math.hsv_to_rgb(h, s, v)`            | Returns vec3                      |
-| `math.rgb_to_oklab(rgb)`              | RGB to OKLab (vec3)               |
-| `math.oklab_to_rgb(lab)`              | OKLab to RGB (vec3)               |
+Most functions accept `number`, `float2`, `float3`, or `float4` unless noted.
+
+**Constants**
+
+| Name             | Description               |
+| ---------------- | ------------------------- |
+| `math.PI`        | 3.14159265...             |
+| `math.E`         | 2.71828182...             |
+| `math.EPSILON`   | Machine epsilon (~1.2e-7) |
+| `math.INFINITY`  | Positive infinity         |
+| `math.random()`  | Random number [0, 1)      |
+
+**Trigonometric**
+
+| Function          | Description            |
+| ----------------- | ---------------------- |
+| `math.sin(x)`     | Sine                   |
+| `math.cos(x)`     | Cosine                 |
+| `math.tan(x)`     | Tangent                |
+| `math.asin(x)`    | Arcsine                |
+| `math.acos(x)`    | Arccosine              |
+| `math.atan(x)`    | Arctangent             |
+| `math.atan2(y,x)` | Two-arg arctangent (scalar only) |
+| `math.sinh(x)`    | Hyperbolic sine        |
+| `math.cosh(x)`    | Hyperbolic cosine      |
+| `math.tanh(x)`    | Hyperbolic tangent     |
+
+**Exponential / Logarithmic**
+
+| Function          | Description            |
+| ----------------- | ---------------------- |
+| `math.exp(x)`     | e^x                    |
+| `math.exp2(x)`    | 2^x                    |
+| `math.log(x)`     | Natural log            |
+| `math.log2(x)`    | Base-2 log             |
+| `math.log10(x)`   | Base-10 log            |
+| `math.sqrt(x)`    | Square root            |
+| `math.rsqrt(x)`   | Reciprocal square root |
+
+**Rounding**
+
+| Function          | Description                   |
+| ----------------- | ----------------------------- |
+| `math.floor(x)`   | Round down                    |
+| `math.ceil(x)`    | Round up                      |
+| `math.round(x)`   | Round to nearest              |
+| `math.trunc(x)`   | Truncate toward zero          |
+| `math.frac(x)`    | Fractional part (x - floor)   |
+
+**Sign / Utility**
+
+| Function            | Description              |
+| ------------------- | ------------------------ |
+| `math.abs(x)`       | Absolute value           |
+| `math.sign(x)`      | Sign (-1, 0, or 1)      |
+| `math.saturate(x)`  | Clamp to [0, 1]         |
+| `math.radians(x)`   | Degrees to radians       |
+| `math.degrees(x)`   | Radians to degrees       |
+
+**Binary**
+
+| Function            | Description              |
+| ------------------- | ------------------------ |
+| `math.min(a, b)`    | Minimum                  |
+| `math.max(a, b)`    | Maximum                  |
+| `math.pow(a, b)`    | Power (a^b)              |
+| `math.step(a, b)`   | Step function            |
+
+**Interpolation**
+
+| Function                        | Description                          |
+| ------------------------------- | ------------------------------------ |
+| `math.lerp(a, b, t)`           | Linear interpolation                 |
+| `math.clamp(x, min, max)`      | Clamp to range                       |
+| `math.smoothstep(a, b, x)`     | Smooth Hermite interpolation         |
+| `math.unlerp(a, b, x)`         | Inverse lerp (scalar only)           |
+| `math.remap(a,b,c,d,x)`       | Remap from [a,b] to [c,d] (scalar only) |
+
+**Vector (float3 only)**
+
+| Function                          | Description              |
+| --------------------------------- | ------------------------ |
+| `math.dot(a, b)`                 | Dot product              |
+| `math.cross(a, b)`              | Cross product            |
+| `math.normalize(v)`             | Safe normalize           |
+| `math.distance(a, b)`           | Distance                 |
+| `math.distancesq(a, b)`         | Squared distance         |
+| `math.length(v)`                | Length                    |
+| `math.lengthsq(v)`              | Squared length           |
+| `math.reflect(i, n)`            | Reflect around normal    |
+| `math.refract(i, n, eta)`       | Refraction               |
+
+### `colors`
+
+| Function                        | Description                    |
+| ------------------------------- | ------------------------------ |
+| `colors.hsvToRgb(h, s, v)`     | HSV to RGB (h in degrees)      |
+| `colors.rgbToHsv(rgb)`         | RGB to `{h, s, v}`             |
+| `colors.oklabToRgb(lab)`       | OKLab to RGB                   |
+| `colors.rgbToOklab(rgb)`       | RGB to OKLab                   |
 
 ### `log`
 
@@ -284,14 +340,64 @@ export function onUpdate(state) {
 | `log.error(msg)`   | Log error         |
 | `log.trace(msg)`   | Log trace         |
 
-## Types
+## Vector Types
+
+### Constructors
+
+`float2`, `float3`, and `float4` are global constructor functions:
+
+```js
+float3(1, 2, 3)    // component args
+float3(5)           // splat → float3(5, 5, 5)
+float3(other)       // clone from existing vector
+float3()            // zero → float3(0, 0, 0)
+```
+
+### Static constants
+
+```js
+float3.zero  // float3(0, 0, 0)
+float3.one   // float3(1, 1, 1)
+// same for float2 and float4
+```
+
+### Arithmetic
+
+Instance methods — `b` can be a vector of matching type or a scalar:
+
+```js
+const v = float3(1, 2, 3);
+v.add(float3(4, 5, 6))  // float3(5, 7, 9)
+v.sub(1)                 // float3(0, 1, 2)
+v.mul(2)                 // float3(2, 4, 6)
+v.div(float3(1, 2, 3))  // float3(1, 1, 1)
+```
+
+Global free functions — auto-detect dimension from `a`:
+
+```js
+add(a, b)   sub(a, b)   mul(a, b)   div(a, b)
+```
+
+### Swizzles
+
+All permutations of component names are available as properties. Swizzles with **unique** indices are read/write; repeated indices are read-only.
+
+```js
+const v = float3(1, 2, 3);
+v.xy             // float2(1, 2) — read
+v.zyx            // float3(3, 2, 1) — read
+v.xy = float2(9, 8)  // write — v is now float3(9, 8, 3)
+v.xx             // float2(9, 9) — read-only (repeated index)
+```
+
+Return type matches swizzle length: 2-component → `float2`, 3 → `float3`, 4 → `float4`.
+
+## Other Types
 
 | Type     | JS representation                        |
 | -------- | ---------------------------------------- |
 | `entity` | integer                                  |
-| `vec2`   | `{x: number, y: number}`                |
-| `vec3`   | `{x: number, y: number, z: number}`     |
-| `vec4`   | `{x: number, y: number, z: number, w: number}` |
 | `quat`   | `{x: number, y: number, z: number, w: number}` |
 
 ## Type Stubs
