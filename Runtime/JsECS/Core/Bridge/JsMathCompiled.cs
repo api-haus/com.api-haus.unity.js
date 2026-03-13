@@ -417,35 +417,83 @@ namespace UnityJS.Entities.Core
   [JsCompile("math", "remap")]
   static float remap_f(float a, float b, float c, float d, float x) => math.remap(a, b, c, d, x);
 
-  // ── Vector → scalar (float3 only) ──
+  // ── Vector → scalar (float2/float3/float4) ──
+
+  [JsCompile("math", "dot")]
+  static float dot_f2(float2 a, float2 b) => math.dot(a, b);
 
   [JsCompile("math", "dot")]
   static float dot_f3(float3 a, float3 b) => math.dot(a, b);
 
+  [JsCompile("math", "dot")]
+  static float dot_f4(float4 a, float4 b) => math.dot(a, b);
+
+  [JsCompile("math", "length")]
+  static float length_f2(float2 v) => math.length(v);
+
   [JsCompile("math", "length")]
   static float length_f3(float3 v) => math.length(v);
+
+  [JsCompile("math", "length")]
+  static float length_f4(float4 v) => math.length(v);
+
+  [JsCompile("math", "lengthsq")]
+  static float lengthsq_f2(float2 v) => math.lengthsq(v);
 
   [JsCompile("math", "lengthsq")]
   static float lengthsq_f3(float3 v) => math.lengthsq(v);
 
+  [JsCompile("math", "lengthsq")]
+  static float lengthsq_f4(float4 v) => math.lengthsq(v);
+
+  [JsCompile("math", "distance")]
+  static float distance_f2(float2 a, float2 b) => math.distance(a, b);
+
   [JsCompile("math", "distance")]
   static float distance_f3(float3 a, float3 b) => math.distance(a, b);
+
+  [JsCompile("math", "distance")]
+  static float distance_f4(float4 a, float4 b) => math.distance(a, b);
+
+  [JsCompile("math", "distancesq")]
+  static float distancesq_f2(float2 a, float2 b) => math.distancesq(a, b);
 
   [JsCompile("math", "distancesq")]
   static float distancesq_f3(float3 a, float3 b) => math.distancesq(a, b);
 
-  // ── Vector → vector (float3 only) ──
+  [JsCompile("math", "distancesq")]
+  static float distancesq_f4(float4 a, float4 b) => math.distancesq(a, b);
+
+  // ── Vector → vector (float2/float3/float4) ──
+
+  [JsCompile("math", "normalize")]
+  static float2 normalize_f2(float2 v) => math.normalizesafe(v);
 
   [JsCompile("math", "normalize")]
   static float3 normalize_f3(float3 v) => math.normalizesafe(v);
+
+  [JsCompile("math", "normalize")]
+  static float4 normalize_f4(float4 v) => math.normalizesafe(v);
 
   [JsCompile("math", "cross")]
   static float3 cross_f3(float3 a, float3 b) => math.cross(a, b);
 
   [JsCompile("math", "reflect")]
+  static float2 reflect_f2(float2 i, float2 n) => math.reflect(i, n);
+
+  [JsCompile("math", "reflect")]
   static float3 reflect_f3(float3 i, float3 n) => math.reflect(i, n);
+
+  [JsCompile("math", "reflect")]
+  static float4 reflect_f4(float4 i, float4 n) => math.reflect(i, n);
+
+  [JsCompile("math", "refract")]
+  static float2 refract_f2(float2 i, float2 n, float eta) => math.refract(i, n, eta);
 
   [JsCompile("math", "refract")]
   static float3 refract_f3(float3 i, float3 n, float eta) => math.refract(i, n, eta);
+
+  [JsCompile("math", "refract")]
+  static float4 refract_f4(float4 i, float4 n, float eta) => math.refract(i, n, eta);
   }
 }

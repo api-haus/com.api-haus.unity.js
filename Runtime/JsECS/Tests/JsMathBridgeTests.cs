@@ -161,5 +161,81 @@ namespace UnityJS.Entities.Tests
       var v = EvalGlobalFloat("float3(5).z");
       Assert.AreEqual(5.0, v, 0.001);
     }
+
+    // ── float2 overload tests ──
+
+    [Test]
+    public void Dot_Float2_ReturnsCorrect()
+    {
+      var v = EvalGlobalFloat("math.dot({x:3,y:4},{x:1,y:0})");
+      Assert.AreEqual(3.0, v, 0.001);
+    }
+
+    [Test]
+    public void Length_Float2_ReturnsCorrect()
+    {
+      var v = EvalGlobalFloat("math.length({x:3,y:4})");
+      Assert.AreEqual(5.0, v, 0.001);
+    }
+
+    [Test]
+    public void Normalize_Float2_ReturnsCorrect()
+    {
+      var v = EvalGlobalFloat("math.normalize({x:3,y:0}).x");
+      Assert.AreEqual(1.0, v, 0.001);
+    }
+
+    [Test]
+    public void Distance_Float2_ReturnsCorrect()
+    {
+      var v = EvalGlobalFloat("math.distance({x:0,y:0},{x:3,y:4})");
+      Assert.AreEqual(5.0, v, 0.001);
+    }
+
+    [Test]
+    public void Reflect_Float2_ReturnsCorrect()
+    {
+      // reflect({1,-1}, {0,1}) = {1,1}
+      var v = EvalGlobalFloat("math.reflect({x:1,y:-1},{x:0,y:1}).y");
+      Assert.AreEqual(1.0, v, 0.001);
+    }
+
+    // ── float4 overload tests ──
+
+    [Test]
+    public void Dot_Float4_ReturnsCorrect()
+    {
+      var v = EvalGlobalFloat("math.dot({x:1,y:2,z:3,w:4},{x:1,y:0,z:0,w:0})");
+      Assert.AreEqual(1.0, v, 0.001);
+    }
+
+    [Test]
+    public void Length_Float4_ReturnsCorrect()
+    {
+      var v = EvalGlobalFloat("math.length({x:1,y:0,z:0,w:0})");
+      Assert.AreEqual(1.0, v, 0.001);
+    }
+
+    [Test]
+    public void Normalize_Float4_ReturnsCorrect()
+    {
+      var v = EvalGlobalFloat("math.normalize({x:0,y:0,z:0,w:5}).w");
+      Assert.AreEqual(1.0, v, 0.001);
+    }
+
+    [Test]
+    public void Distance_Float4_ReturnsCorrect()
+    {
+      var v = EvalGlobalFloat("math.distance({x:0,y:0,z:0,w:0},{x:1,y:0,z:0,w:0})");
+      Assert.AreEqual(1.0, v, 0.001);
+    }
+
+    [Test]
+    public void Reflect_Float4_ReturnsCorrect()
+    {
+      // reflect({1,-1,0,0}, {0,1,0,0}) = {1,1,0,0}
+      var v = EvalGlobalFloat("math.reflect({x:1,y:-1,z:0,w:0},{x:0,y:1,z:0,w:0}).y");
+      Assert.AreEqual(1.0, v, 0.001);
+    }
   }
 }
