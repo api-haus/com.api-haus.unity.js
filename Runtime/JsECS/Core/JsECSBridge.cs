@@ -276,9 +276,75 @@ namespace UnityJS.Entities.Core
   m.INFINITY = Infinity;
   m.random = Math.random;
   globalThis.math = m;
-  globalThis.float2 = function(x, y) { return {x: x, y: y !== undefined ? y : x}; };
-  globalThis.float3 = function(x, y, z) { return {x: x, y: y !== undefined ? y : x, z: z !== undefined ? z : x}; };
-  globalThis.float4 = function(x, y, z, w) { return {x: x, y: y !== undefined ? y : x, z: z !== undefined ? z : x, w: w !== undefined ? w : x}; };
+
+  var F2P = {
+    add: function(b) { return typeof b === 'number' ? float2(this.x+b, this.y+b) : float2(this.x+b.x, this.y+b.y); },
+    sub: function(b) { return typeof b === 'number' ? float2(this.x-b, this.y-b) : float2(this.x-b.x, this.y-b.y); },
+    mul: function(b) { return typeof b === 'number' ? float2(this.x*b, this.y*b) : float2(this.x*b.x, this.y*b.y); },
+    div: function(b) { return typeof b === 'number' ? float2(this.x/b, this.y/b) : float2(this.x/b.x, this.y/b.y); }
+  };
+  globalThis.float2 = function(x, y) {
+    var o = Object.create(F2P);
+    if (typeof x === 'object') { o.x = x.x; o.y = x.y; }
+    else { o.x = x; o.y = y !== undefined ? y : x; }
+    return o;
+  };
+
+  var F3P = {
+    add: function(b) { return typeof b === 'number' ? float3(this.x+b, this.y+b, this.z+b) : float3(this.x+b.x, this.y+b.y, this.z+b.z); },
+    sub: function(b) { return typeof b === 'number' ? float3(this.x-b, this.y-b, this.z-b) : float3(this.x-b.x, this.y-b.y, this.z-b.z); },
+    mul: function(b) { return typeof b === 'number' ? float3(this.x*b, this.y*b, this.z*b) : float3(this.x*b.x, this.y*b.y, this.z*b.z); },
+    div: function(b) { return typeof b === 'number' ? float3(this.x/b, this.y/b, this.z/b) : float3(this.x/b.x, this.y/b.y, this.z/b.z); }
+  };
+  globalThis.float3 = function(x, y, z) {
+    var o = Object.create(F3P);
+    if (typeof x === 'object') { o.x = x.x; o.y = x.y; o.z = x.z; }
+    else { o.x = x; o.y = y !== undefined ? y : x; o.z = z !== undefined ? z : x; }
+    return o;
+  };
+
+  var F4P = {
+    add: function(b) { return typeof b === 'number' ? float4(this.x+b, this.y+b, this.z+b, this.w+b) : float4(this.x+b.x, this.y+b.y, this.z+b.z, this.w+b.w); },
+    sub: function(b) { return typeof b === 'number' ? float4(this.x-b, this.y-b, this.z-b, this.w-b) : float4(this.x-b.x, this.y-b.y, this.z-b.z, this.w-b.w); },
+    mul: function(b) { return typeof b === 'number' ? float4(this.x*b, this.y*b, this.z*b, this.w*b) : float4(this.x*b.x, this.y*b.y, this.z*b.z, this.w*b.w); },
+    div: function(b) { return typeof b === 'number' ? float4(this.x/b, this.y/b, this.z/b, this.w/b) : float4(this.x/b.x, this.y/b.y, this.z/b.z, this.w/b.w); }
+  };
+  globalThis.float4 = function(x, y, z, w) {
+    var o = Object.create(F4P);
+    if (typeof x === 'object') { o.x = x.x; o.y = x.y; o.z = x.z; o.w = x.w; }
+    else { o.x = x; o.y = y !== undefined ? y : x; o.z = z !== undefined ? z : x; o.w = w !== undefined ? w : x; }
+    return o;
+  };
+
+  function _isNum(v) { return typeof v === 'number'; }
+  globalThis.add = function(a, b) {
+    if (_isNum(a)) a = { x: a, y: a, z: a, w: a };
+    if (_isNum(b)) b = { x: b, y: b, z: b, w: b };
+    if (a.w !== undefined) return float4(a.x+b.x, a.y+b.y, a.z+b.z, a.w+b.w);
+    if (a.z !== undefined) return float3(a.x+b.x, a.y+b.y, a.z+b.z);
+    return float2(a.x+b.x, a.y+b.y);
+  };
+  globalThis.sub = function(a, b) {
+    if (_isNum(a)) a = { x: a, y: a, z: a, w: a };
+    if (_isNum(b)) b = { x: b, y: b, z: b, w: b };
+    if (a.w !== undefined) return float4(a.x-b.x, a.y-b.y, a.z-b.z, a.w-b.w);
+    if (a.z !== undefined) return float3(a.x-b.x, a.y-b.y, a.z-b.z);
+    return float2(a.x-b.x, a.y-b.y);
+  };
+  globalThis.mul = function(a, b) {
+    if (_isNum(a)) a = { x: a, y: a, z: a, w: a };
+    if (_isNum(b)) b = { x: b, y: b, z: b, w: b };
+    if (a.w !== undefined) return float4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w);
+    if (a.z !== undefined) return float3(a.x*b.x, a.y*b.y, a.z*b.z);
+    return float2(a.x*b.x, a.y*b.y);
+  };
+  globalThis.div = function(a, b) {
+    if (_isNum(a)) a = { x: a, y: a, z: a, w: a };
+    if (_isNum(b)) b = { x: b, y: b, z: b, w: b };
+    if (a.w !== undefined) return float4(a.x/b.x, a.y/b.y, a.z/b.z, a.w/b.w);
+    if (a.z !== undefined) return float3(a.x/b.x, a.y/b.y, a.z/b.z);
+    return float2(a.x/b.x, a.y/b.y);
+  };
 })();";
 
 			var codeBytes = System.Text.Encoding.UTF8.GetBytes(bootstrap + '\0');

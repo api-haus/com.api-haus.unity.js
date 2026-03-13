@@ -196,25 +196,18 @@ namespace JsGameCodegen
             if (methods.Length == 0)
                 return;
 
-            // Separate full-compile vs stub-only
-            var fullMethods = methods.Where(m => m.Signature == null).ToList();
-            var allMethods = methods; // stubs need all
+            // Group ALL methods by containing class (both full-compile and Signature-mode)
+            var byClass = methods
+                .GroupBy(m => m.FullClassName)
+                .ToList();
 
-            // Group full-compile by containing class
-            if (fullMethods.Count > 0)
+            foreach (var classGroup in byClass)
             {
-                var byClass = fullMethods
-                    .GroupBy(m => m.FullClassName)
-                    .ToList();
-
-                foreach (var classGroup in byClass)
-                {
-                    GenerateClassPartial(ctx, classGroup.Key, classGroup.ToList());
-                }
+                GenerateClassPartial(ctx, classGroup.Key, classGroup.ToList());
             }
 
             // Generate stub info class (includes both full and stub-only)
-            GenerateStubInfo(ctx, allMethods);
+            GenerateStubInfo(ctx, methods);
         }
 
         static void GenerateClassPartial(
@@ -249,8 +242,8 @@ namespace JsGameCodegen
                 .GroupBy(m => new { m.Table, m.Function })
                 .ToList();
 
-            // Check if we need DetectVecSize helper
-            var needsDetectVecSize = byTableFunc.Any(g => g.Count() > 1);
+            // Check if we need DetectVecSize helper (only for full-compile overload groups)
+            var needsDetectVecSize = byTableFunc.Any(g => g.Count(m => m.Signature == null) > 1);
 
             if (needsDetectVecSize)
             {
@@ -284,13 +277,26 @@ namespace JsGameCodegen
                 foreach (var funcGroup in tableGroup)
                 {
                     var funcName = funcGroup.Key.Function;
-                    var wrapperName = "JsCompiled_" + funcName;
-                    // For overload groups, use the function name as wrapper; for singles, use method name
-                    if (funcGroup.Count() == 1)
-                        wrapperName = "JsCompiled_" + funcGroup.First().MethodName;
+                    var isSignatureMode = funcGroup.Any(m => m.Signature != null);
+                    var fullOverloads = funcGroup.Where(m => m.Signature == null).ToList();
 
-                    // argc = max across overloads
-                    var argc = funcGroup.Max(m => m.Parameters.Count(p => !p.IsOut));
+                    string wrapperName;
+                    int argc;
+
+                    if (isSignatureMode && fullOverloads.Count == 0)
+                    {
+                        // Pure Signature-mode: the method already has QJSShimCallback signature
+                        wrapperName = funcGroup.First().MethodName;
+                        argc = CountSignatureParams(funcGroup.First().Signature);
+                    }
+                    else
+                    {
+                        // Full-compile: use generated wrapper
+                        wrapperName = "JsCompiled_" + funcName;
+                        if (fullOverloads.Count == 1)
+                            wrapperName = "JsCompiled_" + fullOverloads[0].MethodName;
+                        argc = fullOverloads.Max(m => m.Parameters.Count(p => !p.IsOut));
+                    }
 
                     sb.AppendLine("\t\t\tvar p_" + funcName + " = System.Text.Encoding.UTF8.GetBytes(\"" + funcName + "\\0\");");
                     sb.AppendLine("\t\t\tfixed (byte* pp_" + funcName + " = p_" + funcName + ")");
@@ -304,15 +310,21 @@ namespace JsGameCodegen
             }
 
             // Emit wrappers — single methods get direct wrappers, groups get dispatch
-            foreach (var funcGroup in byTableFunc)
+            // Skip Signature-mode methods (they have manual [MonoPInvokeCallback] implementations)
+            var fullByTableFunc = byTableFunc
+                .Select(g => new { g.Key, Methods = g.Where(m => m.Signature == null).ToList() })
+                .Where(g => g.Methods.Count > 0)
+                .ToList();
+
+            foreach (var funcGroup in fullByTableFunc)
             {
-                if (funcGroup.Count() == 1)
+                if (funcGroup.Methods.Count == 1)
                 {
-                    EmitWrapper(sb, funcGroup.First());
+                    EmitWrapper(sb, funcGroup.Methods[0]);
                 }
                 else
                 {
-                    EmitDispatchWrapper(sb, funcGroup.Key.Function, funcGroup.ToList());
+                    EmitDispatchWrapper(sb, funcGroup.Key.Function, funcGroup.Methods);
                 }
             }
 
@@ -730,6 +742,20 @@ namespace JsGameCodegen
             sb.Append(m.ReturnType == JsParamType.Void ? "void" : TsTypeName(m.ReturnType));
 
             return sb.ToString();
+        }
+
+        static int CountSignatureParams(string signature)
+        {
+            if (string.IsNullOrEmpty(signature))
+                return 0;
+            var open = signature.IndexOf('(');
+            var close = signature.IndexOf(')');
+            if (open < 0 || close < 0 || close <= open + 1)
+                return 0;
+            var inside = signature.Substring(open + 1, close - open - 1).Trim();
+            if (inside.Length == 0)
+                return 0;
+            return inside.Split(',').Length;
         }
 
         static string TableToIdentifier(string table)

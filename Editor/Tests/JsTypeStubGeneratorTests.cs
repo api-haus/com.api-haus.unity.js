@@ -55,17 +55,17 @@ namespace UnityJS.Editor.Tests
 		[Test]
 		public void GenerateContent_ComponentHasGetSet()
 		{
-			StringAssert.Contains("get(eid: number): LocalTransform | null;", m_Content);
-			StringAssert.Contains("set(eid: number, data: LocalTransform): void;", m_Content);
+			// LocalTransform uses ComponentAccessor (get + set); actual get/set are in bridges.d.ts
+			StringAssert.Contains("declare const LocalTransform: ComponentAccessor<LocalTransform>;", m_Content);
 		}
 
 		[Test]
 		public void GenerateContent_ComponentFieldsHaveTypes()
 		{
-			// LocalTransform has position ({x,y,z}), scale (number), rotation ({x,y,z,w})
-			StringAssert.Contains("position: {x: number, y: number, z: number};", m_Content);
-			StringAssert.Contains("scale: number;", m_Content);
-			StringAssert.Contains("rotation: {x: number, y: number, z: number, w: number};", m_Content);
+			// LocalTransform fields use type references, not inline shapes
+			StringAssert.Contains("Position: float3;", m_Content);
+			StringAssert.Contains("Scale: number;", m_Content);
+			StringAssert.Contains("Rotation: quaternion;", m_Content);
 		}
 
 		// ── Descriptions Dictionaries ────────────────────────────────
@@ -93,7 +93,7 @@ namespace UnityJS.Editor.Tests
 			var dict = field.GetValue(null) as Dictionary<string, string>;
 			Assert.IsNotNull(dict, "Descriptions should be a Dictionary<string, string>");
 			Assert.IsTrue(dict.ContainsKey(""), "Should have struct-level description (empty key)");
-			Assert.IsTrue(dict.ContainsKey("max_speed"), "Should have field-level description for max_speed");
+			Assert.IsTrue(dict.ContainsKey("maxSpeed"), "Should have field-level description for maxSpeed");
 		}
 
 		[Test]
@@ -193,32 +193,16 @@ namespace UnityJS.Editor.Tests
 		[Test]
 		public void GenerateContent_ReadOnlyComponent_NoSetFunction()
 		{
-			// ECSCharacterState has NeedSetters = false
+			// ECSCharacterState has NeedSetters = false → ReadonlyComponentAccessor
 			if (!m_Content.Contains("interface ECSCharacterState"))
 			{
 				Assert.Inconclusive("ECSCharacterState not in stub");
 				return;
 			}
 
-			StringAssert.Contains("get(eid: number): ECSCharacterState | null;", m_Content);
-
-			// Find the char_state block and verify no set
-			var charStateIdx = m_Content.IndexOf("declare const char_state:", StringComparison.Ordinal);
-			if (charStateIdx < 0)
-			{
-				Assert.Inconclusive("char_state accessor block not found");
-				return;
-			}
-
-			// Get the block from char_state to the next "declare const" or end
-			var nextDeclareIdx = m_Content.IndexOf("declare const ", charStateIdx + 1, StringComparison.Ordinal);
-			var block = nextDeclareIdx > 0
-				? m_Content.Substring(charStateIdx, nextDeclareIdx - charStateIdx)
-				: m_Content.Substring(charStateIdx);
-
-			Assert.IsFalse(
-				block.Contains("set(eid:"),
-				"Read-only component should not have a set function"
+			StringAssert.Contains(
+				"declare const ECSCharacterState: ReadonlyComponentAccessor<ECSCharacterState>;",
+				m_Content
 			);
 		}
 
@@ -234,7 +218,7 @@ namespace UnityJS.Editor.Tests
 				return;
 			}
 
-			StringAssert.Contains("wander_plane: WanderPlane;", m_Content);
+			StringAssert.Contains("wanderPlane: WanderPlane;", m_Content);
 		}
 
 		// ── Enum type alias ─────────────────────────────────────────
