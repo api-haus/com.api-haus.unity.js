@@ -57,13 +57,31 @@ BuiltQuery.prototype[Symbol.iterator] = function() {
     ? _nativeQuery({ all: this._allNames, none: this._noneNames })
     : _nativeQuery(...this._allNames);
   let i = 0;
+  let prevEid = -1;
+  let prevTuple = null;
+
+  function flush() {
+    if (prevTuple === null) return;
+    for (let j = 0; j < accessors.length; j++) {
+      if (accessors[j].set) accessors[j].set(prevEid, prevTuple[j + 1]);
+    }
+    prevTuple = null;
+  }
+
   return {
     next() {
+      flush();
       if (i >= entities.length) return { done: true, value: undefined };
       const eid = entities[i++];
       const tuple = [eid];
       for (let j = 0; j < accessors.length; j++) tuple.push(accessors[j].get(eid));
+      prevEid = eid;
+      prevTuple = tuple;
       return { done: false, value: tuple };
+    },
+    return(v) {
+      flush();
+      return { done: true, value: v };
     }
   };
 };
