@@ -20,10 +20,10 @@ namespace UnityJS.Editor
 			{ "System.Single", "number" },
 			{ "System.Int32", "number" },
 			{ "System.Boolean", "boolean" },
-			{ "Unity.Mathematics.float2", "{x: number, y: number}" },
-			{ "Unity.Mathematics.float3", "{x: number, y: number, z: number}" },
-			{ "Unity.Mathematics.float4", "{x: number, y: number, z: number, w: number}" },
-			{ "Unity.Mathematics.quaternion", "{x: number, y: number, z: number, w: number}" },
+			{ "Unity.Mathematics.float2", "float2" },
+			{ "Unity.Mathematics.float3", "float3" },
+			{ "Unity.Mathematics.float4", "float4" },
+			{ "Unity.Mathematics.quaternion", "quaternion" },
 		};
 
 		[InitializeOnLoadMethod]

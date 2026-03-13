@@ -261,9 +261,43 @@ namespace UnityJS.Entities.Core
 			RegisterLogFunctions(ctx);
 			RegisterInputFunctions(ctx);
 			RegisterDrawFunctions(ctx);
-			RegisterMathFunctions(ctx);
+			RegisterMathBootstrap(ctx);
 
 			JsFunctionRegistry.RegisterAll(ctx);
+		}
+
+		static unsafe void RegisterMathBootstrap(JSContext ctx)
+		{
+			const string bootstrap = @"(function() {
+  var m = globalThis.math || {};
+  m.PI = 3.14159265358979;
+  m.E = 2.71828182845905;
+  m.EPSILON = 1.1920928955078125e-7;
+  m.INFINITY = Infinity;
+  m.random = Math.random;
+  globalThis.math = m;
+  globalThis.float2 = function(x, y) { return {x: x, y: y !== undefined ? y : x}; };
+  globalThis.float3 = function(x, y, z) { return {x: x, y: y !== undefined ? y : x, z: z !== undefined ? z : x}; };
+  globalThis.float4 = function(x, y, z, w) { return {x: x, y: y !== undefined ? y : x, z: z !== undefined ? z : x, w: w !== undefined ? w : x}; };
+})();";
+
+			var codeBytes = System.Text.Encoding.UTF8.GetBytes(bootstrap + '\0');
+			var filenameBytes = System.Text.Encoding.UTF8.GetBytes("<math_bootstrap>\0");
+			fixed (byte* pCode = codeBytes, pFilename = filenameBytes)
+			{
+				var result = QJS.JS_Eval(ctx, pCode, codeBytes.Length - 1, pFilename,
+					QJS.JS_EVAL_TYPE_GLOBAL);
+				if (QJS.IsException(result))
+				{
+					var ex = QJS.JS_GetException(ctx);
+					var pMsg = QJS.JS_ToCString(ctx, ex);
+					var msg = System.Runtime.InteropServices.Marshal.PtrToStringUTF8((nint)pMsg) ?? "unknown error";
+					QJS.JS_FreeCString(ctx, pMsg);
+					QJS.JS_FreeValue(ctx, ex);
+					Unity.Logging.Log.Error("[JsECS] Failed to initialize math bootstrap: {0}", msg);
+				}
+				QJS.JS_FreeValue(ctx, result);
+			}
 		}
 
 		/// <summary>

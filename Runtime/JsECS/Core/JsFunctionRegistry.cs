@@ -6,13 +6,13 @@ namespace UnityJS.Entities.Core
 
 	public static class JsFunctionRegistry
 	{
-		static readonly Dictionary<string, List<Action<JSContext>>> s_registrations = new();
+		static readonly Dictionary<string, List<Action<JSContext, JSValue>>> s_registrations = new();
 
-		public static void Register(string tableName, Action<JSContext> registerFunc)
+		public static void Register(string tableName, Action<JSContext, JSValue> registerFunc)
 		{
 			if (!s_registrations.TryGetValue(tableName, out var list))
 			{
-				list = new List<Action<JSContext>>();
+				list = new List<Action<JSContext, JSValue>>();
 				s_registrations[tableName] = list;
 			}
 
@@ -45,7 +45,7 @@ namespace UnityJS.Entities.Core
 					}
 
 					foreach (var func in funcs)
-						func(ctx);
+						func(ctx, ns);
 
 					QJS.JS_SetPropertyStr(ctx, global, pTableName, ns);
 				}

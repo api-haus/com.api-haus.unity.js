@@ -157,9 +157,13 @@ namespace JsGameCodegen
             switch (name)
             {
                 case "float": return JsParamType.Float;
+                case "double": return JsParamType.Float;
                 case "int": return JsParamType.Int;
                 case "bool": return JsParamType.Bool;
+                case "Unity.Mathematics.float2": return JsParamType.Float2;
                 case "Unity.Mathematics.float3": return JsParamType.Float3;
+                case "Unity.Mathematics.float4": return JsParamType.Float4;
+                case "Unity.Mathematics.quaternion": return JsParamType.Quaternion;
                 default: return JsParamType.Unsupported;
             }
         }
@@ -232,6 +236,7 @@ namespace JsGameCodegen
             sb.AppendLine("\tusing AOT;");
             sb.AppendLine("\tusing UnityJS.Entities.Core;");
             sb.AppendLine("\tusing UnityJS.QJS;");
+            sb.AppendLine("\tusing UnityJS.Runtime;");
             sb.AppendLine("\tusing Unity.Mathematics;");
             sb.AppendLine();
 
@@ -239,8 +244,21 @@ namespace JsGameCodegen
             sb.AppendLine("\t" + staticMod + "partial class " + first.ClassName);
             sb.AppendLine("\t{");
 
+            // Group by (table, function) for overload dispatch
+            var byTableFunc = methods
+                .GroupBy(m => new { m.Table, m.Function })
+                .ToList();
+
+            // Check if we need DetectVecSize helper
+            var needsDetectVecSize = byTableFunc.Any(g => g.Count() > 1);
+
+            if (needsDetectVecSize)
+            {
+                EmitDetectVecSize(sb);
+            }
+
             // Group by table for registration
-            var byTable = methods.GroupBy(m => m.Table).ToList();
+            var byTable = byTableFunc.GroupBy(g => g.Key.Table).ToList();
 
             // Auto-register method
             sb.AppendLine("#if UNITY_EDITOR");
@@ -257,30 +275,45 @@ namespace JsGameCodegen
             sb.AppendLine("\t\t}");
             sb.AppendLine();
 
-            // Per-table registration functions
+            // Per-table registration functions — register one JS function per (table, function) group
             foreach (var tableGroup in byTable)
             {
                 var safeName = TableToIdentifier(tableGroup.Key);
-                sb.AppendLine("\t\tstatic unsafe void JsCompiled_Register_" + safeName + "(JSContext ctx)");
+                sb.AppendLine("\t\tstatic unsafe void JsCompiled_Register_" + safeName + "(JSContext ctx, JSValue ns)");
                 sb.AppendLine("\t\t{");
-                foreach (var m in tableGroup)
+                foreach (var funcGroup in tableGroup)
                 {
-                    var argc = m.Parameters.Count(p => !p.IsOut);
-                    sb.AppendLine("\t\t\tvar p_" + m.MethodName + " = System.Text.Encoding.UTF8.GetBytes(\"" + m.Function + "\\0\");");
-                    sb.AppendLine("\t\t\tfixed (byte* pp_" + m.MethodName + " = p_" + m.MethodName + ")");
+                    var funcName = funcGroup.Key.Function;
+                    var wrapperName = "JsCompiled_" + funcName;
+                    // For overload groups, use the function name as wrapper; for singles, use method name
+                    if (funcGroup.Count() == 1)
+                        wrapperName = "JsCompiled_" + funcGroup.First().MethodName;
+
+                    // argc = max across overloads
+                    var argc = funcGroup.Max(m => m.Parameters.Count(p => !p.IsOut));
+
+                    sb.AppendLine("\t\t\tvar p_" + funcName + " = System.Text.Encoding.UTF8.GetBytes(\"" + funcName + "\\0\");");
+                    sb.AppendLine("\t\t\tfixed (byte* pp_" + funcName + " = p_" + funcName + ")");
                     sb.AppendLine("\t\t\t{");
-                    sb.AppendLine("\t\t\t\tvar fn = QJSShim.qjs_shim_new_function(ctx, JsCompiled_" + m.MethodName + ", pp_" + m.MethodName + ", " + argc + ");");
-                    sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ctx, pp_" + m.MethodName + ", fn);");
+                    sb.AppendLine("\t\t\t\tvar fn = QJSShim.qjs_shim_new_function(ctx, " + wrapperName + ", pp_" + funcName + ", " + argc + ");");
+                    sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pp_" + funcName + ", fn);");
                     sb.AppendLine("\t\t\t}");
                 }
                 sb.AppendLine("\t\t}");
                 sb.AppendLine();
             }
 
-            // Per-method wrappers
-            foreach (var m in methods)
+            // Emit wrappers — single methods get direct wrappers, groups get dispatch
+            foreach (var funcGroup in byTableFunc)
             {
-                EmitWrapper(sb, m);
+                if (funcGroup.Count() == 1)
+                {
+                    EmitWrapper(sb, funcGroup.First());
+                }
+                else
+                {
+                    EmitDispatchWrapper(sb, funcGroup.Key.Function, funcGroup.ToList());
+                }
             }
 
             sb.AppendLine("\t}");
@@ -290,6 +323,32 @@ namespace JsGameCodegen
 
             var fileName = first.ClassName + ".JsCompiled.g.cs";
             ctx.AddSource(fileName, SourceText.From(sb.ToString(), Encoding.UTF8));
+        }
+
+        static void EmitDetectVecSize(StringBuilder sb)
+        {
+            sb.AppendLine("\t\tstatic readonly byte[] s_dvs_z = {(byte)'z', 0};");
+            sb.AppendLine("\t\tstatic readonly byte[] s_dvs_w = {(byte)'w', 0};");
+            sb.AppendLine();
+            sb.AppendLine("\t\tstatic unsafe int DetectVecSize(JSContext ctx, JSValue val)");
+            sb.AppendLine("\t\t{");
+            sb.AppendLine("\t\t\tfixed (byte* pw = s_dvs_w)");
+            sb.AppendLine("\t\t\t{");
+            sb.AppendLine("\t\t\t\tvar w = QJS.JS_GetPropertyStr(ctx, val, pw);");
+            sb.AppendLine("\t\t\t\tvar has = !QJS.IsUndefined(w);");
+            sb.AppendLine("\t\t\t\tQJS.JS_FreeValue(ctx, w);");
+            sb.AppendLine("\t\t\t\tif (has) return 4;");
+            sb.AppendLine("\t\t\t}");
+            sb.AppendLine("\t\t\tfixed (byte* pz = s_dvs_z)");
+            sb.AppendLine("\t\t\t{");
+            sb.AppendLine("\t\t\t\tvar z = QJS.JS_GetPropertyStr(ctx, val, pz);");
+            sb.AppendLine("\t\t\t\tvar has = !QJS.IsUndefined(z);");
+            sb.AppendLine("\t\t\t\tQJS.JS_FreeValue(ctx, z);");
+            sb.AppendLine("\t\t\t\tif (has) return 3;");
+            sb.AppendLine("\t\t\t}");
+            sb.AppendLine("\t\t\treturn 2;");
+            sb.AppendLine("\t\t}");
+            sb.AppendLine();
         }
 
         static void EmitWrapper(StringBuilder sb, CompiledMethod m)
@@ -306,7 +365,6 @@ namespace JsGameCodegen
                 var p = m.Parameters[i];
                 if (p.IsOut)
                 {
-                    // Declare local for out param
                     sb.AppendLine("\t\t\t" + CSharpTypeName(p.Type) + " " + p.Name + ";");
                 }
                 else
@@ -325,8 +383,6 @@ namespace JsGameCodegen
                     callArgs.Append("out ");
                 callArgs.Append(m.Parameters[i].Name);
             }
-
-            var hasReturnOrOut = m.ReturnType != JsParamType.Void || m.Parameters.Any(p => p.IsOut);
 
             if (m.ReturnType != JsParamType.Void)
             {
@@ -347,6 +403,133 @@ namespace JsGameCodegen
             sb.AppendLine();
         }
 
+        static void EmitDispatchWrapper(StringBuilder sb, string funcName, List<CompiledMethod> overloads)
+        {
+            // Categorize overloads by first param type
+            CompiledMethod? floatOverload = null;
+            CompiledMethod? float2Overload = null;
+            CompiledMethod? float3Overload = null;
+            CompiledMethod? float4Overload = null;
+
+            foreach (var m in overloads)
+            {
+                if (m.Parameters.Length == 0) continue;
+                var firstType = m.Parameters[0].Type;
+                switch (firstType)
+                {
+                    case JsParamType.Float: floatOverload = m; break;
+                    case JsParamType.Float2: float2Overload = m; break;
+                    case JsParamType.Float3: float3Overload = m; break;
+                    case JsParamType.Float4: float4Overload = m; break;
+                }
+            }
+
+            sb.AppendLine("\t\t[MonoPInvokeCallback(typeof(QJSShimCallback))]");
+            sb.AppendLine("\t\tstatic unsafe void JsCompiled_" + funcName + "(JSContext ctx, long thisU, long thisTag,");
+            sb.AppendLine("\t\t\tint argc, JSValue* argv, long* outU, long* outTag)");
+            sb.AppendLine("\t\t{");
+
+            // Check if first arg is a number → scalar overload
+            if (floatOverload != null)
+            {
+                sb.AppendLine("\t\t\tif (QJS.IsNumber(argv[0]))");
+                sb.AppendLine("\t\t\t{");
+                EmitInlineCall(sb, floatOverload.Value, "\t\t\t\t");
+                sb.AppendLine("\t\t\t\treturn;");
+                sb.AppendLine("\t\t\t}");
+            }
+
+            // Vector dispatch
+            var hasVecOverloads = float2Overload != null || float3Overload != null || float4Overload != null;
+            if (hasVecOverloads)
+            {
+                sb.AppendLine("\t\t\tvar _sz = DetectVecSize(ctx, argv[0]);");
+
+                if (float4Overload != null)
+                {
+                    sb.AppendLine("\t\t\tif (_sz == 4)");
+                    sb.AppendLine("\t\t\t{");
+                    EmitInlineCall(sb, float4Overload.Value, "\t\t\t\t");
+                    sb.AppendLine("\t\t\t}");
+                    sb.Append("\t\t\telse ");
+                }
+
+                if (float3Overload != null)
+                {
+                    sb.AppendLine("if (_sz == 3)");
+                    sb.AppendLine("\t\t\t{");
+                    EmitInlineCall(sb, float3Overload.Value, "\t\t\t\t");
+                    sb.AppendLine("\t\t\t}");
+                    sb.Append("\t\t\telse ");
+                }
+
+                if (float2Overload != null)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine("\t\t\t{");
+                    EmitInlineCall(sb, float2Overload.Value, "\t\t\t\t");
+                    sb.AppendLine("\t\t\t}");
+                }
+                else
+                {
+                    // Fallback to float3 if no float2
+                    sb.AppendLine();
+                    sb.AppendLine("\t\t\t{");
+                    if (float3Overload != null)
+                        EmitInlineCall(sb, float3Overload.Value, "\t\t\t\t");
+                    else
+                    {
+                        sb.AppendLine("\t\t\t\t*outU = QJS.JS_UNDEFINED.u;");
+                        sb.AppendLine("\t\t\t\t*outTag = QJS.JS_UNDEFINED.tag;");
+                    }
+                    sb.AppendLine("\t\t\t}");
+                }
+            }
+
+            sb.AppendLine("\t\t}");
+            sb.AppendLine();
+        }
+
+        static void EmitInlineCall(StringBuilder sb, CompiledMethod m, string indent)
+        {
+            // Read args
+            var stackIdx = 0;
+            for (var i = 0; i < m.Parameters.Length; i++)
+            {
+                var p = m.Parameters[i];
+                if (p.IsOut)
+                {
+                    sb.AppendLine(indent + CSharpTypeName(p.Type) + " _p" + i + ";");
+                }
+                else
+                {
+                    sb.AppendLine(indent + "var _p" + i + " = " + ReadCode(p.Type, stackIdx) + ";");
+                    stackIdx++;
+                }
+            }
+
+            // Build call args
+            var callArgs = new StringBuilder();
+            for (var i = 0; i < m.Parameters.Length; i++)
+            {
+                if (i > 0) callArgs.Append(", ");
+                if (m.Parameters[i].IsOut) callArgs.Append("out ");
+                callArgs.Append("_p" + i);
+            }
+
+            if (m.ReturnType != JsParamType.Void)
+            {
+                sb.AppendLine(indent + "var _ret = " + m.MethodName + "(" + callArgs + ");");
+                sb.AppendLine(indent + "var _rv = " + PushCode(m.ReturnType, "_ret") + ";");
+                sb.AppendLine(indent + "*outU = _rv.u; *outTag = _rv.tag;");
+            }
+            else
+            {
+                sb.AppendLine(indent + m.MethodName + "(" + callArgs + ");");
+                sb.AppendLine(indent + "*outU = QJS.JS_UNDEFINED.u; *outTag = QJS.JS_UNDEFINED.tag;");
+            }
+        }
+
         static string ReadCode(JsParamType type, int argIdx)
         {
             switch (type)
@@ -357,8 +540,14 @@ namespace JsGameCodegen
                     return "QJSHelpers.ArgInt(ctx, argv, " + argIdx + ")";
                 case JsParamType.Bool:
                     return "QJS.JS_ToBool(ctx, argv[" + argIdx + "]) != 0";
+                case JsParamType.Float2:
+                    return "JsStateExtensions.JsObjectToFloat2(ctx, argv[" + argIdx + "])";
                 case JsParamType.Float3:
-                    return "JsECSBridge.ArgToFloat3(ctx, argv, " + argIdx + ")";
+                    return "JsStateExtensions.JsObjectToFloat3(ctx, argv[" + argIdx + "])";
+                case JsParamType.Float4:
+                    return "JsStateExtensions.JsObjectToFloat4(ctx, argv[" + argIdx + "])";
+                case JsParamType.Quaternion:
+                    return "JsStateExtensions.JsObjectToQuaternion(ctx, argv[" + argIdx + "])";
                 default: return "default";
             }
         }
@@ -370,7 +559,10 @@ namespace JsGameCodegen
                 case JsParamType.Float: return "QJS.NewFloat64(ctx, " + expr + ")";
                 case JsParamType.Int: return "QJS.NewInt32(ctx, " + expr + ")";
                 case JsParamType.Bool: return "QJS.JS_NewBool(ctx, " + expr + " ? 1 : 0)";
-                case JsParamType.Float3: return "JsECSBridge.Float3ToNewObject(ctx, " + expr + ")";
+                case JsParamType.Float2: return "JsStateExtensions.Float2ToJsObject(ctx, " + expr + ")";
+                case JsParamType.Float3: return "JsStateExtensions.Float3ToJsObject(ctx, " + expr + ")";
+                case JsParamType.Float4: return "JsStateExtensions.Float4ToJsObject(ctx, " + expr + ")";
+                case JsParamType.Quaternion: return "JsStateExtensions.QuaternionToJsObject(ctx, " + expr + ")";
                 default: return "QJS.JS_UNDEFINED";
             }
         }
@@ -382,40 +574,52 @@ namespace JsGameCodegen
                 case JsParamType.Float: return "float";
                 case JsParamType.Int: return "int";
                 case JsParamType.Bool: return "bool";
+                case JsParamType.Float2: return "float2";
                 case JsParamType.Float3: return "float3";
+                case JsParamType.Float4: return "float4";
+                case JsParamType.Quaternion: return "quaternion";
                 default: return "object";
             }
         }
 
-        static string JsCATSType(JsParamType type)
+        static string TsTypeName(JsParamType type)
         {
             switch (type)
             {
                 case JsParamType.Float: return "number";
-                case JsParamType.Int: return "integer";
+                case JsParamType.Int: return "number";
                 case JsParamType.Bool: return "boolean";
-                case JsParamType.Float3: return "vec3";
+                case JsParamType.Float2: return "float2";
+                case JsParamType.Float3: return "float3";
+                case JsParamType.Float4: return "float4";
+                case JsParamType.Quaternion: return "quaternion";
                 default: return "any";
             }
         }
 
         static void GenerateStubInfo(SourceProductionContext ctx, ImmutableArray<CompiledMethod> methods)
         {
+            // Group by (table, function) for TS signature generation
+            var grouped = methods
+                .OrderBy(x => x.Table).ThenBy(x => x.Function)
+                .GroupBy(m => new { m.Table, m.Function })
+                .ToList();
+
             var sb = new StringBuilder();
             sb.AppendLine("// <auto-generated/>");
             sb.AppendLine("namespace UnityJS.Entities.Generated");
             sb.AppendLine("{");
             sb.AppendLine("    public static class JsCompiledStubs");
             sb.AppendLine("    {");
-            sb.AppendLine("        public static readonly (string table, string function, string signature, string description)[] Stubs = new[]");
+            sb.AppendLine("        public static readonly (string table, string function, string tsSignature, string description)[] Stubs = new[]");
             sb.AppendLine("        {");
 
-            foreach (var m in methods.OrderBy(x => x.Table).ThenBy(x => x.Function))
+            foreach (var group in grouped)
             {
-                var sig = m.Signature ?? BuildSignature(m);
-                var desc = m.Summary ?? "";
-                sb.AppendLine("            (\"" + EscapeString(m.Table) + "\", \"" + EscapeString(m.Function)
-                              + "\", \"" + EscapeString(sig) + "\", \"" + EscapeString(desc) + "\"),");
+                var tsSig = BuildTsSignature(group.ToList());
+                var desc = group.First().Summary ?? "";
+                sb.AppendLine("            (\"" + EscapeString(group.Key.Table) + "\", \"" + EscapeString(group.Key.Function)
+                              + "\", \"" + EscapeString(tsSig) + "\", \"" + EscapeString(desc) + "\"),");
             }
 
             sb.AppendLine("        };");
@@ -425,39 +629,105 @@ namespace JsGameCodegen
             ctx.AddSource("JsCompiledStubs.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
         }
 
-        static string BuildSignature(CompiledMethod m)
+        static string BuildTsSignature(List<CompiledMethod> group)
         {
-            var sb = new StringBuilder("fun(");
+            // If any has explicit Signature, use it
+            var withSig = group.FirstOrDefault(m => m.Signature != null);
+            if (withSig.Signature != null)
+                return withSig.Signature;
+
+            if (group.Count == 1)
+            {
+                return BuildSingleTsSignature(group[0]);
+            }
+
+            // Multiple overloads — detect pattern
+            var firstParamTypes = new HashSet<JsParamType>(
+                group.Where(m => m.Parameters.Length > 0).Select(m => m.Parameters[0].Type));
+
+            var returnTypes = new HashSet<JsParamType>(group.Select(m => m.ReturnType));
+
+            // Componentwise pattern: first param type == return type for each overload
+            var isComponentwise = group.All(m =>
+                m.Parameters.Length > 0 && m.ReturnType == m.Parameters[0].Type);
+
+            // Vector-to-scalar pattern: return type is always Float
+            var isVectorToScalar = returnTypes.Count == 1 && returnTypes.Contains(JsParamType.Float);
+
+            if (isComponentwise)
+            {
+                // Build generic: <T extends ...>(x: T, ...): T
+                var types = new List<string>();
+                if (firstParamTypes.Contains(JsParamType.Float)) types.Add("number");
+                if (firstParamTypes.Contains(JsParamType.Float2)) types.Add("float2");
+                if (firstParamTypes.Contains(JsParamType.Float3)) types.Add("float3");
+                if (firstParamTypes.Contains(JsParamType.Float4)) types.Add("float4");
+
+                var constraint = string.Join(" | ", types);
+
+                // Use first overload as template for param names/count
+                var template = group[0];
+                var paramSb = new StringBuilder();
+                for (var i = 0; i < template.Parameters.Length; i++)
+                {
+                    if (i > 0) paramSb.Append(", ");
+                    var p = template.Parameters[i];
+                    // If the param type matches the first param type in all overloads, use T
+                    var allSameSlot = group.All(m => m.Parameters.Length > i && m.Parameters[i].Type == m.Parameters[0].Type);
+                    if (allSameSlot)
+                        paramSb.Append(p.Name + ": T");
+                    else
+                        paramSb.Append(p.Name + ": " + TsTypeName(p.Type));
+                }
+
+                return "<T extends " + constraint + ">(" + paramSb + "): T";
+            }
+
+            if (isVectorToScalar)
+            {
+                // Build generic: <T extends float2 | float3 | float4>(a: T, b: T): number
+                var types = new List<string>();
+                if (firstParamTypes.Contains(JsParamType.Float)) types.Add("number");
+                if (firstParamTypes.Contains(JsParamType.Float2)) types.Add("float2");
+                if (firstParamTypes.Contains(JsParamType.Float3)) types.Add("float3");
+                if (firstParamTypes.Contains(JsParamType.Float4)) types.Add("float4");
+
+                var constraint = string.Join(" | ", types);
+                var template = group[0];
+                var paramSb = new StringBuilder();
+                for (var i = 0; i < template.Parameters.Length; i++)
+                {
+                    if (i > 0) paramSb.Append(", ");
+                    var p = template.Parameters[i];
+                    var allSameSlot = group.All(m => m.Parameters.Length > i && m.Parameters[i].Type == m.Parameters[0].Type);
+                    if (allSameSlot)
+                        paramSb.Append(p.Name + ": T");
+                    else
+                        paramSb.Append(p.Name + ": " + TsTypeName(p.Type));
+                }
+
+                return "<T extends " + constraint + ">(" + paramSb + "): number";
+            }
+
+            // Fallback: just emit the first overload's signature
+            return BuildSingleTsSignature(group[0]);
+        }
+
+        static string BuildSingleTsSignature(CompiledMethod m)
+        {
+            var sb = new StringBuilder("(");
 
             var first = true;
             foreach (var p in m.Parameters)
             {
-                if (p.IsOut)
-                    continue;
+                if (p.IsOut) continue;
                 if (!first) sb.Append(", ");
                 first = false;
-                sb.Append(SnakeCaseHelper.ToSnakeCase(p.Name));
-                sb.Append(": ");
-                sb.Append(JsCATSType(p.Type));
+                sb.Append(p.Name + ": " + TsTypeName(p.Type));
             }
 
-            sb.Append(")");
-
-            // Build return types
-            var returns = new List<string>();
-            if (m.ReturnType != JsParamType.Void)
-                returns.Add(JsCATSType(m.ReturnType));
-            foreach (var p in m.Parameters)
-            {
-                if (p.IsOut)
-                    returns.Add(JsCATSType(p.Type));
-            }
-
-            if (returns.Count > 0)
-            {
-                sb.Append(": ");
-                sb.Append(string.Join(", ", returns));
-            }
+            sb.Append("): ");
+            sb.Append(m.ReturnType == JsParamType.Void ? "void" : TsTypeName(m.ReturnType));
 
             return sb.ToString();
         }
@@ -477,7 +747,10 @@ namespace JsGameCodegen
             Float,
             Int,
             Bool,
+            Float2,
             Float3,
+            Float4,
+            Quaternion,
             Void,
             Unsupported,
         }
