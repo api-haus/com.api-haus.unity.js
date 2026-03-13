@@ -22,6 +22,7 @@ namespace UnityJS.Entities.Systems
     const string QueryBuilderSource =
       @"
 const _nativeQuery = globalThis.ecs.query;
+globalThis._nativeQuery = _nativeQuery;
 globalThis.ecs.query = function() {
   return new QueryBuilder([], []);
 };
