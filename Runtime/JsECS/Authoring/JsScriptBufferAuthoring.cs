@@ -71,8 +71,6 @@ namespace UnityJS.Entities.Authoring
 
         AddBuffer<JsEvent>(entity);
 
-        AddComponent(entity, new JsEntityId { value = 0 });
-
         m_Scripts.Clear();
       }
     }

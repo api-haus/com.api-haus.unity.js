@@ -3,6 +3,3 @@ build_property.RootNamespace = JsGameCodegen
 build_property.ProjectDir = /mnt/archive4/UNITY/Projects/woweyreey/Packages/unity.js/JsGameCodegen~/
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
-build_property.CsWinRTUseWindowsUIXamlProjections = false
-build_property.EffectiveAnalysisLevelStyle = 
-build_property.EnableCodeStyleSeverity = 

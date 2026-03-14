@@ -6,19 +6,77 @@ namespace UnityJS.Entities.Core
   using AOT;
   using Components;
   using Unity.Collections;
+  using Unity.Collections.LowLevel.Unsafe;
   using Unity.Entities;
   using UnityJS.QJS;
 
   public static class JsQueryBridge
   {
     static readonly Dictionary<int, EntityQuery> s_queryCache = new();
+    static readonly Dictionary<int, (ComponentType[] all, ComponentType[] none)> s_pendingQueries = new();
+    static readonly Dictionary<int, int[]> s_precomputedIds = new();
     static EntityManager s_entityManager;
     static bool s_initialized;
+
 
     public static void Initialize(EntityManager entityManager)
     {
       s_entityManager = entityManager;
       s_initialized = true;
+    }
+
+    /// <summary>
+    /// Called from JsSystemRunner.OnUpdate (system context) each frame.
+    /// Creates EntityQuery objects for any component combinations that
+    /// were first encountered inside the P/Invoke callback.
+    /// </summary>
+    public static void FlushPendingQueries(EntityManager entityManager)
+    {
+      if (s_pendingQueries.Count == 0)
+        return;
+
+      foreach (var kvp in s_pendingQueries)
+      {
+        var (all, none) = kvp.Value;
+        var desc = new EntityQueryDesc { All = all, None = none };
+        s_queryCache[kvp.Key] = entityManager.CreateEntityQuery(desc);
+      }
+      s_pendingQueries.Clear();
+    }
+
+    /// <summary>
+    /// Called from JsSystemRunner.OnUpdate (system context) each frame.
+    /// Snapshots entity IDs for all cached queries so the P/Invoke callback
+    /// never touches EntityManager directly.
+    /// </summary>
+    public static void PrecomputeQueryResults(EntityManager entityManager)
+    {
+      foreach (var kvp in s_queryCache)
+      {
+        var query = kvp.Value;
+        if (query == default) continue;
+
+        var entities = query.ToEntityArray(Allocator.Temp);
+        var ids = new int[entities.Length];
+        var count = 0;
+
+        for (var i = 0; i < entities.Length; i++)
+        {
+          var entity = entities[i];
+          var entityId = JsEntityRegistry.GetIdFromEntity(entity);
+          if (entityId <= 0 && entityManager.HasComponent<JsEntityId>(entity))
+            entityId = entityManager.GetComponentData<JsEntityId>(entity).value;
+
+          if (entityId > 0)
+            ids[count++] = entityId;
+        }
+        entities.Dispose();
+
+        if (count < ids.Length)
+          System.Array.Resize(ref ids, count);
+
+        s_precomputedIds[kvp.Key] = ids;
+      }
     }
 
     public static void Shutdown()
@@ -29,6 +87,8 @@ namespace UnityJS.Entities.Core
           kvp.Value.Dispose();
       }
       s_queryCache.Clear();
+      s_pendingQueries.Clear();
+      s_precomputedIds.Clear();
       s_initialized = false;
     }
 
@@ -63,7 +123,7 @@ namespace UnityJS.Entities.Core
       QJS.JS_FreeValue(ctx, global);
     }
 
-    /// <summary>Query entities by component names.</summary>
+    /// <summary>Query entities by component names — returns precomputed results only.</summary>
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
     static unsafe void Query(
       JSContext ctx,
@@ -130,30 +190,35 @@ namespace UnityJS.Entities.Core
         return;
       }
 
-      var query = GetOrCreateQuery(allComponents, noneComponents);
-      var entities = query.ToEntityArray(Allocator.Temp);
+      var hash = ComputeQueryHash(allComponents, noneComponents);
 
-      var arr = QJS.JS_NewArray(ctx);
-      uint resultIndex = 0;
-      for (var i = 0; i < entities.Length; i++)
+      // Return precomputed results if available
+      if (s_precomputedIds.TryGetValue(hash, out var ids) && ids.Length > 0)
       {
-        var entity = entities[i];
-        var entityId = JsEntityRegistry.GetIdFromEntity(entity);
-        if (entityId <= 0)
-        {
-          if (s_entityManager.HasComponent<JsEntityId>(entity))
-            entityId = s_entityManager.GetComponentData<JsEntityId>(entity).value;
-        }
-
-        if (entityId > 0)
-        {
-          QJS.JS_SetPropertyUint32(ctx, arr, resultIndex++, QJS.NewInt32(ctx, entityId));
-        }
+        // Use a plain JS array — Int32Array via qjs_shim_new_int32array references
+        // the source buffer, which is invalid after the callback returns.
+        var arr = QJS.JS_NewArray(ctx);
+        for (var i = 0; i < ids.Length; i++)
+          QJS.JS_SetPropertyUint32(ctx, arr, (uint)i, QJS.NewInt32(ctx, ids[i]));
+        *outU = arr.u;
+        *outTag = arr.tag;
+        return;
       }
-      entities.Dispose();
 
-      *outU = arr.u;
-      *outTag = arr.tag;
+      // No precomputed results — register for creation from system context next frame
+      if (!s_queryCache.ContainsKey(hash))
+      {
+        var allArray = allComponents.ToArray();
+        var noneArray = noneComponents.Count > 0
+          ? noneComponents.ToArray()
+          : System.Array.Empty<ComponentType>();
+        s_pendingQueries[hash] = (allArray, noneArray);
+      }
+
+      // Return empty for this frame
+      var emptyArr = QJS.JS_NewArray(ctx);
+      *outU = emptyArr.u;
+      *outTag = emptyArr.tag;
     }
 
     static unsafe void ReadJsComponentArray(JSContext ctx, JSValue arr, List<ComponentType> result)
@@ -180,27 +245,6 @@ namespace UnityJS.Entities.Core
           QJS.JS_FreeValue(ctx, elem);
         }
       }
-    }
-
-    static EntityQuery GetOrCreateQuery(
-      List<ComponentType> allComponents,
-      List<ComponentType> noneComponents
-    )
-    {
-      var hash = ComputeQueryHash(allComponents, noneComponents);
-      if (s_queryCache.TryGetValue(hash, out var cached))
-        return cached;
-
-      var desc = new EntityQueryDesc
-      {
-        All = allComponents.ToArray(),
-        None =
-          noneComponents.Count > 0 ? noneComponents.ToArray() : System.Array.Empty<ComponentType>(),
-      };
-
-      var query = s_entityManager.CreateEntityQuery(desc);
-      s_queryCache[hash] = query;
-      return query;
     }
 
     static int ComputeQueryHash(

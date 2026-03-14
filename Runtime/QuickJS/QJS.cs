@@ -282,6 +282,27 @@ namespace UnityJS.QJS
     [DllImport(Lib, CallingConvention = CC)]
     public static extern int JS_IsFunction(JSContext ctx, JSValue val);
 
+    // ArrayBuffer / TypedArray
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe JSValue JS_NewArrayBufferCopy(
+      JSContext ctx, byte* buf, nint len);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe byte* JS_GetArrayBuffer(
+      JSContext ctx, nint* psize, JSValue obj);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe JSValue JS_NewTypedArray(
+      JSContext ctx, int argc, JSValue* argv, int array_type);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe JSValue JS_GetTypedArrayBuffer(
+      JSContext ctx, JSValue obj, nint* pbyte_offset, nint* pbyte_length, nint* pbytes_per_element);
+
+    // TypedArray enum constants (from JSTypedArrayEnum)
+    public const int JS_TYPED_ARRAY_INT32 = 5;
+    public const int JS_TYPED_ARRAY_FLOAT32 = 10;
+
     // Exceptions
     [DllImport(Lib, CallingConvention = CC)]
     public static extern JSValue JS_GetException(JSContext ctx);

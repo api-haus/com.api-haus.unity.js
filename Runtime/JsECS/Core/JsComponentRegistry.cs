@@ -89,9 +89,7 @@ namespace UnityJS.Entities.Core
     public static void UpdateAllLookups(ref SystemState state)
     {
       foreach (var updater in s_lookupUpdaters)
-      {
         updater(ref state);
-      }
     }
   }
 }

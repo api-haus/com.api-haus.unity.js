@@ -121,49 +121,7 @@ namespace UnityJS.Entities.PlayModeTests
       }
     }
 
-    static string BuildQueryOnlyJs(int compCount)
-    {
-      var names = new StringBuilder();
-      for (var i = 0; i < compCount; i++)
-      {
-        if (i > 0)
-          names.Append(", ");
-        names.Append('"');
-        names.Append(s_CompNames[i]);
-        names.Append('"');
-      }
-
-      return $"(function() {{ var r = globalThis._nativeQuery({names}); return r.length; }})()";
-    }
-
-    static string BuildIterateReadJs(int compCount)
-    {
-      var sb = new StringBuilder();
-      sb.Append("(function() {");
-      sb.Append("var names = [");
-      for (var i = 0; i < compCount; i++)
-      {
-        if (i > 0)
-          sb.Append(',');
-        sb.Append('"');
-        sb.Append(s_CompNames[i]);
-        sb.Append('"');
-      }
-      sb.Append("];");
-      sb.Append("var eids = globalThis._nativeQuery(...names);");
-      sb.Append("var sum = 0;");
-      sb.Append("for (var i = 0; i < eids.length; i++) {");
-      sb.Append("  var eid = eids[i];");
-      for (var i = 0; i < compCount; i++)
-        sb.Append($"  var c{i} = {s_CompNames[i]}.get(eid);");
-      sb.Append("  sum += c0.a;");
-      sb.Append('}');
-      sb.Append("return sum;");
-      sb.Append("})()");
-      return sb.ToString();
-    }
-
-    static string BuildIterateReadWriteJs(int compCount)
+    static string BuildReadWriteJs(int compCount)
     {
       var sb = new StringBuilder();
       sb.Append("(function() {");
@@ -201,68 +159,72 @@ namespace UnityJS.Entities.PlayModeTests
     #region Benchmark Tests
 
     [UnityTest]
-    public IEnumerator Bridged_QueryOnly(
+    public IEnumerator Bridged_ReadWrite(
       [Values(10, 100, 10_000, 100_000)] int entityCount,
-      [Values(1, 2, 3, 4, 5)] int componentCount
-    )
+      [Values(1, 2, 3, 4, 5)] int componentCount)
     {
       CreateBenchmarkEntities(entityCount, componentCount);
       yield return null;
 
-      var js = BuildQueryOnlyJs(componentCount);
+      var js = BuildReadWriteJs(componentCount);
       var (warmup, iterations) = GetIterationCounts(entityCount);
 
       BenchmarkHarness.Measure(
-        MakeLabel("QueryOnly", entityCount, componentCount),
-        warmup,
-        iterations,
-        () => EvalGlobal(js)
-      );
+        MakeLabel("ReadWrite", entityCount, componentCount),
+        warmup, iterations,
+        () => EvalGlobal(js));
 
       yield return null;
     }
 
     [UnityTest]
-    public IEnumerator Bridged_IterateRead(
-      [Values(10, 100, 10_000, 100_000)] int entityCount,
-      [Values(1, 2, 3, 4, 5)] int componentCount
-    )
+    public IEnumerator Bridged_ReadWriteRoundTrip()
     {
-      CreateBenchmarkEntities(entityCount, componentCount);
+      const int count = 10;
+      CreateBenchmarkEntities(count, 2);
+
+      // Set known initial values
+      var q = m_EntityManager.CreateEntityQuery(
+        ComponentType.ReadWrite<BenchComp1>(),
+        ComponentType.ReadWrite<BenchComp2>());
+      var entities = q.ToEntityArray(Allocator.Temp);
+      for (var i = 0; i < entities.Length; i++)
+      {
+        m_EntityManager.SetComponentData(entities[i], new BenchComp1 { a = 1f });
+        m_EntityManager.SetComponentData(entities[i], new BenchComp2 { a = 2f, b = 3f });
+      }
+      entities.Dispose();
+      q.Dispose();
+
+      // PrecomputeQueryResults needs a frame to pick up entities
+      yield return null;
       yield return null;
 
-      var js = BuildIterateReadJs(componentCount);
-      var (warmup, iterations) = GetIterationCounts(entityCount);
-
-      BenchmarkHarness.Measure(
-        MakeLabel("IterateRead", entityCount, componentCount),
-        warmup,
-        iterations,
-        () => EvalGlobal(js)
-      );
-
-      yield return null;
+      // JS: read + write via query builder for-of (per-entity set path)
+      EvalGlobal(@"(function() {
+    var q = ecs.query().withAll(BenchComp1).withAll(BenchComp2).build();
+    for (const [eid, c1, c2] of q) {
+      c1.a += 10;
+      c2.b += 100;
     }
+  })()");
 
-    [UnityTest]
-    public IEnumerator Bridged_IterateReadWrite(
-      [Values(10, 100, 10_000, 100_000)] int entityCount,
-      [Values(1, 2, 3, 4, 5)] int componentCount
-    )
-    {
-      CreateBenchmarkEntities(entityCount, componentCount);
-      yield return null;
-
-      var js = BuildIterateReadWriteJs(componentCount);
-      var (warmup, iterations) = GetIterationCounts(entityCount);
-
-      BenchmarkHarness.Measure(
-        MakeLabel("IterateReadWrite", entityCount, componentCount),
-        warmup,
-        iterations,
-        () => EvalGlobal(js)
-      );
-
+      // Assert writes persisted to C#
+      var q2 = m_EntityManager.CreateEntityQuery(
+        ComponentType.ReadWrite<BenchComp1>(),
+        ComponentType.ReadWrite<BenchComp2>());
+      var ents = q2.ToEntityArray(Allocator.Temp);
+      Assert.AreEqual(count, ents.Length);
+      for (var i = 0; i < ents.Length; i++)
+      {
+        var c1 = m_EntityManager.GetComponentData<BenchComp1>(ents[i]);
+        var c2 = m_EntityManager.GetComponentData<BenchComp2>(ents[i]);
+        Assert.AreEqual(11f, c1.a, 0.001f, $"BenchComp1.a entity {i}");
+        Assert.AreEqual(2f, c2.a, 0.001f, $"BenchComp2.a entity {i}");
+        Assert.AreEqual(103f, c2.b, 0.001f, $"BenchComp2.b entity {i}");
+      }
+      ents.Dispose();
+      q2.Dispose();
       yield return null;
     }
 

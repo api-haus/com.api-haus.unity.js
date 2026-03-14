@@ -1,4 +1,5 @@
 #include "quickjs.h"
+#include <stdint.h>
 #include <string.h>
 
 #ifdef _WIN32
@@ -98,6 +99,26 @@ SHIM_API void qjs_shim_set_module_loader(JSContext *ctx,
     s_read_file_cb = read_file_cb;
     JS_SetModuleLoaderFunc(JS_GetRuntime(ctx),
                            normalize_trampoline, loader_trampoline, NULL);
+}
+
+SHIM_API JSValue qjs_shim_new_float32array(JSContext *ctx, const float *data, int count)
+{
+    JSValue ab = JS_NewArrayBufferCopy(ctx, (const uint8_t *)data, (size_t)count * sizeof(float));
+    if (JS_IsException(ab))
+        return ab;
+    JSValue result = JS_NewTypedArray(ctx, 1, &ab, JS_TYPED_ARRAY_FLOAT32);
+    JS_FreeValue(ctx, ab);
+    return result;
+}
+
+SHIM_API JSValue qjs_shim_new_int32array(JSContext *ctx, const int32_t *data, int count)
+{
+    JSValue ab = JS_NewArrayBufferCopy(ctx, (const uint8_t *)data, (size_t)count * sizeof(int32_t));
+    if (JS_IsException(ab))
+        return ab;
+    JSValue result = JS_NewTypedArray(ctx, 1, &ab, JS_TYPED_ARRAY_INT32);
+    JS_FreeValue(ctx, ab);
+    return result;
 }
 
 SHIM_API JSValue qjs_shim_eval_module(JSContext *ctx,

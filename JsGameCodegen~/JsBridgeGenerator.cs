@@ -349,6 +349,45 @@ namespace JsGameCodegen
       return s.Replace("\\", "\\\\").Replace("\"", "\\\"");
     }
 
+    /// <summary>Compute total float slots per entity for a set of fields.</summary>
+    static int ComputeStride(ImmutableArray<FieldInfo> fields)
+    {
+      var stride = 0;
+      foreach (var f in fields)
+      {
+        stride += f.Type switch
+        {
+          JsFieldType.Float2 => 2,
+          JsFieldType.Float3 => 3,
+          JsFieldType.Float4 => 4,
+          JsFieldType.Quaternion => 4,
+          _ => 1, // Float, Int, Bool, Enum
+        };
+      }
+      return stride;
+    }
+
+    /// <summary>Build field layout: list of (name, slotCount, offset) for JS reconstruction.</summary>
+    static List<(string name, int count, int offset)> BuildFieldLayout(ImmutableArray<FieldInfo> fields)
+    {
+      var layout = new List<(string, int, int)>();
+      var offset = 0;
+      foreach (var f in fields)
+      {
+        var count = f.Type switch
+        {
+          JsFieldType.Float2 => 2,
+          JsFieldType.Float3 => 3,
+          JsFieldType.Float4 => 4,
+          JsFieldType.Quaternion => 4,
+          _ => 1,
+        };
+        layout.Add((f.JsName, count, offset));
+        offset += count;
+      }
+      return layout;
+    }
+
     /// <summary>
     /// Emit a C# static byte array literal: static readonly byte[] s_name = { (byte)'c', ..., 0 };
     /// </summary>
@@ -442,6 +481,13 @@ namespace JsGameCodegen
       if (needSetters)
         EmitByteArray(sb, "s_set", "set");
       EmitByteArray(sb, "s___name", "__name");
+      // Batch API byte arrays
+      if (needAccessors)
+        EmitByteArray(sb, "s_getAll", "getAll");
+      if (needSetters)
+        EmitByteArray(sb, "s_setAll", "setAll");
+      EmitByteArray(sb, "s___stride", "__stride");
+      EmitByteArray(sb, "s___fieldLayout", "__fieldLayout");
       sb.AppendLine();
 
       // Auto-register (deferred — TypeManager may not be initialized yet at AfterAssembliesLoaded)
@@ -486,6 +532,76 @@ namespace JsGameCodegen
         sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pSet, fn);");
         sb.AppendLine("\t\t\t}");
       }
+      // Batch getAll/setAll
+      if (needAccessors)
+      {
+        sb.AppendLine("\t\t\tfixed (byte* pGetAll = s_getAll)");
+        sb.AppendLine("\t\t\t{");
+        sb.AppendLine(
+          "\t\t\t\tvar fn = QJSShim.qjs_shim_new_function(ctx, GetAll_Component, pGetAll, 1);"
+        );
+        sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pGetAll, fn);");
+        sb.AppendLine("\t\t\t}");
+      }
+      if (needSetters)
+      {
+        sb.AppendLine("\t\t\tfixed (byte* pSetAll = s_setAll)");
+        sb.AppendLine("\t\t\t{");
+        sb.AppendLine(
+          "\t\t\t\tvar fn = QJSShim.qjs_shim_new_function(ctx, SetAll_Component, pSetAll, 2);"
+        );
+        sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pSetAll, fn);");
+        sb.AppendLine("\t\t\t}");
+      }
+      // Metadata: __stride and __fieldLayout
+      {
+        var stride = ComputeStride(fields);
+        var layout = BuildFieldLayout(fields);
+        sb.AppendLine("\t\t\tfixed (byte* pStride = s___stride)");
+        sb.AppendLine(
+          "\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pStride, QJS.NewInt32(ctx, " + stride + "));"
+        );
+        // __fieldLayout = [{name:"x", count:1, offset:0}, ...]
+        sb.AppendLine("\t\t\tvar layoutArr = QJS.JS_NewArray(ctx);");
+        for (var li = 0; li < layout.Count; li++)
+        {
+          var (fname, fcount, foffset) = layout[li];
+          sb.AppendLine("\t\t\t{");
+          sb.AppendLine("\t\t\t\tvar fObj = QJS.JS_NewObject(ctx);");
+          sb.AppendLine(
+            "\t\t\t\tvar pFn = System.Text.Encoding.UTF8.GetBytes(\"name\\0\");"
+          );
+          sb.AppendLine(
+            "\t\t\t\tvar pFnV = System.Text.Encoding.UTF8.GetBytes(\"" + fname + "\\0\");"
+          );
+          sb.AppendLine(
+            "\t\t\t\tvar pFc = System.Text.Encoding.UTF8.GetBytes(\"count\\0\");"
+          );
+          sb.AppendLine(
+            "\t\t\t\tvar pFo = System.Text.Encoding.UTF8.GetBytes(\"offset\\0\");"
+          );
+          sb.AppendLine(
+            "\t\t\t\tfixed (byte* ppn = pFn, ppnv = pFnV, ppc = pFc, ppo = pFo)"
+          );
+          sb.AppendLine("\t\t\t\t{");
+          sb.AppendLine(
+            "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, fObj, ppn, QJS.JS_NewString(ctx, ppnv));"
+          );
+          sb.AppendLine(
+            "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, fObj, ppc, QJS.NewInt32(ctx, " + fcount + "));"
+          );
+          sb.AppendLine(
+            "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, fObj, ppo, QJS.NewInt32(ctx, " + foffset + "));"
+          );
+          sb.AppendLine("\t\t\t\t}");
+          sb.AppendLine(
+            "\t\t\t\tQJS.JS_SetPropertyUint32(ctx, layoutArr, " + li + ", fObj);"
+          );
+          sb.AppendLine("\t\t\t}");
+        }
+        sb.AppendLine("\t\t\tfixed (byte* pLayout = s___fieldLayout)");
+        sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pLayout, layoutArr);");
+      }
       sb.AppendLine("\t\t\tvar global = QJS.JS_GetGlobalObject(ctx);");
       sb.AppendLine(
         "\t\t\tvar pNameBytes = System.Text.Encoding.UTF8.GetBytes(\"" + jsName + "\\0\");"
@@ -512,11 +628,16 @@ namespace JsGameCodegen
       sb.AppendLine("\t\t}");
       sb.AppendLine();
 
-      // Get/Set component functions
+      // Get/Set component functions (per-entity)
       if (needAccessors)
         EmitGetComponent(sb, fields, fullTypeName);
       if (needSetters)
         EmitSetComponent(sb, fields, fullTypeName);
+      // Batch GetAll/SetAll component functions
+      if (needAccessors)
+        EmitGetAllComponent(sb, fields, fullTypeName);
+      if (needSetters)
+        EmitSetAllComponent(sb, fields, fullTypeName);
 
       // Emit Descriptions dictionary for editor stub generation
       var hasAnyDoc = target.Description != null || fields.Any(f => f.Description != null);
@@ -833,6 +954,308 @@ namespace JsGameCodegen
         sb.AppendLine("\t\t\t\t}");
       }
       sb.AppendLine("\t\t\t\tQJS.JS_FreeValue(ctx, v_" + field.JsName + ");");
+    }
+
+    static void EmitGetAllComponent(
+      StringBuilder sb,
+      ImmutableArray<FieldInfo> fields,
+      string fullTypeName
+    )
+    {
+      var stride = ComputeStride(fields);
+      sb.AppendLine("\t\t[MonoPInvokeCallback(typeof(QJSShimCallback))]");
+      sb.AppendLine(
+        "\t\tstatic unsafe void GetAll_Component(JSContext ctx, long thisU, long thisTag,"
+      );
+      sb.AppendLine("\t\t\tint argc, JSValue* argv, long* outU, long* outTag)");
+      sb.AppendLine("\t\t{");
+      // Get the backing buffer of the Int32Array
+      sb.AppendLine("\t\t\tnint byteOffset, byteLen, bpe;");
+      sb.AppendLine(
+        "\t\t\tvar abVal = QJS.JS_GetTypedArrayBuffer(ctx, argv[0], &byteOffset, &byteLen, &bpe);"
+      );
+      sb.AppendLine("\t\t\tnint abSize;");
+      sb.AppendLine("\t\t\tvar abPtr = QJS.JS_GetArrayBuffer(ctx, &abSize, abVal);");
+      sb.AppendLine("\t\t\tQJS.JS_FreeValue(ctx, abVal);");
+      sb.AppendLine("\t\t\tint* ids = (int*)(abPtr + byteOffset);");
+      sb.AppendLine("\t\t\tvar count = (int)(byteLen / 4);");
+      sb.AppendLine();
+      // Allocate float buffer
+      sb.AppendLine("\t\t\tconst int stride = " + stride + ";");
+      sb.AppendLine("\t\t\tvar totalFloats = count * stride;");
+      sb.AppendLine("\t\t\tfloat* buf;");
+      sb.AppendLine("\t\t\tbool heapAlloc;");
+      sb.AppendLine("\t\t\tif (totalFloats <= 16384)");
+      sb.AppendLine("\t\t\t{");
+      sb.AppendLine("\t\t\t\tvar stackBuf = stackalloc float[totalFloats];");
+      sb.AppendLine("\t\t\t\tbuf = stackBuf;");
+      sb.AppendLine("\t\t\t\theapAlloc = false;");
+      sb.AppendLine("\t\t\t}");
+      sb.AppendLine("\t\t\telse");
+      sb.AppendLine("\t\t\t{");
+      sb.AppendLine(
+        "\t\t\t\tbuf = (float*)Unity.Collections.LowLevel.Unsafe.UnsafeUtility.MallocTracked("
+      );
+      sb.AppendLine(
+        "\t\t\t\t\ttotalFloats * sizeof(float), Unity.Collections.LowLevel.Unsafe.UnsafeUtility.AlignOf<float>(),"
+      );
+      sb.AppendLine("\t\t\t\t\tUnity.Collections.Allocator.Temp, 0);");
+      sb.AppendLine("\t\t\t\theapAlloc = true;");
+      sb.AppendLine("\t\t\t}");
+      sb.AppendLine();
+      // Inner loop — pure C#, zero P/Invoke
+      sb.AppendLine("\t\t\tfor (var i = 0; i < count; i++)");
+      sb.AppendLine("\t\t\t{");
+      sb.AppendLine("\t\t\t\tvar entity = JsECSBridge.GetEntityFromIdBurst(ids[i]);");
+      sb.AppendLine("\t\t\t\tvar comp = s_lookup.Data[entity];");
+      sb.AppendLine("\t\t\t\tvar off = i * stride;");
+
+      var slotOffset = 0;
+      foreach (var field in fields)
+      {
+        switch (field.Type)
+        {
+          case JsFieldType.Float:
+            sb.AppendLine("\t\t\t\tbuf[off + " + slotOffset + "] = comp." + field.Name + ";");
+            slotOffset++;
+            break;
+          case JsFieldType.Int:
+            sb.AppendLine(
+              "\t\t\t\tbuf[off + "
+                + slotOffset
+                + "] = Unity.Mathematics.math.asfloat(comp."
+                + field.Name
+                + ");"
+            );
+            slotOffset++;
+            break;
+          case JsFieldType.Bool:
+            sb.AppendLine(
+              "\t\t\t\tbuf[off + "
+                + slotOffset
+                + "] = Unity.Mathematics.math.asfloat(comp."
+                + field.Name
+                + " ? 1 : 0);"
+            );
+            slotOffset++;
+            break;
+          case JsFieldType.Enum:
+            sb.AppendLine(
+              "\t\t\t\tbuf[off + "
+                + slotOffset
+                + "] = Unity.Mathematics.math.asfloat((int)comp."
+                + field.Name
+                + ");"
+            );
+            slotOffset++;
+            break;
+          case JsFieldType.Float2:
+            sb.AppendLine("\t\t\t\tbuf[off + " + slotOffset + "] = comp." + field.Name + ".x;");
+            sb.AppendLine(
+              "\t\t\t\tbuf[off + " + (slotOffset + 1) + "] = comp." + field.Name + ".y;"
+            );
+            slotOffset += 2;
+            break;
+          case JsFieldType.Float3:
+            sb.AppendLine("\t\t\t\tbuf[off + " + slotOffset + "] = comp." + field.Name + ".x;");
+            sb.AppendLine(
+              "\t\t\t\tbuf[off + " + (slotOffset + 1) + "] = comp." + field.Name + ".y;"
+            );
+            sb.AppendLine(
+              "\t\t\t\tbuf[off + " + (slotOffset + 2) + "] = comp." + field.Name + ".z;"
+            );
+            slotOffset += 3;
+            break;
+          case JsFieldType.Float4:
+            for (var ci = 0; ci < 4; ci++)
+            {
+              var comp = new[] { "x", "y", "z", "w" }[ci];
+              sb.AppendLine(
+                "\t\t\t\tbuf[off + "
+                  + (slotOffset + ci)
+                  + "] = comp."
+                  + field.Name
+                  + "."
+                  + comp
+                  + ";"
+              );
+            }
+            slotOffset += 4;
+            break;
+          case JsFieldType.Quaternion:
+            for (var ci = 0; ci < 4; ci++)
+            {
+              var comp = new[] { "x", "y", "z", "w" }[ci];
+              sb.AppendLine(
+                "\t\t\t\tbuf[off + "
+                  + (slotOffset + ci)
+                  + "] = comp."
+                  + field.Name
+                  + ".value."
+                  + comp
+                  + ";"
+              );
+            }
+            slotOffset += 4;
+            break;
+        }
+      }
+
+      sb.AppendLine("\t\t\t}");
+      sb.AppendLine();
+      sb.AppendLine("\t\t\tvar result = QJSShim.qjs_shim_new_float32array(ctx, buf, totalFloats);");
+      sb.AppendLine("\t\t\tif (heapAlloc)");
+      sb.AppendLine(
+        "\t\t\t\tUnity.Collections.LowLevel.Unsafe.UnsafeUtility.FreeTracked(buf, Unity.Collections.Allocator.Temp);"
+      );
+      sb.AppendLine("\t\t\t*outU = result.u;");
+      sb.AppendLine("\t\t\t*outTag = result.tag;");
+      sb.AppendLine("\t\t}");
+      sb.AppendLine();
+    }
+
+    static void EmitSetAllComponent(
+      StringBuilder sb,
+      ImmutableArray<FieldInfo> fields,
+      string fullTypeName
+    )
+    {
+      var stride = ComputeStride(fields);
+      sb.AppendLine("\t\t[MonoPInvokeCallback(typeof(QJSShimCallback))]");
+      sb.AppendLine(
+        "\t\tstatic unsafe void SetAll_Component(JSContext ctx, long thisU, long thisTag,"
+      );
+      sb.AppendLine("\t\t\tint argc, JSValue* argv, long* outU, long* outTag)");
+      sb.AppendLine("\t\t{");
+      // argv[0] = Int32Array of entity IDs, argv[1] = Float32Array of data
+      sb.AppendLine("\t\t\tnint idByteOff, idByteLen, idBpe;");
+      sb.AppendLine(
+        "\t\t\tvar idAb = QJS.JS_GetTypedArrayBuffer(ctx, argv[0], &idByteOff, &idByteLen, &idBpe);"
+      );
+      sb.AppendLine("\t\t\tnint idAbSize;");
+      sb.AppendLine("\t\t\tvar idAbPtr = QJS.JS_GetArrayBuffer(ctx, &idAbSize, idAb);");
+      sb.AppendLine("\t\t\tQJS.JS_FreeValue(ctx, idAb);");
+      sb.AppendLine("\t\t\tint* ids = (int*)(idAbPtr + idByteOff);");
+      sb.AppendLine("\t\t\tvar count = (int)(idByteLen / 4);");
+      sb.AppendLine();
+      sb.AppendLine("\t\t\tnint dataByteOff, dataByteLen, dataBpe;");
+      sb.AppendLine(
+        "\t\t\tvar dataAb = QJS.JS_GetTypedArrayBuffer(ctx, argv[1], &dataByteOff, &dataByteLen, &dataBpe);"
+      );
+      sb.AppendLine("\t\t\tnint dataAbSize;");
+      sb.AppendLine("\t\t\tvar dataAbPtr = QJS.JS_GetArrayBuffer(ctx, &dataAbSize, dataAb);");
+      sb.AppendLine("\t\t\tQJS.JS_FreeValue(ctx, dataAb);");
+      sb.AppendLine("\t\t\tfloat* buf = (float*)(dataAbPtr + dataByteOff);");
+      sb.AppendLine();
+      sb.AppendLine("\t\t\tconst int stride = " + stride + ";");
+      // Inner loop
+      sb.AppendLine("\t\t\tfor (var i = 0; i < count; i++)");
+      sb.AppendLine("\t\t\t{");
+      sb.AppendLine("\t\t\t\tvar entity = JsECSBridge.GetEntityFromIdBurst(ids[i]);");
+      sb.AppendLine("\t\t\t\tvar comp = s_lookup.Data[entity];");
+      sb.AppendLine("\t\t\t\tvar off = i * stride;");
+
+      var slotOffset = 0;
+      foreach (var field in fields)
+      {
+        switch (field.Type)
+        {
+          case JsFieldType.Float:
+            sb.AppendLine("\t\t\t\tcomp." + field.Name + " = buf[off + " + slotOffset + "];");
+            slotOffset++;
+            break;
+          case JsFieldType.Int:
+            sb.AppendLine(
+              "\t\t\t\tcomp."
+                + field.Name
+                + " = Unity.Mathematics.math.asint(buf[off + "
+                + slotOffset
+                + "]);"
+            );
+            slotOffset++;
+            break;
+          case JsFieldType.Bool:
+            sb.AppendLine(
+              "\t\t\t\tcomp."
+                + field.Name
+                + " = Unity.Mathematics.math.asint(buf[off + "
+                + slotOffset
+                + "]) != 0;"
+            );
+            slotOffset++;
+            break;
+          case JsFieldType.Enum:
+            sb.AppendLine(
+              "\t\t\t\tcomp."
+                + field.Name
+                + " = ("
+                + field.EnumTypeName
+                + ")Unity.Mathematics.math.asint(buf[off + "
+                + slotOffset
+                + "]);"
+            );
+            slotOffset++;
+            break;
+          case JsFieldType.Float2:
+            sb.AppendLine("\t\t\t\tcomp." + field.Name + ".x = buf[off + " + slotOffset + "];");
+            sb.AppendLine(
+              "\t\t\t\tcomp." + field.Name + ".y = buf[off + " + (slotOffset + 1) + "];"
+            );
+            slotOffset += 2;
+            break;
+          case JsFieldType.Float3:
+            sb.AppendLine("\t\t\t\tcomp." + field.Name + ".x = buf[off + " + slotOffset + "];");
+            sb.AppendLine(
+              "\t\t\t\tcomp." + field.Name + ".y = buf[off + " + (slotOffset + 1) + "];"
+            );
+            sb.AppendLine(
+              "\t\t\t\tcomp." + field.Name + ".z = buf[off + " + (slotOffset + 2) + "];"
+            );
+            slotOffset += 3;
+            break;
+          case JsFieldType.Float4:
+            for (var ci = 0; ci < 4; ci++)
+            {
+              var comp = new[] { "x", "y", "z", "w" }[ci];
+              sb.AppendLine(
+                "\t\t\t\tcomp."
+                  + field.Name
+                  + "."
+                  + comp
+                  + " = buf[off + "
+                  + (slotOffset + ci)
+                  + "];"
+              );
+            }
+            slotOffset += 4;
+            break;
+          case JsFieldType.Quaternion:
+            for (var ci = 0; ci < 4; ci++)
+            {
+              var comp = new[] { "x", "y", "z", "w" }[ci];
+              sb.AppendLine(
+                "\t\t\t\tcomp."
+                  + field.Name
+                  + ".value."
+                  + comp
+                  + " = buf[off + "
+                  + (slotOffset + ci)
+                  + "];"
+              );
+            }
+            slotOffset += 4;
+            break;
+        }
+      }
+
+      sb.AppendLine("\t\t\t\ts_lookup.Data[entity] = comp;");
+      sb.AppendLine("\t\t\t}");
+      sb.AppendLine();
+      sb.AppendLine("\t\t\tvar ret = QJS.JS_UNDEFINED;");
+      sb.AppendLine("\t\t\t*outU = ret.u;");
+      sb.AppendLine("\t\t\t*outTag = ret.tag;");
+      sb.AppendLine("\t\t}");
+      sb.AppendLine();
     }
 
     // -- Code generation (enum) ----------------------------------------------

@@ -55,5 +55,13 @@ namespace UnityJS.QJS
       int sourceLen,
       byte* filename
     );
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe JSValue qjs_shim_new_float32array(
+      JSContext ctx, float* data, int count);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern unsafe JSValue qjs_shim_new_int32array(
+      JSContext ctx, int* data, int count);
   }
 }

@@ -58,31 +58,111 @@ BuiltQuery.prototype[Symbol.iterator] = function() {
   const entities = this._noneNames.length > 0
     ? _nativeQuery({ all: this._allNames, none: this._noneNames })
     : _nativeQuery(...this._allNames);
-  let i = 0;
-  let prevEid = -1;
-  let prevTuple = null;
+  const n = entities.length;
+  if (n === 0) return { next() { return { done: true, value: undefined }; } };
 
-  function flush() {
-    if (prevTuple === null) return;
-    for (let j = 0; j < accessors.length; j++) {
-      if (accessors[j].set) accessors[j].set(prevEid, prevTuple[j + 1]);
+  // Force per-entity path — batch setAll writeback doesn't persist
+  // for components whose lookup was obtained in a different context.
+  let useBatch = false;
+
+  if (!useBatch) {
+    // Per-entity fallback
+    let i = 0, prevEid = -1, prevTuple = null;
+    function flush() {
+      if (prevTuple === null) return;
+      for (let j = 0; j < accessors.length; j++) {
+        if (accessors[j].set) accessors[j].set(prevEid, prevTuple[j + 1]);
+      }
+      prevTuple = null;
     }
-    prevTuple = null;
+    return {
+      next() {
+        flush();
+        if (i >= n) return { done: true, value: undefined };
+        const eid = entities[i++];
+        const tuple = [eid];
+        for (let j = 0; j < accessors.length; j++) tuple.push(accessors[j].get(eid));
+        prevEid = eid;
+        prevTuple = tuple;
+        return { done: false, value: tuple };
+      },
+      return(v) { flush(); return { done: true, value: v }; }
+    };
+  }
+
+  // Batch path: one FFI call per component instead of N
+  const columns = [];
+  const strides = [];
+  const layouts = [];
+  for (let j = 0; j < accessors.length; j++) {
+    columns[j] = accessors[j].getAll(entities);
+    strides[j] = accessors[j].__stride;
+    layouts[j] = accessors[j].__fieldLayout;
+  }
+
+  let i = 0;
+  const refs = [];
+
+  function unpackEntity(idx) {
+    const tuple = [entities[idx]];
+    for (let j = 0; j < accessors.length; j++) {
+      const s = strides[j], layout = layouts[j], col = columns[j];
+      const off = idx * s;
+      const obj = {};
+      for (let f = 0; f < layout.length; f++) {
+        const fl = layout[f];
+        if (fl.count === 1) {
+          obj[fl.name] = col[off + fl.offset];
+        } else {
+          const sub = { x: col[off + fl.offset], y: col[off + fl.offset + 1] };
+          if (fl.count >= 3) sub.z = col[off + fl.offset + 2];
+          if (fl.count >= 4) sub.w = col[off + fl.offset + 3];
+          obj[fl.name] = sub;
+        }
+      }
+      tuple.push(obj);
+    }
+    return tuple;
+  }
+
+  function writeback() {
+    for (let j = 0; j < accessors.length; j++) {
+      if (!accessors[j].setAll) continue;
+      const s = strides[j], layout = layouts[j], col = columns[j];
+      for (let k = 0; k < refs.length; k++) {
+        const obj = refs[k][j + 1];
+        const off = refs[k]._idx * s;
+        for (let f = 0; f < layout.length; f++) {
+          const fl = layout[f];
+          if (fl.count === 1) {
+            col[off + fl.offset] = obj[fl.name];
+          } else {
+            const sub = obj[fl.name];
+            col[off + fl.offset] = sub.x;
+            col[off + fl.offset + 1] = sub.y;
+            if (fl.count >= 3) col[off + fl.offset + 2] = sub.z;
+            if (fl.count >= 4) col[off + fl.offset + 3] = sub.w;
+          }
+        }
+      }
+      accessors[j].setAll(entities, col);
+    }
   }
 
   return {
     next() {
-      flush();
-      if (i >= entities.length) return { done: true, value: undefined };
-      const eid = entities[i++];
-      const tuple = [eid];
-      for (let j = 0; j < accessors.length; j++) tuple.push(accessors[j].get(eid));
-      prevEid = eid;
-      prevTuple = tuple;
+      if (i >= n) {
+        writeback();
+        return { done: true, value: undefined };
+      }
+      const tuple = unpackEntity(i);
+      tuple._idx = i;
+      refs.push(tuple);
+      i++;
       return { done: false, value: tuple };
     },
     return(v) {
-      flush();
+      writeback();
       return { done: true, value: v };
     }
   };
@@ -239,9 +319,6 @@ BuiltQuery.prototype[Symbol.iterator] = function() {
       if (!EnsureVmReady())
         return;
 
-      if (m_SystemNames.Count == 0)
-        return;
-
       var deltaTime = SystemAPI.Time.DeltaTime;
       if (deltaTime <= 0f)
         deltaTime = UnityEngine.Time.deltaTime;
@@ -249,6 +326,8 @@ BuiltQuery.prototype[Symbol.iterator] = function() {
       var elapsedTime = SystemAPI.Time.ElapsedTime;
 
       RegisterSentinelEntities();
+
+      PrewarmComponentQueries();
 
       EntityManager.CompleteDependencyBeforeRW<LocalTransform>();
       m_TransformLookup.Update(this);
@@ -273,6 +352,12 @@ BuiltQuery.prototype[Symbol.iterator] = function() {
         var scriptId = "system:" + systemName;
         m_Vm.CallFunction(scriptId, "onUpdate", stateRef);
       }
+    }
+
+    void PrewarmComponentQueries()
+    {
+      JsQueryBridge.FlushPendingQueries(EntityManager);
+      JsQueryBridge.PrecomputeQueryResults(EntityManager);
     }
 
     void RegisterSentinelEntities()

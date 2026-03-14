@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("JsGameCodegen")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+473800c1c187622e3a7249f424e9f2ac26d25bce")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c7f8ba3943d6d98ff711ab21a95badc163e2662d")]
 [assembly: System.Reflection.AssemblyProductAttribute("JsGameCodegen")]
 [assembly: System.Reflection.AssemblyTitleAttribute("JsGameCodegen")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
