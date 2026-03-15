@@ -2,11 +2,10 @@
   "name": "UnityJS.QJS.Tests",
   "rootNamespace": "UnityJS.QJS.Tests",
   "references": [
-    "UnityJS.QJS"
+    "UnityJS.QJS",
+    "UnityEngine.TestRunner"
   ],
-  "includePlatforms": [
-    "Editor"
-  ],
+  "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": true,
   "overrideReferences": true,

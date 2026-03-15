@@ -6,11 +6,10 @@
     "UnityJS.Runtime",
     "Unity.Mathematics",
     "Unity.Collections",
-    "Unity.Burst"
+    "Unity.Burst",
+    "UnityEngine.TestRunner"
   ],
-  "includePlatforms": [
-    "Editor"
-  ],
+  "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": true,
   "overrideReferences": true,

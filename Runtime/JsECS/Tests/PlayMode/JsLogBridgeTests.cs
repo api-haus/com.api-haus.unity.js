@@ -1,4 +1,4 @@
-namespace UnityJS.Entities.Tests
+namespace UnityJS.Entities.PlayModeTests
 {
   using NUnit.Framework;
 
