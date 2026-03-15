@@ -228,6 +228,7 @@ namespace UnityJS.Editor
       {
         var className = type.Name;
         var docs = GetComponentDocs(type);
+        var isComponent = typeof(Unity.Entities.IComponentData).IsAssignableFrom(type);
 
         if (docs != null && docs.TryGetValue("", out var classDesc))
           sb.AppendLine($"/** {classDesc} */");
@@ -248,15 +249,18 @@ namespace UnityJS.Editor
         sb.AppendLine("}");
         sb.AppendLine();
 
-        if (needSetters)
+        if (isComponent)
         {
-          sb.AppendLine($"declare const {jsName}: ComponentAccessor<{className}>;");
-          sb.AppendLine();
-        }
-        else if (needAccessors)
-        {
-          sb.AppendLine($"declare const {jsName}: ReadonlyComponentAccessor<{className}>;");
-          sb.AppendLine();
+          if (needSetters)
+          {
+            sb.AppendLine($"declare const {jsName}: ComponentAccessor<{className}>;");
+            sb.AppendLine();
+          }
+          else if (needAccessors)
+          {
+            sb.AppendLine($"declare const {jsName}: ReadonlyComponentAccessor<{className}>;");
+            sb.AppendLine();
+          }
         }
       }
     }

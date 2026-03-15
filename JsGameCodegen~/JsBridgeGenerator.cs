@@ -107,8 +107,10 @@ namespace JsGameCodegen
     {
       var structSyntax = (StructDeclarationSyntax)ctx.Node;
       var symbol = ctx.SemanticModel.GetDeclaredSymbol(structSyntax, ct);
-      if (symbol == null || !ImplementsIComponentData(symbol))
+      if (symbol == null)
         return null;
+
+      var isComponent = ImplementsIComponentData(symbol);
 
       foreach (var attrData in symbol.GetAttributes())
       {
@@ -133,6 +135,13 @@ namespace JsGameCodegen
         if (string.IsNullOrEmpty(jsName))
           jsName = symbol.Name;
 
+        // Non-components don't need ECS accessors
+        if (!isComponent)
+        {
+          needAccessors = false;
+          needSetters = false;
+        }
+
         var fields = GetSupportedFields(symbol, needAccessors, needSetters, ct);
         if (fields.Length == 0)
           return null;
@@ -144,6 +153,7 @@ namespace JsGameCodegen
           jsName,
           needAccessors,
           needSetters,
+          isComponent,
           fields,
           desc
         );
@@ -180,8 +190,7 @@ namespace JsGameCodegen
       if (typeInfo.Type is not INamedTypeSymbol targetType)
         return null;
 
-      if (!ImplementsIComponentData(targetType))
-        return null;
+      var isComponent = ImplementsIComponentData(targetType);
 
       string jsName = null;
       var needAccessors = true;
@@ -216,6 +225,13 @@ namespace JsGameCodegen
       if (string.IsNullOrEmpty(jsName))
         jsName = targetType.Name;
 
+      // Non-components don't need ECS accessors
+      if (!isComponent)
+      {
+        needAccessors = false;
+        needSetters = false;
+      }
+
       var fields = GetSupportedFields(targetType, needAccessors, needSetters, ct);
       if (fields.Length == 0)
         return null;
@@ -227,6 +243,7 @@ namespace JsGameCodegen
         jsName,
         needAccessors,
         needSetters,
+        isComponent,
         fields,
         desc
       );
@@ -416,6 +433,7 @@ namespace JsGameCodegen
       var jsName = target.JsName;
       var needAccessors = target.NeedAccessors;
       var needSetters = target.NeedSetters;
+      var isComponent = target.IsComponent;
       var fields = target.Fields;
       var className = "Js" + typeName + "Bridge";
 
@@ -433,21 +451,25 @@ namespace JsGameCodegen
 
       sb.AppendLine("\tpublic static class " + className);
       sb.AppendLine("\t{");
-      sb.AppendLine("\t\tstruct LookupMarker_" + typeName + " { }");
-      sb.AppendLine();
-      sb.AppendLine(
-        "\t\tstatic readonly SharedStatic<ComponentLookup<" + fullTypeName + ">> s_lookup ="
-      );
-      sb.AppendLine(
-        "\t\t\tSharedStatic<ComponentLookup<"
-          + fullTypeName
-          + ">>.GetOrCreate<LookupMarker_"
-          + typeName
-          + ", ComponentLookup<"
-          + fullTypeName
-          + ">>();"
-      );
-      sb.AppendLine();
+
+      if (isComponent)
+      {
+        sb.AppendLine("\t\tstruct LookupMarker_" + typeName + " { }");
+        sb.AppendLine();
+        sb.AppendLine(
+          "\t\tstatic readonly SharedStatic<ComponentLookup<" + fullTypeName + ">> s_lookup ="
+        );
+        sb.AppendLine(
+          "\t\t\tSharedStatic<ComponentLookup<"
+            + fullTypeName
+            + ">>.GetOrCreate<LookupMarker_"
+            + typeName
+            + ", ComponentLookup<"
+            + fullTypeName
+            + ">>();"
+        );
+        sb.AppendLine();
+      }
 
       // Static byte arrays for property names
       foreach (var field in fields)
@@ -483,16 +505,19 @@ namespace JsGameCodegen
       if (needSetters)
         EmitByteArray(sb, "s_set", "set");
       EmitByteArray(sb, "s___name", "__name");
-      // Batch API byte arrays
-      if (needAccessors)
-        EmitByteArray(sb, "s_getAll", "getAll");
-      if (needSetters)
-        EmitByteArray(sb, "s_setAll", "setAll");
-      EmitByteArray(sb, "s___stride", "__stride");
-      EmitByteArray(sb, "s___fieldLayout", "__fieldLayout");
+      if (isComponent)
+      {
+        // Batch API byte arrays
+        if (needAccessors)
+          EmitByteArray(sb, "s_getAll", "getAll");
+        if (needSetters)
+          EmitByteArray(sb, "s_setAll", "setAll");
+        EmitByteArray(sb, "s___stride", "__stride");
+        EmitByteArray(sb, "s___fieldLayout", "__fieldLayout");
+      }
       sb.AppendLine();
 
-      // Auto-register (deferred — TypeManager may not be initialized yet at AfterAssembliesLoaded)
+      // Auto-register
       sb.AppendLine("#if UNITY_EDITOR");
       sb.AppendLine("\t\t[UnityEditor.InitializeOnLoadMethod]");
       sb.AppendLine("#endif");
@@ -501,12 +526,20 @@ namespace JsGameCodegen
       );
       sb.AppendLine("\t\tstatic void AutoRegister()");
       sb.AppendLine("\t\t{");
-      sb.AppendLine("\t\t\tJsComponentRegistry.RegisterBridgeDeferred(");
-      sb.AppendLine("\t\t\t\t\"" + jsName + "\",");
-      sb.AppendLine("\t\t\t\t() => ComponentType.ReadWrite<" + fullTypeName + ">(),");
-      sb.AppendLine("\t\t\t\tRegister,");
-      sb.AppendLine("\t\t\t\tUpdateLookup");
-      sb.AppendLine("\t\t\t);");
+      if (isComponent)
+      {
+        // Deferred registration — TypeManager may not be initialized yet at AfterAssembliesLoaded
+        sb.AppendLine("\t\t\tJsComponentRegistry.RegisterBridgeDeferred(");
+        sb.AppendLine("\t\t\t\t\"" + jsName + "\",");
+        sb.AppendLine("\t\t\t\t() => ComponentType.ReadWrite<" + fullTypeName + ">(),");
+        sb.AppendLine("\t\t\t\tRegister,");
+        sb.AppendLine("\t\t\t\tUpdateLookup");
+        sb.AppendLine("\t\t\t);");
+      }
+      else
+      {
+        sb.AppendLine("\t\t\tJsComponentRegistry.RegisterEnum(Register);");
+      }
       sb.AppendLine("\t\t}");
       sb.AppendLine();
 
@@ -534,65 +567,68 @@ namespace JsGameCodegen
         sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pSet, fn);");
         sb.AppendLine("\t\t\t}");
       }
-      // Batch getAll/setAll
-      if (needAccessors)
+      if (isComponent)
       {
-        sb.AppendLine("\t\t\tfixed (byte* pGetAll = s_getAll)");
-        sb.AppendLine("\t\t\t{");
-        sb.AppendLine(
-          "\t\t\t\tvar fn = QJSShim.qjs_shim_new_function(ctx, GetAll_Component, pGetAll, 1);"
-        );
-        sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pGetAll, fn);");
-        sb.AppendLine("\t\t\t}");
-      }
-      if (needSetters)
-      {
-        sb.AppendLine("\t\t\tfixed (byte* pSetAll = s_setAll)");
-        sb.AppendLine("\t\t\t{");
-        sb.AppendLine(
-          "\t\t\t\tvar fn = QJSShim.qjs_shim_new_function(ctx, SetAll_Component, pSetAll, 2);"
-        );
-        sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pSetAll, fn);");
-        sb.AppendLine("\t\t\t}");
-      }
-      // Metadata: __stride and __fieldLayout
-      {
-        var stride = ComputeStride(fields);
-        var layout = BuildFieldLayout(fields);
-        sb.AppendLine("\t\t\tfixed (byte* pStride = s___stride)");
-        sb.AppendLine(
-          "\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pStride, QJS.NewInt32(ctx, " + stride + "));"
-        );
-        // __fieldLayout = [{name:"x", count:1, offset:0}, ...]
-        sb.AppendLine("\t\t\tvar layoutArr = QJS.JS_NewArray(ctx);");
-        for (var li = 0; li < layout.Count; li++)
+        // Batch getAll/setAll
+        if (needAccessors)
         {
-          var (fname, fcount, foffset) = layout[li];
+          sb.AppendLine("\t\t\tfixed (byte* pGetAll = s_getAll)");
           sb.AppendLine("\t\t\t{");
-          sb.AppendLine("\t\t\t\tvar fObj = QJS.JS_NewObject(ctx);");
-          sb.AppendLine("\t\t\t\tvar pFn = System.Text.Encoding.UTF8.GetBytes(\"name\\0\");");
           sb.AppendLine(
-            "\t\t\t\tvar pFnV = System.Text.Encoding.UTF8.GetBytes(\"" + fname + "\\0\");"
+            "\t\t\t\tvar fn = QJSShim.qjs_shim_new_function(ctx, GetAll_Component, pGetAll, 1);"
           );
-          sb.AppendLine("\t\t\t\tvar pFc = System.Text.Encoding.UTF8.GetBytes(\"count\\0\");");
-          sb.AppendLine("\t\t\t\tvar pFo = System.Text.Encoding.UTF8.GetBytes(\"offset\\0\");");
-          sb.AppendLine("\t\t\t\tfixed (byte* ppn = pFn, ppnv = pFnV, ppc = pFc, ppo = pFo)");
-          sb.AppendLine("\t\t\t\t{");
-          sb.AppendLine(
-            "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, fObj, ppn, QJS.JS_NewString(ctx, ppnv));"
-          );
-          sb.AppendLine(
-            "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, fObj, ppc, QJS.NewInt32(ctx, " + fcount + "));"
-          );
-          sb.AppendLine(
-            "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, fObj, ppo, QJS.NewInt32(ctx, " + foffset + "));"
-          );
-          sb.AppendLine("\t\t\t\t}");
-          sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyUint32(ctx, layoutArr, " + li + ", fObj);");
+          sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pGetAll, fn);");
           sb.AppendLine("\t\t\t}");
         }
-        sb.AppendLine("\t\t\tfixed (byte* pLayout = s___fieldLayout)");
-        sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pLayout, layoutArr);");
+        if (needSetters)
+        {
+          sb.AppendLine("\t\t\tfixed (byte* pSetAll = s_setAll)");
+          sb.AppendLine("\t\t\t{");
+          sb.AppendLine(
+            "\t\t\t\tvar fn = QJSShim.qjs_shim_new_function(ctx, SetAll_Component, pSetAll, 2);"
+          );
+          sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pSetAll, fn);");
+          sb.AppendLine("\t\t\t}");
+        }
+        // Metadata: __stride and __fieldLayout
+        {
+          var stride = ComputeStride(fields);
+          var layout = BuildFieldLayout(fields);
+          sb.AppendLine("\t\t\tfixed (byte* pStride = s___stride)");
+          sb.AppendLine(
+            "\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pStride, QJS.NewInt32(ctx, " + stride + "));"
+          );
+          // __fieldLayout = [{name:"x", count:1, offset:0}, ...]
+          sb.AppendLine("\t\t\tvar layoutArr = QJS.JS_NewArray(ctx);");
+          for (var li = 0; li < layout.Count; li++)
+          {
+            var (fname, fcount, foffset) = layout[li];
+            sb.AppendLine("\t\t\t{");
+            sb.AppendLine("\t\t\t\tvar fObj = QJS.JS_NewObject(ctx);");
+            sb.AppendLine("\t\t\t\tvar pFn = System.Text.Encoding.UTF8.GetBytes(\"name\\0\");");
+            sb.AppendLine(
+              "\t\t\t\tvar pFnV = System.Text.Encoding.UTF8.GetBytes(\"" + fname + "\\0\");"
+            );
+            sb.AppendLine("\t\t\t\tvar pFc = System.Text.Encoding.UTF8.GetBytes(\"count\\0\");");
+            sb.AppendLine("\t\t\t\tvar pFo = System.Text.Encoding.UTF8.GetBytes(\"offset\\0\");");
+            sb.AppendLine("\t\t\t\tfixed (byte* ppn = pFn, ppnv = pFnV, ppc = pFc, ppo = pFo)");
+            sb.AppendLine("\t\t\t\t{");
+            sb.AppendLine(
+              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, fObj, ppn, QJS.JS_NewString(ctx, ppnv));"
+            );
+            sb.AppendLine(
+              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, fObj, ppc, QJS.NewInt32(ctx, " + fcount + "));"
+            );
+            sb.AppendLine(
+              "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, fObj, ppo, QJS.NewInt32(ctx, " + foffset + "));"
+            );
+            sb.AppendLine("\t\t\t\t}");
+            sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyUint32(ctx, layoutArr, " + li + ", fObj);");
+            sb.AppendLine("\t\t\t}");
+          }
+          sb.AppendLine("\t\t\tfixed (byte* pLayout = s___fieldLayout)");
+          sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pLayout, layoutArr);");
+        }
       }
       sb.AppendLine("\t\t\tvar global = QJS.JS_GetGlobalObject(ctx);");
       sb.AppendLine(
@@ -604,21 +640,29 @@ namespace JsGameCodegen
       sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, global, pName, ns);");
       sb.AppendLine("\t\t\t}");
       sb.AppendLine("\t\t\tQJS.JS_FreeValue(ctx, global);");
+      // Register marshal reader
+      sb.AppendLine("\t\t\tJsBridgeMarshal<" + fullTypeName + ">.Reader = &ReadFromJsObject;");
       sb.AppendLine("\t\t}");
       sb.AppendLine();
 
-      // UpdateLookup
-      sb.AppendLine("\t\tpublic static void UpdateLookup(ref SystemState state)");
-      sb.AppendLine("\t\t{");
-      sb.AppendLine(
-        "\t\t\ts_lookup.Data = state.GetComponentLookup<"
-          + fullTypeName
-          + ">("
-          + (!needSetters ? "true" : "false")
-          + ");"
-      );
-      sb.AppendLine("\t\t}");
-      sb.AppendLine();
+      if (isComponent)
+      {
+        // UpdateLookup
+        sb.AppendLine("\t\tpublic static void UpdateLookup(ref SystemState state)");
+        sb.AppendLine("\t\t{");
+        sb.AppendLine(
+          "\t\t\ts_lookup.Data = state.GetComponentLookup<"
+            + fullTypeName
+            + ">("
+            + (!needSetters ? "true" : "false")
+            + ");"
+        );
+        sb.AppendLine("\t\t}");
+        sb.AppendLine();
+      }
+
+      // ReadFromJsObject — reusable marshal method for all [JsBridge] structs
+      EmitReadFromJsObject(sb, fields, fullTypeName);
 
       // Get/Set component functions (per-entity)
       if (needAccessors)
@@ -659,6 +703,127 @@ namespace JsGameCodegen
       sb.AppendLine("}");
 
       ctx.AddSource(className + ".g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
+    }
+
+    static void EmitReadFromJsObject(
+      StringBuilder sb,
+      ImmutableArray<FieldInfo> fields,
+      string fullTypeName
+    )
+    {
+      sb.AppendLine("\t\tpublic static unsafe " + fullTypeName + " ReadFromJsObject(JSContext ctx, JSValue obj)");
+      sb.AppendLine("\t\t{");
+      sb.AppendLine("\t\t\tvar comp = default(" + fullTypeName + ");");
+      sb.AppendLine("\t\t\tvar data = obj;");
+
+      foreach (var field in fields)
+      {
+        sb.AppendLine("\t\t\tfixed (byte* p_" + field.JsName + " = s_" + field.JsName + ")");
+        sb.AppendLine("\t\t\t{");
+
+        switch (field.Type)
+        {
+          case JsFieldType.Float:
+            sb.AppendLine(
+              "\t\t\t\tvar v_"
+                + field.JsName
+                + " = QJS.JS_GetPropertyStr(ctx, data, p_"
+                + field.JsName
+                + ");"
+            );
+            sb.AppendLine(
+              "\t\t\t\tdouble d_"
+                + field.JsName
+                + "; QJS.JS_ToFloat64(ctx, &d_"
+                + field.JsName
+                + ", v_"
+                + field.JsName
+                + ");"
+            );
+            sb.AppendLine("\t\t\t\tcomp." + field.Name + " = (float)d_" + field.JsName + ";");
+            sb.AppendLine("\t\t\t\tQJS.JS_FreeValue(ctx, v_" + field.JsName + ");");
+            break;
+          case JsFieldType.Int:
+            sb.AppendLine(
+              "\t\t\t\tvar v_"
+                + field.JsName
+                + " = QJS.JS_GetPropertyStr(ctx, data, p_"
+                + field.JsName
+                + ");"
+            );
+            sb.AppendLine(
+              "\t\t\t\tint i_"
+                + field.JsName
+                + "; QJS.JS_ToInt32(ctx, &i_"
+                + field.JsName
+                + ", v_"
+                + field.JsName
+                + ");"
+            );
+            sb.AppendLine("\t\t\t\tcomp." + field.Name + " = i_" + field.JsName + ";");
+            sb.AppendLine("\t\t\t\tQJS.JS_FreeValue(ctx, v_" + field.JsName + ");");
+            break;
+          case JsFieldType.Bool:
+            sb.AppendLine(
+              "\t\t\t\tvar v_"
+                + field.JsName
+                + " = QJS.JS_GetPropertyStr(ctx, data, p_"
+                + field.JsName
+                + ");"
+            );
+            sb.AppendLine(
+              "\t\t\t\tcomp." + field.Name + " = QJS.JS_ToBool(ctx, v_" + field.JsName + ") != 0;"
+            );
+            sb.AppendLine("\t\t\t\tQJS.JS_FreeValue(ctx, v_" + field.JsName + ");");
+            break;
+          case JsFieldType.Enum:
+            sb.AppendLine(
+              "\t\t\t\tvar v_"
+                + field.JsName
+                + " = QJS.JS_GetPropertyStr(ctx, data, p_"
+                + field.JsName
+                + ");"
+            );
+            sb.AppendLine(
+              "\t\t\t\tint e_"
+                + field.JsName
+                + "; QJS.JS_ToInt32(ctx, &e_"
+                + field.JsName
+                + ", v_"
+                + field.JsName
+                + ");"
+            );
+            sb.AppendLine(
+              "\t\t\t\tcomp."
+                + field.Name
+                + " = ("
+                + field.EnumTypeName
+                + ")e_"
+                + field.JsName
+                + ";"
+            );
+            sb.AppendLine("\t\t\t\tQJS.JS_FreeValue(ctx, v_" + field.JsName + ");");
+            break;
+          case JsFieldType.Float2:
+            EmitReadCompound(sb, field, new[] { "x", "y" }, false);
+            break;
+          case JsFieldType.Float3:
+            EmitReadCompound(sb, field, new[] { "x", "y", "z" }, false);
+            break;
+          case JsFieldType.Float4:
+            EmitReadCompound(sb, field, new[] { "x", "y", "z", "w" }, false);
+            break;
+          case JsFieldType.Quaternion:
+            EmitReadCompound(sb, field, new[] { "x", "y", "z", "w" }, true);
+            break;
+        }
+
+        sb.AppendLine("\t\t\t}");
+      }
+
+      sb.AppendLine("\t\t\treturn comp;");
+      sb.AppendLine("\t\t}");
+      sb.AppendLine();
     }
 
     static void EmitGetComponent(
@@ -792,114 +957,7 @@ namespace JsGameCodegen
       sb.AppendLine("\t\t\t\t*outTag = undef.tag;");
       sb.AppendLine("\t\t\t\treturn;");
       sb.AppendLine("\t\t\t}");
-      sb.AppendLine("\t\t\tvar comp = s_lookup.Data[entity];");
-      sb.AppendLine("\t\t\tvar data = argv[1];");
-
-      foreach (var field in fields)
-      {
-        sb.AppendLine("\t\t\tfixed (byte* p_" + field.JsName + " = s_" + field.JsName + ")");
-        sb.AppendLine("\t\t\t{");
-
-        switch (field.Type)
-        {
-          case JsFieldType.Float:
-            sb.AppendLine(
-              "\t\t\t\tvar v_"
-                + field.JsName
-                + " = QJS.JS_GetPropertyStr(ctx, data, p_"
-                + field.JsName
-                + ");"
-            );
-            sb.AppendLine(
-              "\t\t\t\tdouble d_"
-                + field.JsName
-                + "; QJS.JS_ToFloat64(ctx, &d_"
-                + field.JsName
-                + ", v_"
-                + field.JsName
-                + ");"
-            );
-            sb.AppendLine("\t\t\t\tcomp." + field.Name + " = (float)d_" + field.JsName + ";");
-            sb.AppendLine("\t\t\t\tQJS.JS_FreeValue(ctx, v_" + field.JsName + ");");
-            break;
-          case JsFieldType.Int:
-            sb.AppendLine(
-              "\t\t\t\tvar v_"
-                + field.JsName
-                + " = QJS.JS_GetPropertyStr(ctx, data, p_"
-                + field.JsName
-                + ");"
-            );
-            sb.AppendLine(
-              "\t\t\t\tint i_"
-                + field.JsName
-                + "; QJS.JS_ToInt32(ctx, &i_"
-                + field.JsName
-                + ", v_"
-                + field.JsName
-                + ");"
-            );
-            sb.AppendLine("\t\t\t\tcomp." + field.Name + " = i_" + field.JsName + ";");
-            sb.AppendLine("\t\t\t\tQJS.JS_FreeValue(ctx, v_" + field.JsName + ");");
-            break;
-          case JsFieldType.Bool:
-            sb.AppendLine(
-              "\t\t\t\tvar v_"
-                + field.JsName
-                + " = QJS.JS_GetPropertyStr(ctx, data, p_"
-                + field.JsName
-                + ");"
-            );
-            sb.AppendLine(
-              "\t\t\t\tcomp." + field.Name + " = QJS.JS_ToBool(ctx, v_" + field.JsName + ") != 0;"
-            );
-            sb.AppendLine("\t\t\t\tQJS.JS_FreeValue(ctx, v_" + field.JsName + ");");
-            break;
-          case JsFieldType.Enum:
-            sb.AppendLine(
-              "\t\t\t\tvar v_"
-                + field.JsName
-                + " = QJS.JS_GetPropertyStr(ctx, data, p_"
-                + field.JsName
-                + ");"
-            );
-            sb.AppendLine(
-              "\t\t\t\tint e_"
-                + field.JsName
-                + "; QJS.JS_ToInt32(ctx, &e_"
-                + field.JsName
-                + ", v_"
-                + field.JsName
-                + ");"
-            );
-            sb.AppendLine(
-              "\t\t\t\tcomp."
-                + field.Name
-                + " = ("
-                + field.EnumTypeName
-                + ")e_"
-                + field.JsName
-                + ";"
-            );
-            sb.AppendLine("\t\t\t\tQJS.JS_FreeValue(ctx, v_" + field.JsName + ");");
-            break;
-          case JsFieldType.Float2:
-            EmitReadCompound(sb, field, new[] { "x", "y" }, false);
-            break;
-          case JsFieldType.Float3:
-            EmitReadCompound(sb, field, new[] { "x", "y", "z" }, false);
-            break;
-          case JsFieldType.Float4:
-            EmitReadCompound(sb, field, new[] { "x", "y", "z", "w" }, false);
-            break;
-          case JsFieldType.Quaternion:
-            EmitReadCompound(sb, field, new[] { "x", "y", "z", "w" }, true);
-            break;
-        }
-
-        sb.AppendLine("\t\t\t}");
-      }
-
+      sb.AppendLine("\t\t\tvar comp = ReadFromJsObject(ctx, argv[1]);");
       sb.AppendLine("\t\t\ts_lookup.Data[entity] = comp;");
       sb.AppendLine("\t\t\tvar ret = QJS.JS_UNDEFINED;");
       sb.AppendLine("\t\t\t*outU = ret.u;");
@@ -1349,6 +1407,7 @@ namespace JsGameCodegen
       public string JsName;
       public bool NeedAccessors;
       public bool NeedSetters;
+      public bool IsComponent;
       public ImmutableArray<FieldInfo> Fields;
       public string Description;
 
@@ -1358,6 +1417,7 @@ namespace JsGameCodegen
         string jsName,
         bool needAccessors,
         bool needSetters,
+        bool isComponent,
         ImmutableArray<FieldInfo> fields,
         string description = null
       )
@@ -1367,6 +1427,7 @@ namespace JsGameCodegen
         JsName = jsName;
         NeedAccessors = needAccessors;
         NeedSetters = needSetters;
+        IsComponent = isComponent;
         Fields = fields;
         Description = description;
       }
