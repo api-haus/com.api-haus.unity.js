@@ -97,6 +97,15 @@ namespace UnityJS.Entities.Core
     static bool s_playerQueryInitialized;
     static bool s_initialized;
 
+    [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetSession()
+    {
+      s_world = null;
+      s_entityManager = default;
+      s_playerQueryInitialized = false;
+      s_initialized = false;
+    }
+
     /// <summary>
     /// Tracks entities created in the current frame before ECB playback.
     /// </summary>
@@ -604,11 +613,58 @@ namespace UnityJS.Entities.Core
     /// <summary>
     /// Helper: set JS_UNDEFINED on the output pointers of a QJSShimCallback.
     /// </summary>
-    static unsafe void SetUndefined(long* outU, long* outTag)
+    /// <summary>
+    /// Helper: register a JS function on a namespace object.
+    /// </summary>
+    internal static unsafe void AddFunction(
+      JSContext ctx,
+      JSValue ns,
+      string name,
+      QJSShimCallback callback,
+      int argc
+    )
+    {
+      var bytes = System.Text.Encoding.UTF8.GetBytes(name + '\0');
+      fixed (byte* p = bytes)
+      {
+        var fn = QJSShim.qjs_shim_new_function(ctx, callback, p, argc);
+        QJS.JS_SetPropertyStr(ctx, ns, p, fn);
+      }
+    }
+
+    internal static unsafe void SetNamespace(JSContext ctx, JSValue global, string name, JSValue ns)
+    {
+      var bytes = System.Text.Encoding.UTF8.GetBytes(name + '\0');
+      fixed (byte* p = bytes)
+        QJS.JS_SetPropertyStr(ctx, global, p, ns);
+    }
+
+    internal static unsafe void SetUndefined(long* outU, long* outTag)
     {
       var undef = QJS.JS_UNDEFINED;
       *outU = undef.u;
       *outTag = undef.tag;
+    }
+
+    internal static unsafe void SetNull(long* outU, long* outTag)
+    {
+      var n = QJS.JS_NULL;
+      *outU = n.u;
+      *outTag = n.tag;
+    }
+
+    internal static unsafe void SetBool(long* outU, long* outTag, JSContext ctx, bool value)
+    {
+      var v = QJS.NewBool(ctx, value);
+      *outU = v.u;
+      *outTag = v.tag;
+    }
+
+    internal static unsafe void SetInt(long* outU, long* outTag, JSContext ctx, int value)
+    {
+      var v = QJS.NewInt32(ctx, value);
+      *outU = v.u;
+      *outTag = v.tag;
     }
   }
 }

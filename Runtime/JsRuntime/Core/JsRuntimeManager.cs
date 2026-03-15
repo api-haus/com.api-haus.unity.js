@@ -130,101 +130,16 @@ namespace UnityJS.Runtime
     /// Creates a JS state object for an entity script instance.
     /// Returns a monotonic int key into the state dictionary.
     /// </summary>
-    static readonly byte[] s_script =
-    {
-      (byte)'_',
-      (byte)'s',
-      (byte)'c',
-      (byte)'r',
-      (byte)'i',
-      (byte)'p',
-      (byte)'t',
-      0,
-    };
-    static readonly byte[] s_entityId =
-    {
-      (byte)'e',
-      (byte)'n',
-      (byte)'t',
-      (byte)'i',
-      (byte)'t',
-      (byte)'y',
-      (byte)'I',
-      (byte)'d',
-      0,
-    };
-    static readonly byte[] s_deltaTime =
-    {
-      (byte)'d',
-      (byte)'e',
-      (byte)'l',
-      (byte)'t',
-      (byte)'a',
-      (byte)'T',
-      (byte)'i',
-      (byte)'m',
-      (byte)'e',
-      0,
-    };
-    static readonly byte[] s_elapsedTime =
-    {
-      (byte)'e',
-      (byte)'l',
-      (byte)'a',
-      (byte)'p',
-      (byte)'s',
-      (byte)'e',
-      (byte)'d',
-      (byte)'T',
-      (byte)'i',
-      (byte)'m',
-      (byte)'e',
-      0,
-    };
-    static readonly byte[] s_onInit =
-    {
-      (byte)'o',
-      (byte)'n',
-      (byte)'I',
-      (byte)'n',
-      (byte)'i',
-      (byte)'t',
-      0,
-    };
-    static readonly byte[] s_onTick =
-    {
-      (byte)'o',
-      (byte)'n',
-      (byte)'T',
-      (byte)'i',
-      (byte)'c',
-      (byte)'k',
-      0,
-    };
-    static readonly byte[] s_onEvent =
-    {
-      (byte)'o',
-      (byte)'n',
-      (byte)'E',
-      (byte)'v',
-      (byte)'e',
-      (byte)'n',
-      (byte)'t',
-      0,
-    };
-    static readonly byte[] s_onCommand =
-    {
-      (byte)'o',
-      (byte)'n',
-      (byte)'C',
-      (byte)'o',
-      (byte)'m',
-      (byte)'m',
-      (byte)'a',
-      (byte)'n',
-      (byte)'d',
-      0,
-    };
+    static byte[] U8(string s) => Encoding.UTF8.GetBytes(s + '\0');
+
+    static readonly byte[] s_script = U8("_script");
+    static readonly byte[] s_entityId = U8("entityId");
+    static readonly byte[] s_deltaTime = U8("deltaTime");
+    static readonly byte[] s_elapsedTime = U8("elapsedTime");
+    static readonly byte[] s_onInit = U8("onInit");
+    static readonly byte[] s_onTick = U8("onTick");
+    static readonly byte[] s_onEvent = U8("onEvent");
+    static readonly byte[] s_onCommand = U8("onCommand");
 
     public unsafe int CreateEntityState(string scriptName, int entityId)
     {
@@ -273,14 +188,23 @@ namespace UnityJS.Runtime
     }
 
     /// <summary>
-    /// Calls a named function on a script's module namespace object.
+    /// Core invocation: resolves an export on a script module and calls it.
+    /// Returns true on success or if the function doesn't exist (missing export is not an error).
+    /// Caller must supply pre-encoded funcNameBytes (null-terminated UTF-8).
+    /// argv[0] is always the state object; extra args (1..argc-1) are caller-owned and freed by caller.
     /// </summary>
-    public unsafe bool CallFunction(string scriptName, string funcName, int stateRef)
+    unsafe bool InvokeExport(
+      string scriptName,
+      byte[] funcNameBytes,
+      int stateRef,
+      JSValue* extraArgv,
+      int extraArgc,
+      string errorContext
+    )
     {
       if (!m_ScriptRefs.TryGetValue(scriptName, out var scriptObj))
         return false;
 
-      var funcNameBytes = Encoding.UTF8.GetBytes(funcName + '\0');
       fixed (byte* pFuncName = funcNameBytes)
       {
         var func = QJS.JS_GetPropertyStr(m_Context, scriptObj, pFuncName);
@@ -290,17 +214,19 @@ namespace UnityJS.Runtime
           return true; // missing func is not an error
         }
 
-        // Build argv: [stateRef JSValue]
         if (!m_StateRefs.TryGetValue(stateRef, out var stateVal))
           stateVal = QJS.JS_UNDEFINED;
 
-        var argv = stackalloc JSValue[1];
+        var totalArgc = 1 + extraArgc;
+        var argv = stackalloc JSValue[totalArgc];
         argv[0] = stateVal;
+        for (var i = 0; i < extraArgc; i++)
+          argv[1 + i] = extraArgv[i];
 
-        var result = QJS.JS_Call(m_Context, func, scriptObj, 1, argv);
+        var result = QJS.JS_Call(m_Context, func, scriptObj, totalArgc, argv);
         if (QJS.IsException(result))
         {
-          LogException($"CallFunction({scriptName}.{funcName})");
+          LogException(errorContext);
           QJS.JS_FreeValue(m_Context, result);
           QJS.JS_FreeValue(m_Context, func);
           return false;
@@ -310,6 +236,16 @@ namespace UnityJS.Runtime
         QJS.JS_FreeValue(m_Context, func);
         return true;
       }
+    }
+
+    /// <summary>
+    /// Calls a named function on a script's module namespace object.
+    /// </summary>
+    public unsafe bool CallFunction(string scriptName, string funcName, int stateRef)
+    {
+      var funcNameBytes = Encoding.UTF8.GetBytes(funcName + '\0');
+      return InvokeExport(scriptName, funcNameBytes, stateRef, null, 0,
+        $"CallFunction({scriptName}.{funcName})");
     }
 
     /// <summary>
@@ -353,52 +289,9 @@ namespace UnityJS.Runtime
       double elapsedTime = 0.0
     )
     {
-      if (!m_ScriptRefs.TryGetValue(scriptName, out var scriptObj))
-        return false;
-
-      fixed (byte* pFuncName = s_onTick)
-      {
-        var func = QJS.JS_GetPropertyStr(m_Context, scriptObj, pFuncName);
-        if (QJS.JS_IsFunction(m_Context, func) == 0)
-        {
-          QJS.JS_FreeValue(m_Context, func);
-          return true;
-        }
-
-        if (!m_StateRefs.TryGetValue(stateRef, out var stateVal))
-          stateVal = QJS.JS_UNDEFINED;
-
-        // Update deltaTime / elapsedTime in-place on the persistent state
-        fixed (
-          byte* pDt = s_deltaTime,
-            pElapsed = s_elapsedTime
-        )
-        {
-          QJS.JS_SetPropertyStr(m_Context, stateVal, pDt, QJS.NewFloat64(m_Context, deltaTime));
-          QJS.JS_SetPropertyStr(
-            m_Context,
-            stateVal,
-            pElapsed,
-            QJS.NewFloat64(m_Context, elapsedTime)
-          );
-        }
-
-        var argv = stackalloc JSValue[1];
-        argv[0] = stateVal;
-
-        var result = QJS.JS_Call(m_Context, func, scriptObj, 1, argv);
-        if (QJS.IsException(result))
-        {
-          LogException($"CallTick({scriptName})");
-          QJS.JS_FreeValue(m_Context, result);
-          QJS.JS_FreeValue(m_Context, func);
-          return false;
-        }
-
-        QJS.JS_FreeValue(m_Context, result);
-        QJS.JS_FreeValue(m_Context, func);
-        return true;
-      }
+      UpdateStateTimings(stateRef, deltaTime, elapsedTime);
+      return InvokeExport(scriptName, s_onTick, stateRef, null, 0,
+        $"CallTick({scriptName})");
     }
 
     /// <summary>
@@ -413,48 +306,20 @@ namespace UnityJS.Runtime
       int intParam
     )
     {
-      if (!m_ScriptRefs.TryGetValue(scriptName, out var scriptObj))
-        return false;
-
-      fixed (byte* pFuncName = s_onEvent)
+      var eventNameBytes = Encoding.UTF8.GetBytes(eventName + '\0');
+      fixed (byte* pEventName = eventNameBytes)
       {
-        var func = QJS.JS_GetPropertyStr(m_Context, scriptObj, pFuncName);
-        if (QJS.JS_IsFunction(m_Context, func) == 0)
-        {
-          QJS.JS_FreeValue(m_Context, func);
-          return true;
-        }
+        var extras = stackalloc JSValue[4];
+        extras[0] = QJS.JS_NewString(m_Context, pEventName);
+        extras[1] = QJS.NewInt32(m_Context, sourceId);
+        extras[2] = QJS.NewInt32(m_Context, targetId);
+        extras[3] = QJS.NewInt32(m_Context, intParam);
 
-        if (!m_StateRefs.TryGetValue(stateRef, out var stateVal))
-          stateVal = QJS.JS_UNDEFINED;
+        var ok = InvokeExport(scriptName, s_onEvent, stateRef, extras, 4,
+          $"CallEvent({scriptName}, {eventName})");
 
-        var eventNameBytes = Encoding.UTF8.GetBytes(eventName + '\0');
-        fixed (byte* pEventName = eventNameBytes)
-        {
-          var argv = stackalloc JSValue[5];
-          argv[0] = stateVal;
-          argv[1] = QJS.JS_NewString(m_Context, pEventName);
-          argv[2] = QJS.NewInt32(m_Context, sourceId);
-          argv[3] = QJS.NewInt32(m_Context, targetId);
-          argv[4] = QJS.NewInt32(m_Context, intParam);
-
-          var result = QJS.JS_Call(m_Context, func, scriptObj, 5, argv);
-
-          // Free the event name string we created
-          QJS.JS_FreeValue(m_Context, argv[1]);
-
-          if (QJS.IsException(result))
-          {
-            LogException($"CallEvent({scriptName}, {eventName})");
-            QJS.JS_FreeValue(m_Context, result);
-            QJS.JS_FreeValue(m_Context, func);
-            return false;
-          }
-
-          QJS.JS_FreeValue(m_Context, result);
-          QJS.JS_FreeValue(m_Context, func);
-          return true;
-        }
+        QJS.JS_FreeValue(m_Context, extras[0]);
+        return ok;
       }
     }
 
@@ -463,44 +328,17 @@ namespace UnityJS.Runtime
     /// </summary>
     public unsafe bool CallCommand(string scriptName, int stateRef, string command)
     {
-      if (!m_ScriptRefs.TryGetValue(scriptName, out var scriptObj))
-        return false;
-
-      fixed (byte* pFuncName = s_onCommand)
+      var cmdBytes = Encoding.UTF8.GetBytes(command + '\0');
+      fixed (byte* pCmd = cmdBytes)
       {
-        var func = QJS.JS_GetPropertyStr(m_Context, scriptObj, pFuncName);
-        if (QJS.JS_IsFunction(m_Context, func) == 0)
-        {
-          QJS.JS_FreeValue(m_Context, func);
-          return true;
-        }
+        var extras = stackalloc JSValue[1];
+        extras[0] = QJS.JS_NewString(m_Context, pCmd);
 
-        if (!m_StateRefs.TryGetValue(stateRef, out var stateVal))
-          stateVal = QJS.JS_UNDEFINED;
+        var ok = InvokeExport(scriptName, s_onCommand, stateRef, extras, 1,
+          $"CallCommand({scriptName}, {command})");
 
-        var cmdBytes = Encoding.UTF8.GetBytes(command + '\0');
-        fixed (byte* pCmd = cmdBytes)
-        {
-          var argv = stackalloc JSValue[2];
-          argv[0] = stateVal;
-          argv[1] = QJS.JS_NewString(m_Context, pCmd);
-
-          var result = QJS.JS_Call(m_Context, func, scriptObj, 2, argv);
-
-          QJS.JS_FreeValue(m_Context, argv[1]);
-
-          if (QJS.IsException(result))
-          {
-            LogException($"CallCommand({scriptName}, {command})");
-            QJS.JS_FreeValue(m_Context, result);
-            QJS.JS_FreeValue(m_Context, func);
-            return false;
-          }
-
-          QJS.JS_FreeValue(m_Context, result);
-          QJS.JS_FreeValue(m_Context, func);
-          return true;
-        }
+        QJS.JS_FreeValue(m_Context, extras[0]);
+        return ok;
       }
     }
 

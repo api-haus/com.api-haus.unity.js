@@ -86,23 +86,11 @@ namespace UnityJS.Entities.Core
       // Register _log_internal namespace with dispatch and traceback
       var ns = QJS.JS_NewObject(ctx);
 
-      var pDispatchBytes = Encoding.UTF8.GetBytes("dispatch\0");
-      fixed (byte* pDispatch = pDispatchBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Log_Dispatch, pDispatch, 3);
-        QJS.JS_SetPropertyStr(ctx, ns, pDispatch, fn);
-      }
-      var pTracebackBytes = Encoding.UTF8.GetBytes("traceback\0");
-      fixed (byte* pTraceback = pTracebackBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Log_Traceback, pTraceback, 0);
-        QJS.JS_SetPropertyStr(ctx, ns, pTraceback, fn);
-      }
+      AddFunction(ctx, ns, "dispatch", Log_Dispatch, 3);
+      AddFunction(ctx, ns, "traceback", Log_Traceback, 0);
 
       var global = QJS.JS_GetGlobalObject(ctx);
-      var pNameBytes = Encoding.UTF8.GetBytes("_log_internal\0");
-      fixed (byte* pName = pNameBytes)
-        QJS.JS_SetPropertyStr(ctx, global, pName, ns);
+      SetNamespace(ctx, global, "_log_internal", ns);
 
       // Bootstrap JS-side log.* wrappers
       const string logBootstrap =

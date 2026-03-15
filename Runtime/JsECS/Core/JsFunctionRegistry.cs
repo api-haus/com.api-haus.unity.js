@@ -2,11 +2,18 @@ namespace UnityJS.Entities.Core
 {
   using System;
   using System.Collections.Generic;
+  using UnityEngine;
   using UnityJS.QJS;
 
   public static class JsFunctionRegistry
   {
     static readonly Dictionary<string, List<Action<JSContext, JSValue>>> s_registrations = new();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetSession()
+    {
+      s_registrations.Clear();
+    }
 
     public static void Register(string tableName, Action<JSContext, JSValue> registerFunc)
     {

@@ -3,6 +3,7 @@ namespace UnityJS.Entities.Core
   using System;
   using System.Collections.Generic;
   using Unity.Entities;
+  using UnityEngine;
   using UnityJS.QJS;
 
   public delegate void JsLookupUpdater(ref SystemState state);
@@ -13,6 +14,15 @@ namespace UnityJS.Entities.Core
     static readonly Dictionary<string, Func<ComponentType>> s_deferredComponents = new();
     static readonly List<Action<JSContext>> s_bridgeRegistrations = new();
     static readonly List<JsLookupUpdater> s_lookupUpdaters = new();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetSession()
+    {
+      s_components.Clear();
+      s_deferredComponents.Clear();
+      s_bridgeRegistrations.Clear();
+      s_lookupUpdaters.Clear();
+    }
 
     public static void Register(string jsName, ComponentType componentType)
     {

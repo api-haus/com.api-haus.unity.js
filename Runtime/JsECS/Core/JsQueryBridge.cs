@@ -94,7 +94,6 @@ namespace UnityJS.Entities.Core
 
     public static unsafe void Register(JSContext ctx)
     {
-      // Get or create ecs namespace
       var global = QJS.JS_GetGlobalObject(ctx);
       var pEcsBytes = Encoding.UTF8.GetBytes("ecs\0");
       fixed (byte* pEcs = pEcsBytes)

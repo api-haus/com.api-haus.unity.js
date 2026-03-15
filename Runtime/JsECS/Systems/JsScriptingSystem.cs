@@ -60,17 +60,13 @@ namespace UnityJS.Entities.Systems
     protected override void OnStartRunning()
     {
       if (m_Vm == null)
-      {
         m_Vm = JsRuntimeManager.GetOrCreate();
-        JsECSBridge.Initialize(World);
-      }
 
       EntityManager.CreateSingleton<JsScriptingSystemSingleton>();
     }
 
     protected override void OnDestroy()
     {
-      JsECSBridge.Shutdown();
       m_Vm?.Dispose();
       m_Vm = null;
     }

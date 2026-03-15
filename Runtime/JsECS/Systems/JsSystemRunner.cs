@@ -235,6 +235,7 @@ BuiltQuery.prototype[Symbol.iterator] = function() {
 
     protected override void OnDestroy()
     {
+      JsECSBridge.Shutdown();
       JsQueryBridge.Shutdown();
       JsComponentStore.Shutdown();
     }

@@ -1,8 +1,6 @@
 namespace UnityJS.Entities.Core
 {
   using System.Runtime.InteropServices;
-  using System.Text;
-  using System.Threading;
   using AOT;
   using Components;
   using Unity.Collections;
@@ -76,9 +74,7 @@ namespace UnityJS.Entities.Core
       ref var bctx = ref s_burstContext.Data;
       if (!bctx.isValid)
       {
-        var n = QJS.JS_NULL;
-        *outU = n.u;
-        *outTag = n.tag;
+        SetNull(outU, outTag);
         return;
       }
 
@@ -92,9 +88,7 @@ namespace UnityJS.Entities.Core
 
       AddPendingEntity(entityId, entity);
 
-      var result = QJS.NewInt32(ctx, entityId);
-      *outU = result.u;
-      *outTag = result.tag;
+      SetInt(outU, outTag, ctx, entityId);
     }
 
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
@@ -110,37 +104,16 @@ namespace UnityJS.Entities.Core
     {
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
-      if (entityId <= 0)
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
+      if (entityId <= 0) { SetBool(outU, outTag, ctx, false); return; }
 
       ref var bctx = ref s_burstContext.Data;
-      if (!bctx.isValid)
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
+      if (!bctx.isValid) { SetBool(outU, outTag, ctx, false); return; }
 
       var entity = GetEntityFromIdBurst(entityId);
-      if (entity == Entity.Null)
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
+      if (entity == Entity.Null) { SetBool(outU, outTag, ctx, false); return; }
 
       bctx.ecb.RemoveComponent<JsEntityId>(entity);
-
-      var t = QJS.NewBool(ctx, true);
-      *outU = t.u;
-      *outTag = t.tag;
+      SetBool(outU, outTag, ctx, true);
     }
 
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
@@ -156,39 +129,14 @@ namespace UnityJS.Entities.Core
     {
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
-      if (entityId <= 0)
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
-
-      if (!TryReadCStringAsFixed64(ctx, argv, 1, out var scriptName))
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
+      if (entityId <= 0) { SetBool(outU, outTag, ctx, false); return; }
+      if (!TryReadCStringAsFixed64(ctx, argv, 1, out var scriptName)) { SetBool(outU, outTag, ctx, false); return; }
 
       ref var bctx = ref s_burstContext.Data;
-      if (!bctx.isValid)
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
+      if (!bctx.isValid) { SetBool(outU, outTag, ctx, false); return; }
 
       var entity = GetEntityFromIdBurst(entityId);
-      if (entity == Entity.Null)
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
+      if (entity == Entity.Null) { SetBool(outU, outTag, ctx, false); return; }
 
       var request = new JsScriptRequest
       {
@@ -197,10 +145,7 @@ namespace UnityJS.Entities.Core
         fulfilled = false,
       };
       bctx.ecb.AppendToBuffer(entity, request);
-
-      var t = QJS.NewBool(ctx, true);
-      *outU = t.u;
-      *outTag = t.tag;
+      SetBool(outU, outTag, ctx, true);
     }
 
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
@@ -216,28 +161,11 @@ namespace UnityJS.Entities.Core
     {
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
-      if (entityId <= 0)
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
-
-      if (!TryReadCStringAsFixed64(ctx, argv, 1, out var scriptName))
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
+      if (entityId <= 0) { SetBool(outU, outTag, ctx, false); return; }
+      if (!TryReadCStringAsFixed64(ctx, argv, 1, out var scriptName)) { SetBool(outU, outTag, ctx, false); return; }
 
       var entity = GetEntityFromIdBurst(entityId);
-      var hasScript = HasScriptBurst(entity, scriptName);
-
-      var result = QJS.NewBool(ctx, hasScript);
-      *outU = result.u;
-      *outTag = result.tag;
+      SetBool(outU, outTag, ctx, HasScriptBurst(entity, scriptName));
     }
 
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
@@ -253,97 +181,36 @@ namespace UnityJS.Entities.Core
     {
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
-      if (entityId <= 0)
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
+      if (entityId <= 0) { SetBool(outU, outTag, ctx, false); return; }
 
       var ptr = QJS.JS_ToCString(ctx, argv[1]);
       var componentName = Marshal.PtrToStringUTF8((nint)ptr);
       QJS.JS_FreeCString(ctx, ptr);
-      if (string.IsNullOrEmpty(componentName))
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
-
-      if (!JsComponentRegistry.TryGetComponentType(componentName, out var componentType))
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
+      if (string.IsNullOrEmpty(componentName)) { SetBool(outU, outTag, ctx, false); return; }
+      if (!JsComponentRegistry.TryGetComponentType(componentName, out var componentType)) { SetBool(outU, outTag, ctx, false); return; }
 
       ref var bctx = ref s_burstContext.Data;
-      if (!bctx.isValid)
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
+      if (!bctx.isValid) { SetBool(outU, outTag, ctx, false); return; }
 
       var entity = GetEntityFromIdBurst(entityId);
-      if (entity == Entity.Null)
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
+      if (entity == Entity.Null) { SetBool(outU, outTag, ctx, false); return; }
 
       bctx.ecb.RemoveComponent(entity, componentType);
-
-      var t = QJS.NewBool(ctx, true);
-      *outU = t.u;
-      *outTag = t.tag;
+      SetBool(outU, outTag, ctx, true);
     }
 
     static unsafe void RegisterEntitiesFunctions(JSContext ctx)
     {
       var ns = QJS.JS_NewObject(ctx);
 
-      var pCreateBytes = Encoding.UTF8.GetBytes("create\0");
-      fixed (byte* pCreate = pCreateBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Entities_Create, pCreate, 0);
-        QJS.JS_SetPropertyStr(ctx, ns, pCreate, fn);
-      }
-      var pDestroyBytes = Encoding.UTF8.GetBytes("destroy\0");
-      fixed (byte* pDestroy = pDestroyBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Entities_Destroy, pDestroy, 1);
-        QJS.JS_SetPropertyStr(ctx, ns, pDestroy, fn);
-      }
-      var pAddScriptBytes = Encoding.UTF8.GetBytes("addScript\0");
-      fixed (byte* pAddScript = pAddScriptBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Entities_AddScript, pAddScript, 2);
-        QJS.JS_SetPropertyStr(ctx, ns, pAddScript, fn);
-      }
-      var pHasScriptBytes = Encoding.UTF8.GetBytes("hasScript\0");
-      fixed (byte* pHasScript = pHasScriptBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Entities_HasScript, pHasScript, 2);
-        QJS.JS_SetPropertyStr(ctx, ns, pHasScript, fn);
-      }
-      var pRemoveComponentBytes = Encoding.UTF8.GetBytes("removeComponent\0");
-      fixed (byte* pRemoveComponent = pRemoveComponentBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Entities_RemoveComponent, pRemoveComponent, 2);
-        QJS.JS_SetPropertyStr(ctx, ns, pRemoveComponent, fn);
-      }
+      AddFunction(ctx, ns, "create", Entities_Create, 0);
+      AddFunction(ctx, ns, "destroy", Entities_Destroy, 1);
+      AddFunction(ctx, ns, "addScript", Entities_AddScript, 2);
+      AddFunction(ctx, ns, "hasScript", Entities_HasScript, 2);
+      AddFunction(ctx, ns, "removeComponent", Entities_RemoveComponent, 2);
 
       var global = QJS.JS_GetGlobalObject(ctx);
-      var pNameBytes = Encoding.UTF8.GetBytes("entities\0");
-      fixed (byte* pName = pNameBytes)
-        QJS.JS_SetPropertyStr(ctx, global, pName, ns);
+      SetNamespace(ctx, global, "entities", ns);
       QJS.JS_FreeValue(ctx, global);
     }
   }

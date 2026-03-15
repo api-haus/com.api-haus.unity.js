@@ -2,7 +2,6 @@ namespace UnityJS.Entities.Core
 {
   using System.Collections.Generic;
   using System.Runtime.InteropServices;
-  using System.Text;
   using AOT;
   using Unity.Mathematics;
   using UnityEngine;
@@ -71,13 +70,7 @@ namespace UnityJS.Entities.Core
     )
     {
       var action = GetInputAction(ctx, argv, 0);
-      if (action == null)
-      {
-        var n = QJS.JS_NULL;
-        *outU = n.u;
-        *outTag = n.tag;
-        return;
-      }
+      if (action == null) { SetNull(outU, outTag); return; }
 
       if (action.expectedControlType == "Vector2")
       {
@@ -97,10 +90,7 @@ namespace UnityJS.Entities.Core
         return;
       }
 
-      var isPressed = action.IsPressed();
-      var bResult = QJS.NewBool(ctx, isPressed);
-      *outU = bResult.u;
-      *outTag = bResult.tag;
+      SetBool(outU, outTag, ctx, action.IsPressed());
     }
 
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
@@ -115,17 +105,8 @@ namespace UnityJS.Entities.Core
     )
     {
       var action = GetInputAction(ctx, argv, 0);
-      if (action == null)
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
-
-      var result = QJS.NewBool(ctx, action.WasPressedThisFrame());
-      *outU = result.u;
-      *outTag = result.tag;
+      if (action == null) { SetBool(outU, outTag, ctx, false); return; }
+      SetBool(outU, outTag, ctx, action.WasPressedThisFrame());
     }
 
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
@@ -140,17 +121,8 @@ namespace UnityJS.Entities.Core
     )
     {
       var action = GetInputAction(ctx, argv, 0);
-      if (action == null)
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
-
-      var result = QJS.NewBool(ctx, action.IsPressed());
-      *outU = result.u;
-      *outTag = result.tag;
+      if (action == null) { SetBool(outU, outTag, ctx, false); return; }
+      SetBool(outU, outTag, ctx, action.IsPressed());
     }
 
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
@@ -165,52 +137,21 @@ namespace UnityJS.Entities.Core
     )
     {
       var action = GetInputAction(ctx, argv, 0);
-      if (action == null)
-      {
-        var f = QJS.NewBool(ctx, false);
-        *outU = f.u;
-        *outTag = f.tag;
-        return;
-      }
-
-      var result = QJS.NewBool(ctx, action.WasReleasedThisFrame());
-      *outU = result.u;
-      *outTag = result.tag;
+      if (action == null) { SetBool(outU, outTag, ctx, false); return; }
+      SetBool(outU, outTag, ctx, action.WasReleasedThisFrame());
     }
 
     static unsafe void RegisterInputFunctions(JSContext ctx)
     {
       var ns = QJS.JS_NewObject(ctx);
 
-      var pReadValueBytes = Encoding.UTF8.GetBytes("readValue\0");
-      fixed (byte* pReadValue = pReadValueBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Input_ReadValue, pReadValue, 1);
-        QJS.JS_SetPropertyStr(ctx, ns, pReadValue, fn);
-      }
-      var pWasPressedBytes = Encoding.UTF8.GetBytes("wasPressed\0");
-      fixed (byte* pWasPressed = pWasPressedBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Input_WasPressed, pWasPressed, 1);
-        QJS.JS_SetPropertyStr(ctx, ns, pWasPressed, fn);
-      }
-      var pIsHeldBytes = Encoding.UTF8.GetBytes("isHeld\0");
-      fixed (byte* pIsHeld = pIsHeldBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Input_IsHeld, pIsHeld, 1);
-        QJS.JS_SetPropertyStr(ctx, ns, pIsHeld, fn);
-      }
-      var pWasReleasedBytes = Encoding.UTF8.GetBytes("wasReleased\0");
-      fixed (byte* pWasReleased = pWasReleasedBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Input_WasReleased, pWasReleased, 1);
-        QJS.JS_SetPropertyStr(ctx, ns, pWasReleased, fn);
-      }
+      AddFunction(ctx, ns, "readValue", Input_ReadValue, 1);
+      AddFunction(ctx, ns, "wasPressed", Input_WasPressed, 1);
+      AddFunction(ctx, ns, "isHeld", Input_IsHeld, 1);
+      AddFunction(ctx, ns, "wasReleased", Input_WasReleased, 1);
 
       var global = QJS.JS_GetGlobalObject(ctx);
-      var pNameBytes = Encoding.UTF8.GetBytes("input\0");
-      fixed (byte* pName = pNameBytes)
-        QJS.JS_SetPropertyStr(ctx, global, pName, ns);
+      SetNamespace(ctx, global, "input", ns);
       QJS.JS_FreeValue(ctx, global);
     }
   }

@@ -1,7 +1,6 @@
 namespace UnityJS.Entities.Core
 {
   using System.Runtime.InteropServices;
-  using System.Text;
   using AOT;
   using Drawing;
   using UnityEngine;
@@ -336,83 +335,21 @@ namespace UnityJS.Entities.Core
     {
       var ns = QJS.JS_NewObject(ctx);
 
-      var pBytes = Encoding.UTF8.GetBytes("setColor\0");
-      fixed (byte* p = pBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Draw_SetColor, p, 4);
-        QJS.JS_SetPropertyStr(ctx, ns, p, fn);
-      }
-      pBytes = Encoding.UTF8.GetBytes("withDuration\0");
-      fixed (byte* p = pBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Draw_WithDuration, p, 1);
-        QJS.JS_SetPropertyStr(ctx, ns, p, fn);
-      }
-      pBytes = Encoding.UTF8.GetBytes("line\0");
-      fixed (byte* p = pBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Draw_Line, p, 2);
-        QJS.JS_SetPropertyStr(ctx, ns, p, fn);
-      }
-      pBytes = Encoding.UTF8.GetBytes("ray\0");
-      fixed (byte* p = pBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Draw_Ray, p, 2);
-        QJS.JS_SetPropertyStr(ctx, ns, p, fn);
-      }
-      pBytes = Encoding.UTF8.GetBytes("arrow\0");
-      fixed (byte* p = pBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Draw_Arrow, p, 2);
-        QJS.JS_SetPropertyStr(ctx, ns, p, fn);
-      }
-      pBytes = Encoding.UTF8.GetBytes("wireSphere\0");
-      fixed (byte* p = pBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Draw_WireSphere, p, 2);
-        QJS.JS_SetPropertyStr(ctx, ns, p, fn);
-      }
-      pBytes = Encoding.UTF8.GetBytes("wireBox\0");
-      fixed (byte* p = pBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Draw_WireBox, p, 2);
-        QJS.JS_SetPropertyStr(ctx, ns, p, fn);
-      }
-      pBytes = Encoding.UTF8.GetBytes("wireCapsule\0");
-      fixed (byte* p = pBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Draw_WireCapsule, p, 3);
-        QJS.JS_SetPropertyStr(ctx, ns, p, fn);
-      }
-      pBytes = Encoding.UTF8.GetBytes("circleXz\0");
-      fixed (byte* p = pBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Draw_CircleXZ, p, 2);
-        QJS.JS_SetPropertyStr(ctx, ns, p, fn);
-      }
-      pBytes = Encoding.UTF8.GetBytes("solidBox\0");
-      fixed (byte* p = pBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Draw_SolidBox, p, 2);
-        QJS.JS_SetPropertyStr(ctx, ns, p, fn);
-      }
-      pBytes = Encoding.UTF8.GetBytes("solidCircle\0");
-      fixed (byte* p = pBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Draw_SolidCircle, p, 3);
-        QJS.JS_SetPropertyStr(ctx, ns, p, fn);
-      }
-      pBytes = Encoding.UTF8.GetBytes("label2d\0");
-      fixed (byte* p = pBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Draw_Label2D, p, 2);
-        QJS.JS_SetPropertyStr(ctx, ns, p, fn);
-      }
+      AddFunction(ctx, ns, "setColor", Draw_SetColor, 4);
+      AddFunction(ctx, ns, "withDuration", Draw_WithDuration, 1);
+      AddFunction(ctx, ns, "line", Draw_Line, 2);
+      AddFunction(ctx, ns, "ray", Draw_Ray, 2);
+      AddFunction(ctx, ns, "arrow", Draw_Arrow, 2);
+      AddFunction(ctx, ns, "wireSphere", Draw_WireSphere, 2);
+      AddFunction(ctx, ns, "wireBox", Draw_WireBox, 2);
+      AddFunction(ctx, ns, "wireCapsule", Draw_WireCapsule, 3);
+      AddFunction(ctx, ns, "circleXz", Draw_CircleXZ, 2);
+      AddFunction(ctx, ns, "solidBox", Draw_SolidBox, 2);
+      AddFunction(ctx, ns, "solidCircle", Draw_SolidCircle, 3);
+      AddFunction(ctx, ns, "label2d", Draw_Label2D, 2);
 
       var global = QJS.JS_GetGlobalObject(ctx);
-      var pNameBytes = Encoding.UTF8.GetBytes("draw\0");
-      fixed (byte* pName = pNameBytes)
-        QJS.JS_SetPropertyStr(ctx, global, pName, ns);
+      SetNamespace(ctx, global, "draw", ns);
       QJS.JS_FreeValue(ctx, global);
     }
   }
