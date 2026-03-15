@@ -32,7 +32,7 @@ namespace UnityJS.Entities.Components
       }
 
       if (
-        !JsScriptPathUtility.TryNormalizeScriptId(path, out var normalized, out var _)
+        !JsScriptPathUtility.TryNormalizeScriptId(path, out var normalized, out _)
         || string.IsNullOrEmpty(normalized)
       )
       {
@@ -48,15 +48,30 @@ namespace UnityJS.Entities.Components
       scriptId.Clear();
     }
 
-    public FixedString64Bytes AsFixedString() => scriptId;
+    public FixedString64Bytes AsFixedString()
+    {
+      return scriptId;
+    }
 
-    public override string ToString() => scriptId.ToString();
+    public override string ToString()
+    {
+      return scriptId.ToString();
+    }
 
-    public bool Equals(JsScriptAssetReference other) => scriptId.Equals(other.scriptId);
+    public bool Equals(JsScriptAssetReference other)
+    {
+      return scriptId.Equals(other.scriptId);
+    }
 
-    public override bool Equals(object obj) => obj is JsScriptAssetReference other && Equals(other);
+    public override bool Equals(object obj)
+    {
+      return obj is JsScriptAssetReference other && Equals(other);
+    }
 
-    public override int GetHashCode() => scriptId.GetHashCode();
+    public override int GetHashCode()
+    {
+      return scriptId.GetHashCode();
+    }
 
     public static implicit operator FixedString64Bytes(JsScriptAssetReference reference) =>
       reference.scriptId;

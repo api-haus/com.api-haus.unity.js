@@ -1,6 +1,6 @@
 namespace UnityJS.Runtime
 {
-  using UnityJS.QJS;
+  using QJS;
 
   public static unsafe class QJSHelpers
   {

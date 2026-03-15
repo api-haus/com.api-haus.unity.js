@@ -3,11 +3,11 @@ namespace UnityJS.Entities.Core
   using System.Collections.Generic;
   using System.Runtime.InteropServices;
   using AOT;
+  using QJS;
+  using Runtime;
   using Unity.Mathematics;
   using UnityEngine;
   using UnityEngine.InputSystem;
-  using UnityJS.QJS;
-  using UnityJS.Runtime;
 
   /// <summary>
   /// Bridge functions for input operations.
@@ -70,7 +70,11 @@ namespace UnityJS.Entities.Core
     )
     {
       var action = GetInputAction(ctx, argv, 0);
-      if (action == null) { SetNull(outU, outTag); return; }
+      if (action == null)
+      {
+        SetNull(outU, outTag);
+        return;
+      }
 
       if (action.expectedControlType == "Vector2")
       {
@@ -105,7 +109,12 @@ namespace UnityJS.Entities.Core
     )
     {
       var action = GetInputAction(ctx, argv, 0);
-      if (action == null) { SetBool(outU, outTag, ctx, false); return; }
+      if (action == null)
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
+
       SetBool(outU, outTag, ctx, action.WasPressedThisFrame());
     }
 
@@ -121,7 +130,12 @@ namespace UnityJS.Entities.Core
     )
     {
       var action = GetInputAction(ctx, argv, 0);
-      if (action == null) { SetBool(outU, outTag, ctx, false); return; }
+      if (action == null)
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
+
       SetBool(outU, outTag, ctx, action.IsPressed());
     }
 
@@ -137,7 +151,12 @@ namespace UnityJS.Entities.Core
     )
     {
       var action = GetInputAction(ctx, argv, 0);
-      if (action == null) { SetBool(outU, outTag, ctx, false); return; }
+      if (action == null)
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
+
       SetBool(outU, outTag, ctx, action.WasReleasedThisFrame());
     }
 

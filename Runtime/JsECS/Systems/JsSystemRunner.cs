@@ -3,12 +3,12 @@ namespace UnityJS.Entities.Systems
   using System.Collections.Generic;
   using System.IO;
   using Core;
+  using Runtime;
   using Unity.Collections;
   using Unity.Entities;
   using Unity.Logging;
   using Unity.Transforms;
   using UnityEngine;
-  using UnityJS.Runtime;
 
   public struct JsSystemManifest : IComponentData
   {
@@ -274,13 +274,11 @@ BuiltQuery.prototype[Symbol.iterator] = function() {
       // If the VM already has this module (e.g. world was recreated but VM persists),
       // skip re-evaluation — QuickJS caches modules and re-eval returns stale namespace.
       if (!m_Vm.HasScript(scriptId))
-      {
         if (!m_Vm.LoadScriptAsModule(scriptId, source, resolvedId))
         {
           Log.Error("[JsSystemRunner] Failed to load system '{0}'", systemName);
           return;
         }
-      }
 
       // System scripts have no entity (entityId = -1)
       var stateRef = m_Vm.CreateEntityState(scriptId, -1);
@@ -310,9 +308,7 @@ BuiltQuery.prototype[Symbol.iterator] = function() {
           out var resolvedId
         )
       )
-      {
         LoadSystem(systemName, source, resolvedId);
-      }
     }
 
     protected override void OnUpdate()

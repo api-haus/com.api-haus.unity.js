@@ -21,25 +21,21 @@ namespace UnityJS.Runtime
       {
         // Replace existing source with same ID
         for (var i = s_sources.Count - 1; i >= 0; i--)
-        {
           if (s_sources[i].SourceId == source.SourceId)
           {
             s_sources.RemoveAt(i);
             break;
           }
-        }
 
         // Insert sorted by priority (ascending — lower priority value = higher precedence)
         var inserted = false;
         for (var i = 0; i < s_sources.Count; i++)
-        {
           if (source.Priority < s_sources[i].Priority)
           {
             s_sources.Insert(i, source);
             inserted = true;
             break;
           }
-        }
 
         if (!inserted)
           s_sources.Add(source);
@@ -54,13 +50,11 @@ namespace UnityJS.Runtime
       lock (s_lock)
       {
         for (var i = s_sources.Count - 1; i >= 0; i--)
-        {
           if (s_sources[i].SourceId == sourceId)
           {
             s_sources.RemoveAt(i);
             return;
           }
-        }
       }
     }
 
@@ -87,10 +81,8 @@ namespace UnityJS.Runtime
         {
           var systems = source.DiscoverSystems();
           foreach (var name in systems)
-          {
             if (seen.Add(name))
               result.Add((name, source));
-          }
         }
       }
 
@@ -108,10 +100,8 @@ namespace UnityJS.Runtime
       lock (s_lock)
       {
         foreach (var src in s_sources)
-        {
           if (src.TryReadScript(scriptName, out source, out resolvedId))
             return true;
-        }
       }
 
       return false;

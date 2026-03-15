@@ -5,13 +5,13 @@ namespace UnityJS.Entities.PlayModeTests
   using Components;
   using Core;
   using NUnit.Framework;
+  using QJS;
+  using Runtime;
   using Unity.Collections;
   using Unity.Entities;
   using Unity.Transforms;
   using UnityEngine;
   using UnityEngine.TestTools;
-  using UnityJS.QJS;
-  using UnityJS.Runtime;
 
   public class JsScriptLifecycleTests
   {
@@ -35,7 +35,7 @@ namespace UnityJS.Entities.PlayModeTests
       m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
       JsECSBridge.Initialize(m_World);
 
-      JsScriptSearchPaths.AddSearchPath(s_testsPath, priority: 0);
+      JsScriptSearchPaths.AddSearchPath(s_testsPath, 0);
 
       if (!JsEntityRegistry.IsCreated)
         JsEntityRegistry.Initialize(16);
@@ -108,9 +108,7 @@ namespace UnityJS.Entities.PlayModeTests
 
       const int frameCount = 5;
       for (var i = 0; i < frameCount; i++)
-      {
         m_Vm.CallTick(scriptId, stateRef, 0.016f);
-      }
 
       var tickCount = GetGlobalInt("_testTickCount");
       Assert.AreEqual(frameCount, tickCount, $"OnTick should have been called {frameCount} times");

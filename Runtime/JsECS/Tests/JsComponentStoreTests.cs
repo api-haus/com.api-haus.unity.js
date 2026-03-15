@@ -39,8 +39,8 @@ namespace UnityJS.Entities.Tests
     {
       EvalGlobalVoid("ecs.define('health')");
       var result = EvalGlobal("ecs.get(1, 'health')");
-      Assert.IsTrue(UnityJS.QJS.QJS.IsUndefined(result));
-      UnityJS.QJS.QJS.JS_FreeValue(Ctx, result);
+      Assert.IsTrue(QJS.QJS.IsUndefined(result));
+      QJS.QJS.JS_FreeValue(Ctx, result);
     }
 
     [Test]

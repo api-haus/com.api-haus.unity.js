@@ -4,8 +4,8 @@ namespace UnityJS.Runtime
   using System.Collections.Generic;
   using System.Runtime.InteropServices;
   using System.Text;
+  using QJS;
   using UnityEngine;
-  using UnityJS.QJS;
 
   /// <summary>
   /// Core runtime host. Owns JSRuntime + JSContext lifecycle.
@@ -17,6 +17,7 @@ namespace UnityJS.Runtime
     /// Set true after the first VM is disposed; checked in the constructor.
     /// </summary>
     static bool s_shimDirty;
+
     static JsRuntimeManager s_Instance;
     public static JsRuntimeManager Instance => s_Instance;
 
@@ -34,7 +35,10 @@ namespace UnityJS.Runtime
     /// <summary>
     /// Returns true if a script module with this ID is already loaded.
     /// </summary>
-    public bool HasScript(string scriptId) => m_ScriptRefs.ContainsKey(scriptId);
+    public bool HasScript(string scriptId)
+    {
+      return m_ScriptRefs.ContainsKey(scriptId);
+    }
 
     public JsRuntimeManager(string basePath = null)
     {
@@ -130,7 +134,10 @@ namespace UnityJS.Runtime
     /// Creates a JS state object for an entity script instance.
     /// Returns a monotonic int key into the state dictionary.
     /// </summary>
-    static byte[] U8(string s) => Encoding.UTF8.GetBytes(s + '\0');
+    static byte[] U8(string s)
+    {
+      return Encoding.UTF8.GetBytes(s + '\0');
+    }
 
     static readonly byte[] s_script = U8("_script");
     static readonly byte[] s_entityId = U8("entityId");
@@ -244,8 +251,14 @@ namespace UnityJS.Runtime
     public unsafe bool CallFunction(string scriptName, string funcName, int stateRef)
     {
       var funcNameBytes = Encoding.UTF8.GetBytes(funcName + '\0');
-      return InvokeExport(scriptName, funcNameBytes, stateRef, null, 0,
-        $"CallFunction({scriptName}.{funcName})");
+      return InvokeExport(
+        scriptName,
+        funcNameBytes,
+        stateRef,
+        null,
+        0,
+        $"CallFunction({scriptName}.{funcName})"
+      );
     }
 
     /// <summary>
@@ -290,8 +303,7 @@ namespace UnityJS.Runtime
     )
     {
       UpdateStateTimings(stateRef, deltaTime, elapsedTime);
-      return InvokeExport(scriptName, s_onTick, stateRef, null, 0,
-        $"CallTick({scriptName})");
+      return InvokeExport(scriptName, s_onTick, stateRef, null, 0, $"CallTick({scriptName})");
     }
 
     /// <summary>
@@ -315,8 +327,14 @@ namespace UnityJS.Runtime
         extras[2] = QJS.NewInt32(m_Context, targetId);
         extras[3] = QJS.NewInt32(m_Context, intParam);
 
-        var ok = InvokeExport(scriptName, s_onEvent, stateRef, extras, 4,
-          $"CallEvent({scriptName}, {eventName})");
+        var ok = InvokeExport(
+          scriptName,
+          s_onEvent,
+          stateRef,
+          extras,
+          4,
+          $"CallEvent({scriptName}, {eventName})"
+        );
 
         QJS.JS_FreeValue(m_Context, extras[0]);
         return ok;
@@ -334,8 +352,14 @@ namespace UnityJS.Runtime
         var extras = stackalloc JSValue[1];
         extras[0] = QJS.JS_NewString(m_Context, pCmd);
 
-        var ok = InvokeExport(scriptName, s_onCommand, stateRef, extras, 1,
-          $"CallCommand({scriptName}, {command})");
+        var ok = InvokeExport(
+          scriptName,
+          s_onCommand,
+          stateRef,
+          extras,
+          1,
+          $"CallCommand({scriptName}, {command})"
+        );
 
         QJS.JS_FreeValue(m_Context, extras[0]);
         return ok;

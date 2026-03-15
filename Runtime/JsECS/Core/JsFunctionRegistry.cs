@@ -2,8 +2,8 @@ namespace UnityJS.Entities.Core
 {
   using System;
   using System.Collections.Generic;
+  using QJS;
   using UnityEngine;
-  using UnityJS.QJS;
 
   public static class JsFunctionRegistry
   {

@@ -141,6 +141,7 @@ namespace UnityJS.Editor
           sb.AppendLine($"  readonly {name}: {val};");
           enumValues.Add(val.ToString());
         }
+
         sb.AppendLine("};");
         sb.AppendLine();
 
@@ -162,6 +163,7 @@ namespace UnityJS.Editor
         var field = docsType.GetField("Descriptions", BindingFlags.Public | BindingFlags.Static);
         return field?.GetValue(null) as Dictionary<string, string>;
       }
+
       return null;
     }
 
@@ -176,6 +178,7 @@ namespace UnityJS.Editor
         var field = docsType.GetField("Descriptions", BindingFlags.Public | BindingFlags.Static);
         return field?.GetValue(null) as Dictionary<string, string>;
       }
+
       return null;
     }
 
@@ -241,6 +244,7 @@ namespace UnityJS.Editor
             sb.AppendLine($"  /** {fieldDesc} */");
           sb.AppendLine($"  {fieldJsName}: {tsType};");
         }
+
         sb.AppendLine("}");
         sb.AppendLine();
 

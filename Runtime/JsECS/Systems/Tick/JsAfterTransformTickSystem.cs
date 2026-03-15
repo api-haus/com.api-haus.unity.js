@@ -8,6 +8,9 @@ namespace UnityJS.Entities.Systems.Tick
   [UpdateAfter(typeof(TransformSystemGroup))]
   public partial class JsAfterTransformTickSystem : JsTickSystemBase
   {
-    protected override JsTickGroup GetTickGroup() => JsTickGroup.AfterTransform;
+    protected override JsTickGroup GetTickGroup()
+    {
+      return JsTickGroup.AfterTransform;
+    }
   }
 }

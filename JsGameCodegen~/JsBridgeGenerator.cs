@@ -368,7 +368,9 @@ namespace JsGameCodegen
     }
 
     /// <summary>Build field layout: list of (name, slotCount, offset) for JS reconstruction.</summary>
-    static List<(string name, int count, int offset)> BuildFieldLayout(ImmutableArray<FieldInfo> fields)
+    static List<(string name, int count, int offset)> BuildFieldLayout(
+      ImmutableArray<FieldInfo> fields
+    )
     {
       var layout = new List<(string, int, int)>();
       var offset = 0;
@@ -568,21 +570,13 @@ namespace JsGameCodegen
           var (fname, fcount, foffset) = layout[li];
           sb.AppendLine("\t\t\t{");
           sb.AppendLine("\t\t\t\tvar fObj = QJS.JS_NewObject(ctx);");
-          sb.AppendLine(
-            "\t\t\t\tvar pFn = System.Text.Encoding.UTF8.GetBytes(\"name\\0\");"
-          );
+          sb.AppendLine("\t\t\t\tvar pFn = System.Text.Encoding.UTF8.GetBytes(\"name\\0\");");
           sb.AppendLine(
             "\t\t\t\tvar pFnV = System.Text.Encoding.UTF8.GetBytes(\"" + fname + "\\0\");"
           );
-          sb.AppendLine(
-            "\t\t\t\tvar pFc = System.Text.Encoding.UTF8.GetBytes(\"count\\0\");"
-          );
-          sb.AppendLine(
-            "\t\t\t\tvar pFo = System.Text.Encoding.UTF8.GetBytes(\"offset\\0\");"
-          );
-          sb.AppendLine(
-            "\t\t\t\tfixed (byte* ppn = pFn, ppnv = pFnV, ppc = pFc, ppo = pFo)"
-          );
+          sb.AppendLine("\t\t\t\tvar pFc = System.Text.Encoding.UTF8.GetBytes(\"count\\0\");");
+          sb.AppendLine("\t\t\t\tvar pFo = System.Text.Encoding.UTF8.GetBytes(\"offset\\0\");");
+          sb.AppendLine("\t\t\t\tfixed (byte* ppn = pFn, ppnv = pFnV, ppc = pFc, ppo = pFo)");
           sb.AppendLine("\t\t\t\t{");
           sb.AppendLine(
             "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, fObj, ppn, QJS.JS_NewString(ctx, ppnv));"
@@ -594,9 +588,7 @@ namespace JsGameCodegen
             "\t\t\t\t\tQJS.JS_SetPropertyStr(ctx, fObj, ppo, QJS.NewInt32(ctx, " + foffset + "));"
           );
           sb.AppendLine("\t\t\t\t}");
-          sb.AppendLine(
-            "\t\t\t\tQJS.JS_SetPropertyUint32(ctx, layoutArr, " + li + ", fObj);"
-          );
+          sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyUint32(ctx, layoutArr, " + li + ", fObj);");
           sb.AppendLine("\t\t\t}");
         }
         sb.AppendLine("\t\t\tfixed (byte* pLayout = s___fieldLayout)");
@@ -762,7 +754,9 @@ namespace JsGameCodegen
           case JsFieldType.Quaternion:
             sb.AppendLine("\t\t\t{");
             sb.AppendLine(
-              "\t\t\t\tvar sub = JsStateExtensions.QuaternionToJsObject(ctx, comp." + field.Name + ");"
+              "\t\t\t\tvar sub = JsStateExtensions.QuaternionToJsObject(ctx, comp."
+                + field.Name
+                + ");"
             );
             sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, obj, p_" + field.JsName + ", sub);");
             sb.AppendLine("\t\t\t}");

@@ -2,10 +2,10 @@ namespace UnityJS.Entities.Systems.Support
 {
   using Components;
   using Core;
+  using Runtime;
   using Unity.Collections;
   using Unity.Entities;
   using Unity.Logging;
-  using UnityJS.Runtime;
 
   [UpdateInGroup(typeof(InitializationSystemGroup))]
   [UpdateBefore(typeof(JsScriptCleanupSystem))]

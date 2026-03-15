@@ -3,12 +3,12 @@ namespace UnityJS.Entities.Core
   using System.Runtime.InteropServices;
   using AOT;
   using Components;
+  using QJS;
+  using Runtime;
   using Unity.Collections;
   using Unity.Entities;
   using Unity.Mathematics;
   using Unity.Transforms;
-  using UnityJS.QJS;
-  using UnityJS.Runtime;
 
   /// <summary>
   /// Bridge functions for entity lifecycle operations.
@@ -104,13 +104,25 @@ namespace UnityJS.Entities.Core
     {
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
-      if (entityId <= 0) { SetBool(outU, outTag, ctx, false); return; }
+      if (entityId <= 0)
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       ref var bctx = ref s_burstContext.Data;
-      if (!bctx.isValid) { SetBool(outU, outTag, ctx, false); return; }
+      if (!bctx.isValid)
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       var entity = GetEntityFromIdBurst(entityId);
-      if (entity == Entity.Null) { SetBool(outU, outTag, ctx, false); return; }
+      if (entity == Entity.Null)
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       bctx.ecb.RemoveComponent<JsEntityId>(entity);
       SetBool(outU, outTag, ctx, true);
@@ -129,14 +141,31 @@ namespace UnityJS.Entities.Core
     {
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
-      if (entityId <= 0) { SetBool(outU, outTag, ctx, false); return; }
-      if (!TryReadCStringAsFixed64(ctx, argv, 1, out var scriptName)) { SetBool(outU, outTag, ctx, false); return; }
+      if (entityId <= 0)
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
+
+      if (!TryReadCStringAsFixed64(ctx, argv, 1, out var scriptName))
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       ref var bctx = ref s_burstContext.Data;
-      if (!bctx.isValid) { SetBool(outU, outTag, ctx, false); return; }
+      if (!bctx.isValid)
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       var entity = GetEntityFromIdBurst(entityId);
-      if (entity == Entity.Null) { SetBool(outU, outTag, ctx, false); return; }
+      if (entity == Entity.Null)
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       var request = new JsScriptRequest
       {
@@ -161,8 +190,17 @@ namespace UnityJS.Entities.Core
     {
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
-      if (entityId <= 0) { SetBool(outU, outTag, ctx, false); return; }
-      if (!TryReadCStringAsFixed64(ctx, argv, 1, out var scriptName)) { SetBool(outU, outTag, ctx, false); return; }
+      if (entityId <= 0)
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
+
+      if (!TryReadCStringAsFixed64(ctx, argv, 1, out var scriptName))
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       var entity = GetEntityFromIdBurst(entityId);
       SetBool(outU, outTag, ctx, HasScriptBurst(entity, scriptName));
@@ -181,19 +219,40 @@ namespace UnityJS.Entities.Core
     {
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
-      if (entityId <= 0) { SetBool(outU, outTag, ctx, false); return; }
+      if (entityId <= 0)
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       var ptr = QJS.JS_ToCString(ctx, argv[1]);
       var componentName = Marshal.PtrToStringUTF8((nint)ptr);
       QJS.JS_FreeCString(ctx, ptr);
-      if (string.IsNullOrEmpty(componentName)) { SetBool(outU, outTag, ctx, false); return; }
-      if (!JsComponentRegistry.TryGetComponentType(componentName, out var componentType)) { SetBool(outU, outTag, ctx, false); return; }
+      if (string.IsNullOrEmpty(componentName))
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
+
+      if (!JsComponentRegistry.TryGetComponentType(componentName, out var componentType))
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       ref var bctx = ref s_burstContext.Data;
-      if (!bctx.isValid) { SetBool(outU, outTag, ctx, false); return; }
+      if (!bctx.isValid)
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       var entity = GetEntityFromIdBurst(entityId);
-      if (entity == Entity.Null) { SetBool(outU, outTag, ctx, false); return; }
+      if (entity == Entity.Null)
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       bctx.ecb.RemoveComponent(entity, componentType);
       SetBool(outU, outTag, ctx, true);

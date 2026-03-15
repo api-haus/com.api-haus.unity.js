@@ -385,13 +385,11 @@ namespace UnityJS.Entities.Core
         return;
 
       foreach (var id in data.pendingDestructions)
-      {
         if (data.idToEntity.TryGetValue(id, out var entity))
         {
           data.entityToId.Remove(entity);
           data.idToEntity.Remove(id);
         }
-      }
 
       data.pendingDestructions.Clear();
     }
@@ -408,19 +406,15 @@ namespace UnityJS.Entities.Core
       var toRemove = new NativeList<int>(Allocator.Temp);
 
       foreach (var kvp in data.idToEntity)
-      {
         if (!IsEntityValid(entityManager, kvp.Value, kvp.Key))
           toRemove.Add(kvp.Key);
-      }
 
       foreach (var id in toRemove)
-      {
         if (data.idToEntity.TryGetValue(id, out var entity))
         {
           data.entityToId.Remove(entity);
           data.idToEntity.Remove(id);
         }
-      }
 
       toRemove.Dispose();
     }

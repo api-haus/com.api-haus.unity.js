@@ -3,9 +3,9 @@ namespace UnityJS.Entities.Systems.Support
   using System.Collections.Generic;
   using Components;
   using Core;
+  using Runtime;
   using Unity.Collections;
   using Unity.Entities;
-  using UnityJS.Runtime;
 
   public class JsEventDispatcher
   {
@@ -60,16 +60,13 @@ namespace UnityJS.Entities.Systems.Support
 
         var eventsCopy = new List<JsEvent>(events.Length);
         for (var i = 0; i < events.Length; i++)
-        {
           eventsCopy.Add(events[i]);
-        }
 
         var scripts = m_EntityManager.GetBuffer<JsScript>(entity);
         for (var i = 0; i < scripts.Length; i++)
         {
           var script = scripts[i];
           if (script.stateRef >= 0 && !script.disabled)
-          {
             m_PendingEvents.Add(
               (
                 entity,
@@ -80,9 +77,9 @@ namespace UnityJS.Entities.Systems.Support
                 eventsCopy
               )
             );
-          }
         }
       }
+
       entities.Dispose();
 
       return eventCount;
@@ -91,9 +88,7 @@ namespace UnityJS.Entities.Systems.Support
     public void ClearEventBuffers(EntityCommandBuffer ecb)
     {
       foreach (var entity in m_EntitiesToClear)
-      {
         ecb.SetBuffer<JsEvent>(entity);
-      }
     }
 
     public void DispatchEvents()

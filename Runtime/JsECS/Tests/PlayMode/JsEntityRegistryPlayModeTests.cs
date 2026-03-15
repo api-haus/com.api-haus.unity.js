@@ -1,6 +1,7 @@
 namespace UnityJS.Entities.PlayModeTests
 {
   using System.Collections;
+  using Components;
   using Core;
   using NUnit.Framework;
   using Unity.Collections;
@@ -8,7 +9,6 @@ namespace UnityJS.Entities.PlayModeTests
   using Unity.Mathematics;
   using Unity.Transforms;
   using UnityEngine.TestTools;
-  using UnityJS.Entities.Components;
 
   public class JsEntityRegistryPlayModeTests
   {
@@ -31,7 +31,10 @@ namespace UnityJS.Entities.PlayModeTests
       yield return null;
     }
 
-    EntityCommandBuffer CreateECB() => m_ECBSystem.CreateCommandBuffer();
+    EntityCommandBuffer CreateECB()
+    {
+      return m_ECBSystem.CreateCommandBuffer();
+    }
 
     [UnityTearDown]
     public IEnumerator TearDown()

@@ -2,9 +2,9 @@ namespace UnityJS.Entities.Core
 {
   using System.Text;
   using AOT;
+  using QJS;
   using Unity.Burst;
   using Unity.Mathematics;
-  using UnityJS.QJS;
 
   public static class JsSystemBridge
   {
@@ -18,7 +18,7 @@ namespace UnityJS.Entities.Core
     static readonly SharedStatic<double> s_elapsedTime =
       SharedStatic<double>.GetOrCreate<ElapsedTimeMarker>();
 
-    static Unity.Mathematics.Random s_random;
+    static Random s_random;
 
     public static void UpdateContext(float deltaTime, double elapsedTime)
     {
@@ -28,7 +28,7 @@ namespace UnityJS.Entities.Core
 
     public static unsafe void Register(JSContext ctx)
     {
-      s_random = new Unity.Mathematics.Random((uint)System.Environment.TickCount | 1u);
+      s_random = new Random((uint)System.Environment.TickCount | 1u);
 
       var ns = QJS.JS_NewObject(ctx);
 
@@ -38,18 +38,21 @@ namespace UnityJS.Entities.Core
         var fn = QJSShim.qjs_shim_new_function(ctx, System_DeltaTime, pDeltaTime, 0);
         QJS.JS_SetPropertyStr(ctx, ns, pDeltaTime, fn);
       }
+
       var pTimeBytes = Encoding.UTF8.GetBytes("time\0");
       fixed (byte* pTime = pTimeBytes)
       {
         var fn = QJSShim.qjs_shim_new_function(ctx, System_Time, pTime, 0);
         QJS.JS_SetPropertyStr(ctx, ns, pTime, fn);
       }
+
       var pRandomBytes = Encoding.UTF8.GetBytes("random\0");
       fixed (byte* pRandom = pRandomBytes)
       {
         var fn = QJSShim.qjs_shim_new_function(ctx, System_Random, pRandom, 2);
         QJS.JS_SetPropertyStr(ctx, ns, pRandom, fn);
       }
+
       var pRandomIntBytes = Encoding.UTF8.GetBytes("randomInt\0");
       fixed (byte* pRandomInt = pRandomIntBytes)
       {
@@ -60,7 +63,10 @@ namespace UnityJS.Entities.Core
       var global = QJS.JS_GetGlobalObject(ctx);
       var pSystemBytes = Encoding.UTF8.GetBytes("system\0");
       fixed (byte* pSystem = pSystemBytes)
+      {
         QJS.JS_SetPropertyStr(ctx, global, pSystem, ns);
+      }
+
       QJS.JS_FreeValue(ctx, global);
     }
 

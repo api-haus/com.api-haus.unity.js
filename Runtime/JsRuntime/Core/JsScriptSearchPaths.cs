@@ -15,7 +15,7 @@ namespace UnityJS.Runtime
   /// </summary>
   public static class JsScriptSearchPaths
   {
-    static readonly object s_searchPathLock = new object();
+    static readonly object s_searchPathLock = new();
     static bool s_initialized;
     static string s_defaultScriptsPath;
 
@@ -27,9 +27,7 @@ namespace UnityJS.Runtime
       get
       {
         if (s_defaultScriptsPath == null)
-        {
           s_defaultScriptsPath = Path.Combine(Application.streamingAssetsPath, "unity.js");
-        }
         return s_defaultScriptsPath;
       }
     }
@@ -104,10 +102,8 @@ namespace UnityJS.Runtime
         var paths = new List<string>();
         var sources = JsScriptSourceRegistry.GetSources();
         foreach (var source in sources)
-        {
           if (source is FileSystemScriptSource fs)
             paths.Add(fs.BasePath);
-        }
         return paths;
       }
     }

@@ -1,8 +1,8 @@
 namespace UnityJS.Runtime
 {
   using System.Runtime.InteropServices;
+  using QJS;
   using Unity.Mathematics;
-  using UnityJS.QJS;
 
   /// <summary>
   /// QuickJS value helpers for float3 and quaternion marshalling.
@@ -29,7 +29,8 @@ namespace UnityJS.Runtime
 
     public static void ClearVectorPrototypes(JSContext ctx)
     {
-      if (!s_protosSet) return;
+      if (!s_protosSet)
+        return;
       QJS.JS_FreeValue(ctx, s_float2Proto);
       QJS.JS_FreeValue(ctx, s_float3Proto);
       QJS.JS_FreeValue(ctx, s_float4Proto);
@@ -55,6 +56,7 @@ namespace UnityJS.Runtime
         QJS.JS_SetPropertyStr(ctx, obj, px, QJS.NewFloat64(ctx, value.x));
         QJS.JS_SetPropertyStr(ctx, obj, py, QJS.NewFloat64(ctx, value.y));
       }
+
       return obj;
     }
 
@@ -73,6 +75,7 @@ namespace UnityJS.Runtime
           QJS.JS_ToFloat64(ctx, &d, vx);
           result.x = (float)d;
         }
+
         QJS.JS_FreeValue(ctx, vx);
 
         var vy = QJS.JS_GetPropertyStr(ctx, val, py);
@@ -81,8 +84,10 @@ namespace UnityJS.Runtime
           QJS.JS_ToFloat64(ctx, &d, vy);
           result.y = (float)d;
         }
+
         QJS.JS_FreeValue(ctx, vy);
       }
+
       return result;
     }
 
@@ -99,6 +104,7 @@ namespace UnityJS.Runtime
         QJS.JS_SetPropertyStr(ctx, obj, py, QJS.NewFloat64(ctx, value.y));
         QJS.JS_SetPropertyStr(ctx, obj, pz, QJS.NewFloat64(ctx, value.z));
       }
+
       return obj;
     }
 
@@ -118,6 +124,7 @@ namespace UnityJS.Runtime
           QJS.JS_ToFloat64(ctx, &d, vx);
           result.x = (float)d;
         }
+
         QJS.JS_FreeValue(ctx, vx);
 
         var vy = QJS.JS_GetPropertyStr(ctx, val, py);
@@ -126,6 +133,7 @@ namespace UnityJS.Runtime
           QJS.JS_ToFloat64(ctx, &d, vy);
           result.y = (float)d;
         }
+
         QJS.JS_FreeValue(ctx, vy);
 
         var vz = QJS.JS_GetPropertyStr(ctx, val, pz);
@@ -134,8 +142,10 @@ namespace UnityJS.Runtime
           QJS.JS_ToFloat64(ctx, &d, vz);
           result.z = (float)d;
         }
+
         QJS.JS_FreeValue(ctx, vz);
       }
+
       return result;
     }
 
@@ -154,6 +164,7 @@ namespace UnityJS.Runtime
         QJS.JS_SetPropertyStr(ctx, obj, pz, QJS.NewFloat64(ctx, value.z));
         QJS.JS_SetPropertyStr(ctx, obj, pw, QJS.NewFloat64(ctx, value.w));
       }
+
       return obj;
     }
 
@@ -174,6 +185,7 @@ namespace UnityJS.Runtime
           QJS.JS_ToFloat64(ctx, &d, vx);
           result.x = (float)d;
         }
+
         QJS.JS_FreeValue(ctx, vx);
 
         var vy = QJS.JS_GetPropertyStr(ctx, val, py);
@@ -182,6 +194,7 @@ namespace UnityJS.Runtime
           QJS.JS_ToFloat64(ctx, &d, vy);
           result.y = (float)d;
         }
+
         QJS.JS_FreeValue(ctx, vy);
 
         var vz = QJS.JS_GetPropertyStr(ctx, val, pz);
@@ -190,6 +203,7 @@ namespace UnityJS.Runtime
           QJS.JS_ToFloat64(ctx, &d, vz);
           result.z = (float)d;
         }
+
         QJS.JS_FreeValue(ctx, vz);
 
         var vw = QJS.JS_GetPropertyStr(ctx, val, pw);
@@ -198,8 +212,10 @@ namespace UnityJS.Runtime
           QJS.JS_ToFloat64(ctx, &d, vw);
           result.w = (float)d;
         }
+
         QJS.JS_FreeValue(ctx, vw);
       }
+
       return result;
     }
 
@@ -218,6 +234,7 @@ namespace UnityJS.Runtime
         QJS.JS_SetPropertyStr(ctx, obj, pz, QJS.NewFloat64(ctx, value.value.z));
         QJS.JS_SetPropertyStr(ctx, obj, pw, QJS.NewFloat64(ctx, value.value.w));
       }
+
       return obj;
     }
 
@@ -238,6 +255,7 @@ namespace UnityJS.Runtime
           QJS.JS_ToFloat64(ctx, &d, vx);
           result.value.x = (float)d;
         }
+
         QJS.JS_FreeValue(ctx, vx);
 
         var vy = QJS.JS_GetPropertyStr(ctx, val, py);
@@ -246,6 +264,7 @@ namespace UnityJS.Runtime
           QJS.JS_ToFloat64(ctx, &d, vy);
           result.value.y = (float)d;
         }
+
         QJS.JS_FreeValue(ctx, vy);
 
         var vz = QJS.JS_GetPropertyStr(ctx, val, pz);
@@ -254,6 +273,7 @@ namespace UnityJS.Runtime
           QJS.JS_ToFloat64(ctx, &d, vz);
           result.value.z = (float)d;
         }
+
         QJS.JS_FreeValue(ctx, vz);
 
         var vw = QJS.JS_GetPropertyStr(ctx, val, pw);
@@ -262,8 +282,10 @@ namespace UnityJS.Runtime
           QJS.JS_ToFloat64(ctx, &d, vw);
           result.value.w = (float)d;
         }
+
         QJS.JS_FreeValue(ctx, vw);
       }
+
       return result;
     }
 

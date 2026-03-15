@@ -35,7 +35,7 @@ namespace UnityJS.QJS.Tests
       var len = bytes.Length - 1;
       fixed (byte* pCode = bytes)
       {
-        byte* pFile = stackalloc byte[] { (byte)'t', (byte)'e', (byte)'s', (byte)'t', 0 };
+        var pFile = stackalloc byte[] { (byte)'t', (byte)'e', (byte)'s', (byte)'t', 0 };
         return QJS.JS_Eval(m_Ctx, pCode, len, pFile, flags);
       }
     }
@@ -123,7 +123,7 @@ namespace UnityJS.QJS.Tests
       long* outTag
     )
     {
-      byte* pStr = stackalloc byte[] { (byte)'h', (byte)'e', (byte)'l', (byte)'l', (byte)'o', 0 };
+      var pStr = stackalloc byte[] { (byte)'h', (byte)'e', (byte)'l', (byte)'l', (byte)'o', 0 };
       var v = QJS.JS_NewString(ctx, pStr);
       *outU = v.u;
       *outTag = v.tag;
@@ -275,7 +275,7 @@ namespace UnityJS.QJS.Tests
     [Test]
     public void NewString_ToCString_Roundtrip()
     {
-      byte* pStr = stackalloc byte[] { (byte)'h', (byte)'e', (byte)'l', (byte)'l', (byte)'o', 0 };
+      var pStr = stackalloc byte[] { (byte)'h', (byte)'e', (byte)'l', (byte)'l', (byte)'o', 0 };
       var val = QJS.JS_NewString(m_Ctx, pStr);
       Assert.AreEqual("hello", ToCString(val));
       QJS.JS_FreeValue(m_Ctx, val);
@@ -285,7 +285,7 @@ namespace UnityJS.QJS.Tests
     public void NewObject_SetGetProperty()
     {
       var obj = QJS.JS_NewObject(m_Ctx);
-      byte* pProp = stackalloc byte[] { (byte)'x', 0 };
+      var pProp = stackalloc byte[] { (byte)'x', 0 };
       QJS.JS_SetPropertyStr(m_Ctx, obj, pProp, QJS.NewInt32(m_Ctx, 42));
       var got = QJS.JS_GetPropertyStr(m_Ctx, obj, pProp);
       Assert.AreEqual(42, ToInt32(got));

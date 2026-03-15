@@ -17,9 +17,7 @@ namespace UnityJS.Runtime
       foreach (var dir in Directory.GetDirectories(modsDir))
       {
         var name = Path.GetFileName(dir);
-        JsScriptSourceRegistry.Register(
-          new FileSystemScriptSource($"mod:{name}", dir, priority: 0)
-        );
+        JsScriptSourceRegistry.Register(new FileSystemScriptSource($"mod:{name}", dir, 0));
       }
     }
   }

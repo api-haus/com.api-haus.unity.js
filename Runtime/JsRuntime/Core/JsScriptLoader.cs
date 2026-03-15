@@ -97,7 +97,7 @@ namespace UnityJS.Runtime
       return JsScriptLoadResult.Success(
         new FixedString64Bytes(normalized),
         JsScriptSourceType.STREAMING_ASSETS,
-        filePath: new FixedString512Bytes(filePath)
+        new FixedString512Bytes(filePath)
       );
     }
 
@@ -126,7 +126,7 @@ namespace UnityJS.Runtime
       return JsScriptLoadResult.Success(
         new FixedString64Bytes(scriptId),
         JsScriptSourceType.FILE_PATH,
-        filePath: new FixedString512Bytes(resolvedPath)
+        new FixedString512Bytes(resolvedPath)
       );
     }
 
@@ -150,7 +150,7 @@ namespace UnityJS.Runtime
       return JsScriptLoadResult.Success(
         new FixedString64Bytes(normalized),
         JsScriptSourceType.FILE_PATH,
-        filePath: new FixedString512Bytes(filePath)
+        new FixedString512Bytes(filePath)
       );
     }
 

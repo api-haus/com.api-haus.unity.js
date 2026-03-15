@@ -4,8 +4,8 @@ namespace UnityJS.Entities.Tests
   using System.Text;
   using Core;
   using NUnit.Framework;
-  using UnityJS.QJS;
-  using UnityJS.Runtime;
+  using QJS;
+  using Runtime;
 
   /// <summary>
   /// Test helper: creates a JsRuntimeManager and registers bridge functions.
@@ -58,6 +58,7 @@ namespace UnityJS.Entities.Tests
           QJS.JS_FreeValue(Ctx, exc);
           Assert.Fail($"JS exception: {emsg}");
         }
+
         return result;
       }
     }

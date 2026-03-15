@@ -39,9 +39,10 @@ namespace UnityJS.Entities.PlayModeTests
         sum += t;
 
       var mean = sum / iterations;
-      var median = iterations % 2 == 1
-        ? timings[iterations / 2]
-        : (timings[iterations / 2 - 1] + timings[iterations / 2]) / 2.0;
+      var median =
+        iterations % 2 == 1
+          ? timings[iterations / 2]
+          : (timings[(iterations / 2) - 1] + timings[iterations / 2]) / 2.0;
       var min = timings[0];
       var max = timings[iterations - 1];
 

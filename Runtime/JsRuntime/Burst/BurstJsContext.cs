@@ -54,10 +54,8 @@ namespace UnityJS.Runtime.Burst
     public bool IsCreated => m_Operations != null;
     public int Length => m_Operations != null ? m_Operations->Length : 0;
 
-    public BurstOperationQueue(int initialCapacity, Allocator allocator)
-    {
+    public BurstOperationQueue(int initialCapacity, Allocator allocator) =>
       m_Operations = UnsafeList<T>.Create(initialCapacity, allocator);
-    }
 
     public void Add(T operation)
     {
@@ -82,7 +80,10 @@ namespace UnityJS.Runtime.Burst
       }
     }
 
-    public UnsafeList<T>* GetUnsafePtr() => m_Operations;
+    public UnsafeList<T>* GetUnsafePtr()
+    {
+      return m_Operations;
+    }
   }
 
   /// <summary>
@@ -97,10 +98,8 @@ namespace UnityJS.Runtime.Burst
     public bool IsCreated => m_Map.IsCreated;
     public int Count => m_Map.Count;
 
-    public BurstIdLookup(int initialCapacity, Allocator allocator)
-    {
+    public BurstIdLookup(int initialCapacity, Allocator allocator) =>
       m_Map = new UnsafeHashMap<int, TValue>(initialCapacity, allocator);
-    }
 
     public bool TryGetValue(int id, out TValue value)
     {
@@ -133,6 +132,9 @@ namespace UnityJS.Runtime.Burst
         m_Map.Dispose();
     }
 
-    public UnsafeHashMap<int, TValue> GetUnsafeMap() => m_Map;
+    public UnsafeHashMap<int, TValue> GetUnsafeMap()
+    {
+      return m_Map;
+    }
   }
 }

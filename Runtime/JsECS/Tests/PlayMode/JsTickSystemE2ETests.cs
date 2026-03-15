@@ -6,14 +6,14 @@ namespace UnityJS.Entities.PlayModeTests
   using Components;
   using Core;
   using NUnit.Framework;
+  using QJS;
+  using Runtime;
   using Unity.Collections;
   using Unity.Entities;
   using Unity.Mathematics;
   using Unity.Transforms;
   using UnityEngine;
   using UnityEngine.TestTools;
-  using UnityJS.QJS;
-  using UnityJS.Runtime;
 
   /// <summary>
   /// End-to-end tests that exercise the real ECS pipeline:
@@ -42,7 +42,7 @@ namespace UnityJS.Entities.PlayModeTests
       m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
       JsECSBridge.Initialize(m_World);
 
-      JsScriptSearchPaths.AddSearchPath(s_testsPath, priority: 0);
+      JsScriptSearchPaths.AddSearchPath(s_testsPath, 0);
 
       if (!JsEntityRegistry.IsCreated)
         JsEntityRegistry.Initialize(64);
@@ -113,7 +113,6 @@ namespace UnityJS.Entities.PlayModeTests
       m_EntityManager.AddComponentData(entity, new JsEntityId { value = entityId });
       var requests = m_EntityManager.AddBuffer<JsScriptRequest>(entity);
       foreach (var name in scriptNames)
-      {
         requests.Add(
           new JsScriptRequest
           {
@@ -122,7 +121,6 @@ namespace UnityJS.Entities.PlayModeTests
             fulfilled = false,
           }
         );
-      }
       return entity;
     }
 

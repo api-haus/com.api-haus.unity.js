@@ -6,6 +6,9 @@ namespace UnityJS.Entities.Systems.Tick
   [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
   public partial class JsFixedTickSystem : JsTickSystemBase
   {
-    protected override JsTickGroup GetTickGroup() => JsTickGroup.Fixed;
+    protected override JsTickGroup GetTickGroup()
+    {
+      return JsTickGroup.Fixed;
+    }
   }
 }

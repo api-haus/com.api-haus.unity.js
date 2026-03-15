@@ -1,10 +1,10 @@
 #if UNITY_EDITOR
 namespace UnityJS.Editor
 {
+  using Entities.Components;
+  using Entities.Core;
   using UnityEditor;
   using UnityEngine;
-  using UnityJS.Entities.Components;
-  using UnityJS.Entities.Core;
 
   [CustomPropertyDrawer(typeof(JsScriptAssetReference))]
   sealed class JsScriptAssetReferenceDrawer : PropertyDrawer

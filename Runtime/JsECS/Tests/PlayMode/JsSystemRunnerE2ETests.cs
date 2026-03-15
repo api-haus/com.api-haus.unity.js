@@ -6,6 +6,8 @@ namespace UnityJS.Entities.PlayModeTests
   using Components;
   using Core;
   using NUnit.Framework;
+  using QJS;
+  using Runtime;
   using Systems;
   using Unity.Collections;
   using Unity.Entities;
@@ -13,8 +15,6 @@ namespace UnityJS.Entities.PlayModeTests
   using Unity.Transforms;
   using UnityEngine;
   using UnityEngine.TestTools;
-  using UnityJS.QJS;
-  using UnityJS.Runtime;
 
   /// <summary>
   /// End-to-end tests that verify JsSystemRunner auto-discovers and executes

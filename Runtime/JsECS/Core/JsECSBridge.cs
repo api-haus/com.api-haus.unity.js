@@ -2,14 +2,14 @@ namespace UnityJS.Entities.Core
 {
   using System.Threading;
   using Components;
+  using QJS;
+  using Runtime;
   using Unity.Burst;
   using Unity.Collections;
   using Unity.Collections.LowLevel.Unsafe;
   using Unity.Entities;
   using Unity.Mathematics;
   using Unity.Transforms;
-  using UnityJS.QJS;
-  using UnityJS.Runtime;
 
   public struct PendingEntityCreation
   {
@@ -97,7 +97,9 @@ namespace UnityJS.Entities.Core
     static bool s_playerQueryInitialized;
     static bool s_initialized;
 
-    [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+    [UnityEngine.RuntimeInitializeOnLoadMethod(
+      UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration
+    )]
     static void ResetSession()
     {
       s_world = null;
@@ -252,6 +254,7 @@ namespace UnityJS.Entities.Core
         ecb = ctx.ecb;
         return true;
       }
+
       ecb = default;
       return false;
     }
@@ -435,6 +438,7 @@ namespace UnityJS.Entities.Core
           QJS.JS_FreeValue(ctx, ex);
           Unity.Logging.Log.Error("[JsECS] Failed to initialize math bootstrap: {0}", msg);
         }
+
         QJS.JS_FreeValue(ctx, result);
       }
 
@@ -443,13 +447,18 @@ namespace UnityJS.Entities.Core
       var f3pBytes = System.Text.Encoding.UTF8.GetBytes("__F3P\0");
       var f4pBytes = System.Text.Encoding.UTF8.GetBytes("__F4P\0");
       var global = QJS.JS_GetGlobalObject(ctx);
-      fixed (byte* pF2 = f2pBytes, pF3 = f3pBytes, pF4 = f4pBytes)
+      fixed (
+        byte* pF2 = f2pBytes,
+          pF3 = f3pBytes,
+          pF4 = f4pBytes
+      )
       {
         var f2p = QJS.JS_GetPropertyStr(ctx, global, pF2);
         var f3p = QJS.JS_GetPropertyStr(ctx, global, pF3);
         var f4p = QJS.JS_GetPropertyStr(ctx, global, pF4);
         JsStateExtensions.SetVectorPrototypes(f2p, f3p, f4p);
       }
+
       QJS.JS_FreeValue(ctx, global);
     }
 
@@ -522,10 +531,8 @@ namespace UnityJS.Entities.Core
 
       var scripts = ctx.scriptBufferLookup[entity];
       for (var i = 0; i < scripts.Length; i++)
-      {
         if (scripts[i].scriptName == scriptName)
           return true;
-      }
 
       return false;
     }
@@ -636,7 +643,9 @@ namespace UnityJS.Entities.Core
     {
       var bytes = System.Text.Encoding.UTF8.GetBytes(name + '\0');
       fixed (byte* p = bytes)
+      {
         QJS.JS_SetPropertyStr(ctx, global, p, ns);
+      }
     }
 
     internal static unsafe void SetUndefined(long* outU, long* outTag)

@@ -71,13 +71,11 @@ namespace UnityJS.Entities.Core
     public static ScriptAnnotations ParseFile(string filePath)
     {
       if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
-      {
         return new ScriptAnnotations
         {
           tickGroup = JsTickGroup.Variable,
           hasTickAnnotation = false,
         };
-      }
 
       // Read only enough lines for header parsing
       var lines = new System.Text.StringBuilder();

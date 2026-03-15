@@ -12,11 +12,20 @@ namespace UnityJS.QJS
     public long u;
     public long tag;
 
-    public readonly bool Equals(JSValue other) => u == other.u && tag == other.tag;
+    public readonly bool Equals(JSValue other)
+    {
+      return u == other.u && tag == other.tag;
+    }
 
-    public override readonly bool Equals(object obj) => obj is JSValue v && Equals(v);
+    public override readonly bool Equals(object obj)
+    {
+      return obj is JSValue v && Equals(v);
+    }
 
-    public override readonly int GetHashCode() => HashCode.Combine(u, tag);
+    public override readonly int GetHashCode()
+    {
+      return HashCode.Combine(u, tag);
+    }
 
     public static bool operator ==(JSValue a, JSValue b) => a.Equals(b);
 
@@ -28,11 +37,20 @@ namespace UnityJS.QJS
     public nuint Handle;
     public readonly bool IsNull => Handle == 0;
 
-    public readonly bool Equals(JSRuntime other) => Handle == other.Handle;
+    public readonly bool Equals(JSRuntime other)
+    {
+      return Handle == other.Handle;
+    }
 
-    public override readonly bool Equals(object obj) => obj is JSRuntime r && Equals(r);
+    public override readonly bool Equals(object obj)
+    {
+      return obj is JSRuntime r && Equals(r);
+    }
 
-    public override readonly int GetHashCode() => Handle.GetHashCode();
+    public override readonly int GetHashCode()
+    {
+      return Handle.GetHashCode();
+    }
   }
 
   public struct JSContext : IEquatable<JSContext>
@@ -40,11 +58,20 @@ namespace UnityJS.QJS
     public nuint Handle;
     public readonly bool IsNull => Handle == 0;
 
-    public readonly bool Equals(JSContext other) => Handle == other.Handle;
+    public readonly bool Equals(JSContext other)
+    {
+      return Handle == other.Handle;
+    }
 
-    public override readonly bool Equals(object obj) => obj is JSContext c && Equals(c);
+    public override readonly bool Equals(object obj)
+    {
+      return obj is JSContext c && Equals(c);
+    }
 
-    public override readonly int GetHashCode() => Handle.GetHashCode();
+    public override readonly int GetHashCode()
+    {
+      return Handle.GetHashCode();
+    }
   }
 
   public unsafe delegate JSValue JSCFunction(
@@ -53,12 +80,14 @@ namespace UnityJS.QJS
     int argc,
     JSValue* argv
   );
+
   public unsafe delegate byte* JSModuleNormalizeFunc(
     JSContext ctx,
     byte* base_name,
     byte* name,
     void* opaque
   );
+
   public unsafe delegate JSValue JSModuleLoaderFunc(JSContext ctx, byte* name, void* opaque);
 
   public struct JSModuleDef
@@ -90,32 +119,65 @@ namespace UnityJS.QJS
 
     // ── Inline reimplementations (NOT exported from .so) ──
 
-    public static JSValue JS_MKVAL(long tag, int val) => new() { u = val, tag = tag };
+    public static JSValue JS_MKVAL(long tag, int val)
+    {
+      return new JSValue { u = val, tag = tag };
+    }
 
     public static JSValue JS_NULL => JS_MKVAL(JS_TAG_NULL, 0);
     public static JSValue JS_UNDEFINED => JS_MKVAL(JS_TAG_UNDEFINED, 0);
     public static JSValue JS_TRUE => JS_MKVAL(JS_TAG_BOOL, 1);
     public static JSValue JS_FALSE => JS_MKVAL(JS_TAG_BOOL, 0);
 
-    public static bool IsException(JSValue v) => v.tag == JS_TAG_EXCEPTION;
+    public static bool IsException(JSValue v)
+    {
+      return v.tag == JS_TAG_EXCEPTION;
+    }
 
-    public static bool IsNumber(JSValue v) => v.tag == JS_TAG_INT || v.tag == JS_TAG_FLOAT64;
+    public static bool IsNumber(JSValue v)
+    {
+      return v.tag == JS_TAG_INT || v.tag == JS_TAG_FLOAT64;
+    }
 
-    public static bool IsString(JSValue v) => v.tag == JS_TAG_STRING;
+    public static bool IsString(JSValue v)
+    {
+      return v.tag == JS_TAG_STRING;
+    }
 
-    public static bool IsObject(JSValue v) => v.tag == JS_TAG_OBJECT;
+    public static bool IsObject(JSValue v)
+    {
+      return v.tag == JS_TAG_OBJECT;
+    }
 
-    public static bool IsUndefined(JSValue v) => v.tag == JS_TAG_UNDEFINED;
+    public static bool IsUndefined(JSValue v)
+    {
+      return v.tag == JS_TAG_UNDEFINED;
+    }
 
-    public static bool IsNull(JSValue v) => v.tag == JS_TAG_NULL;
+    public static bool IsNull(JSValue v)
+    {
+      return v.tag == JS_TAG_NULL;
+    }
 
-    public static bool IsBool(JSValue v) => v.tag == JS_TAG_BOOL;
+    public static bool IsBool(JSValue v)
+    {
+      return v.tag == JS_TAG_BOOL;
+    }
 
-    public static JSValue NewInt32(JSContext ctx, int val) => JS_MKVAL(JS_TAG_INT, val);
+    public static JSValue NewInt32(JSContext ctx, int val)
+    {
+      return JS_MKVAL(JS_TAG_INT, val);
+    }
 
-    public static JSValue NewBool(JSContext ctx, bool val) => JS_MKVAL(JS_TAG_BOOL, val ? 1 : 0);
+    public static JSValue NewBool(JSContext ctx, bool val)
+    {
+      return JS_MKVAL(JS_TAG_BOOL, val ? 1 : 0);
+    }
 
-    public static JSValue JS_NewBool(JSContext ctx, int val) => JS_MKVAL(JS_TAG_BOOL, val);
+    public static JSValue JS_NewBool(JSContext ctx, int val)
+    {
+      return JS_MKVAL(JS_TAG_BOOL, val);
+    }
 
     public static unsafe JSValue NewFloat64(JSContext ctx, double val)
     {
@@ -168,7 +230,7 @@ namespace UnityJS.QJS
 
     public static unsafe JSValue JS_NewString(JSContext ctx, byte* str)
     {
-      int len = 0;
+      var len = 0;
       if (str != null)
         while (str[len] != 0)
           len++;
@@ -212,8 +274,10 @@ namespace UnityJS.QJS
       int cesu8
     );
 
-    public static unsafe byte* JS_ToCString(JSContext ctx, JSValue val) =>
-      JS_ToCStringLen2(ctx, null, val, 0);
+    public static unsafe byte* JS_ToCString(JSContext ctx, JSValue val)
+    {
+      return JS_ToCStringLen2(ctx, null, val, 0);
+    }
 
     [DllImport(Lib, CallingConvention = CC)]
     public static extern unsafe void JS_FreeCString(JSContext ctx, byte* ptr);
@@ -284,20 +348,27 @@ namespace UnityJS.QJS
 
     // ArrayBuffer / TypedArray
     [DllImport(Lib, CallingConvention = CC)]
-    public static extern unsafe JSValue JS_NewArrayBufferCopy(
-      JSContext ctx, byte* buf, nint len);
+    public static extern unsafe JSValue JS_NewArrayBufferCopy(JSContext ctx, byte* buf, nint len);
 
     [DllImport(Lib, CallingConvention = CC)]
-    public static extern unsafe byte* JS_GetArrayBuffer(
-      JSContext ctx, nint* psize, JSValue obj);
+    public static extern unsafe byte* JS_GetArrayBuffer(JSContext ctx, nint* psize, JSValue obj);
 
     [DllImport(Lib, CallingConvention = CC)]
     public static extern unsafe JSValue JS_NewTypedArray(
-      JSContext ctx, int argc, JSValue* argv, int array_type);
+      JSContext ctx,
+      int argc,
+      JSValue* argv,
+      int array_type
+    );
 
     [DllImport(Lib, CallingConvention = CC)]
     public static extern unsafe JSValue JS_GetTypedArrayBuffer(
-      JSContext ctx, JSValue obj, nint* pbyte_offset, nint* pbyte_length, nint* pbytes_per_element);
+      JSContext ctx,
+      JSValue obj,
+      nint* pbyte_offset,
+      nint* pbyte_length,
+      nint* pbytes_per_element
+    );
 
     // TypedArray enum constants (from JSTypedArrayEnum)
     public const int JS_TYPED_ARRAY_INT32 = 5;
@@ -308,11 +379,9 @@ namespace UnityJS.QJS
     public static extern JSValue JS_GetException(JSContext ctx);
 
     // Convenience
-    public static unsafe JSValue JS_NewCFunction(
-      JSContext ctx,
-      nint func,
-      byte* name,
-      int length
-    ) => JS_NewCFunction2(ctx, func, name, length, 0, 0);
+    public static unsafe JSValue JS_NewCFunction(JSContext ctx, nint func, byte* name, int length)
+    {
+      return JS_NewCFunction2(ctx, func, name, length, 0, 0);
+    }
   }
 }

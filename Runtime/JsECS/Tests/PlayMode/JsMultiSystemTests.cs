@@ -7,11 +7,11 @@ namespace UnityJS.Entities.PlayModeTests
   using Components;
   using Core;
   using NUnit.Framework;
+  using QJS;
+  using Runtime;
   using Unity.Entities;
   using UnityEngine;
   using UnityEngine.TestTools;
-  using UnityJS.QJS;
-  using UnityJS.Runtime;
 
   public class JsMultiSystemTests
   {
@@ -49,10 +49,8 @@ namespace UnityJS.Entities.PlayModeTests
     public IEnumerator TearDown()
     {
       foreach (var (_, stateRef) in m_LoadedScripts)
-      {
         if (m_Vm.ValidateStateRef(stateRef))
           m_Vm.ReleaseEntityState(stateRef);
-      }
       m_LoadedScripts.Clear();
 
       JsEntityRegistry.Clear();
@@ -190,6 +188,7 @@ namespace UnityJS.Entities.PlayModeTests
               m_Vm.CallTick(s.scriptId, s.stateRef, fixedDt);
           fixedAccumulator -= fixedDt;
         }
+
         foreach (var s in scripts)
           if (s.group == JsTickGroup.Variable)
             m_Vm.CallTick(s.scriptId, s.stateRef, frameDt);
@@ -212,6 +211,7 @@ namespace UnityJS.Entities.PlayModeTests
           acc -= fixedDt;
         }
       }
+
       return count;
     }
 
@@ -774,6 +774,7 @@ namespace UnityJS.Entities.PlayModeTests
           m_Vm.CallTick(fixS.scriptId, fixS.stateRef, fixedDt);
           fixedAccumulator -= fixedDt;
         }
+
         m_Vm.CallFunction(sysS.scriptId, "onUpdate", sysS.stateRef);
       }
 

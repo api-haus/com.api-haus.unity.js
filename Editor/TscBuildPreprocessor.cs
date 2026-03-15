@@ -39,7 +39,7 @@ namespace UnityJS.Editor
         var targetDir = Path.GetDirectoryName(target);
         if (targetDir != null && !Directory.Exists(targetDir))
           Directory.CreateDirectory(targetDir);
-        File.Copy(jsFile, target, overwrite: true);
+        File.Copy(jsFile, target, true);
       }
 
       UnityEditor.AssetDatabase.Refresh();

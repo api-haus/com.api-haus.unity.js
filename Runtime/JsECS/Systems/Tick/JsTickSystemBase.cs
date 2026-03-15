@@ -2,9 +2,9 @@ namespace UnityJS.Entities.Systems.Tick
 {
   using System.Collections.Generic;
   using Components;
+  using Runtime;
   using Unity.Entities;
   using Unity.Logging;
-  using UnityJS.Runtime;
 
   public abstract partial class JsTickSystemBase : SystemBase
   {
@@ -50,18 +50,14 @@ namespace UnityJS.Entities.Systems.Tick
           .WithAll<JsEntityId>()
           .WithEntityAccess()
       )
-      {
         for (var i = 0; i < scripts.Length; i++)
         {
           var script = scripts[i];
           if (script.stateRef >= 0 && !script.disabled && script.tickGroup == tickGroup)
-          {
             m_PendingTicks.Add(
               (entity, script.scriptName.ToString(), script.entityIndex, script.stateRef)
             );
-          }
         }
-      }
 
       foreach (var (entity, scriptName, entityIndex, stateRef) in m_PendingTicks)
       {

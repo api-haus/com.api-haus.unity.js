@@ -1,8 +1,8 @@
 namespace UnityJS.Entities.Tests
 {
   using NUnit.Framework;
-  using UnityJS.QJS;
-  using UnityJS.Runtime;
+  using QJS;
+  using Runtime;
 
   [TestFixture]
   public unsafe class JsMathBridgeTests : JsBridgeTestFixture
@@ -16,7 +16,10 @@ namespace UnityJS.Entities.Tests
       var global = QJS.JS_GetGlobalObject(Ctx);
       var nameBytes = System.Text.Encoding.UTF8.GetBytes("__testVec\0");
       fixed (byte* pName = nameBytes)
+      {
         QJS.JS_SetPropertyStr(Ctx, global, pName, val);
+      }
+
       QJS.JS_FreeValue(Ctx, global);
 
       var x = EvalGlobalFloat("__testVec.xy.x");
@@ -30,7 +33,10 @@ namespace UnityJS.Entities.Tests
       var global = QJS.JS_GetGlobalObject(Ctx);
       var nameBytes = System.Text.Encoding.UTF8.GetBytes("__testVec\0");
       fixed (byte* pName = nameBytes)
+      {
         QJS.JS_SetPropertyStr(Ctx, global, pName, val);
+      }
+
       QJS.JS_FreeValue(Ctx, global);
 
       var y = EvalGlobalFloat("__testVec.xz.y");
@@ -44,7 +50,10 @@ namespace UnityJS.Entities.Tests
       var global = QJS.JS_GetGlobalObject(Ctx);
       var nameBytes = System.Text.Encoding.UTF8.GetBytes("__testVec2\0");
       fixed (byte* pName = nameBytes)
+      {
         QJS.JS_SetPropertyStr(Ctx, global, pName, val);
+      }
+
       QJS.JS_FreeValue(Ctx, global);
 
       var x = EvalGlobalFloat("__testVec2.yx.x");
@@ -58,7 +67,10 @@ namespace UnityJS.Entities.Tests
       var global = QJS.JS_GetGlobalObject(Ctx);
       var nameBytes = System.Text.Encoding.UTF8.GetBytes("__testVec\0");
       fixed (byte* pName = nameBytes)
+      {
         QJS.JS_SetPropertyStr(Ctx, global, pName, val);
+      }
+
       QJS.JS_FreeValue(Ctx, global);
 
       var eq = EvalGlobalBool("__testVec.equals(float3(1, 2, 3))");
@@ -183,24 +195,21 @@ namespace UnityJS.Entities.Tests
     [Test]
     public void Lerp_VectorT_PerComponent()
     {
-      var y = EvalGlobalFloat(
-        "math.lerp({x:0,y:0,z:0},{x:10,y:20,z:30},{x:0.5,y:0.25,z:1.0}).y");
+      var y = EvalGlobalFloat("math.lerp({x:0,y:0,z:0},{x:10,y:20,z:30},{x:0.5,y:0.25,z:1.0}).y");
       Assert.AreEqual(5.0, y, 0.001);
     }
 
     [Test]
     public void Lerp_VectorT_ZComponent()
     {
-      var z = EvalGlobalFloat(
-        "math.lerp({x:0,y:0,z:0},{x:10,y:20,z:30},{x:0.5,y:0.25,z:1.0}).z");
+      var z = EvalGlobalFloat("math.lerp({x:0,y:0,z:0},{x:10,y:20,z:30},{x:0.5,y:0.25,z:1.0}).z");
       Assert.AreEqual(30.0, z, 0.001);
     }
 
     [Test]
     public void Lerp_ScalarT_WithVectors_StillWorks()
     {
-      var x = EvalGlobalFloat(
-        "math.lerp({x:0,y:0,z:0},{x:10,y:0,z:0},0.5).x");
+      var x = EvalGlobalFloat("math.lerp({x:0,y:0,z:0},{x:10,y:0,z:0},0.5).x");
       Assert.AreEqual(5.0, x, 0.001);
     }
 

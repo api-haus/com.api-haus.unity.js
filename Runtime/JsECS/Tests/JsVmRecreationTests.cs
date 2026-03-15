@@ -3,10 +3,10 @@ namespace UnityJS.Entities.Tests
   using System.Runtime.InteropServices;
   using System.Text;
   using NUnit.Framework;
+  using QJS;
+  using Runtime;
   using Systems;
   using Unity.Entities;
-  using UnityJS.QJS;
-  using UnityJS.Runtime;
 
   [TestFixture]
   public unsafe class JsVmRecreationTests

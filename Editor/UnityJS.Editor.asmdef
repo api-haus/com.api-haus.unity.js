@@ -1,26 +1,26 @@
 {
-	"name": "UnityJS.Editor",
-	"rootNamespace": "UnityJS.Editor",
-	"references": [
-		"UnityJS.Entities",
-		"UnityJS.QJS",
-		"UnityJS.Runtime",
-		"Unity.Entities",
-		"Unity.Entities.Hybrid",
-		"Unity.Mathematics",
-		"Unity.Collections",
-		"Unity.Logging",
-		"Unity.Burst"
-	],
-	"includePlatforms": [
-		"Editor"
-	],
-	"excludePlatforms": [],
-	"allowUnsafeCode": true,
-	"overrideReferences": false,
-	"precompiledReferences": [],
-	"autoReferenced": true,
-	"defineConstraints": [],
-	"versionDefines": [],
-	"noEngineReferences": false
+  "name": "UnityJS.Editor",
+  "rootNamespace": "UnityJS.Editor",
+  "references": [
+    "UnityJS.Entities",
+    "UnityJS.QJS",
+    "UnityJS.Runtime",
+    "Unity.Entities",
+    "Unity.Entities.Hybrid",
+    "Unity.Mathematics",
+    "Unity.Collections",
+    "Unity.Logging",
+    "Unity.Burst"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
 }

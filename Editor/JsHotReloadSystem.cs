@@ -4,11 +4,11 @@ namespace UnityJS.Editor
   using System;
   using System.Collections.Concurrent;
   using System.IO;
+  using Entities.Systems;
+  using Runtime;
   using Unity.Entities;
   using Unity.Logging;
   using UnityEngine;
-  using UnityJS.Entities.Systems;
-  using UnityJS.Runtime;
 
   [UpdateInGroup(typeof(InitializationSystemGroup))]
   public partial class JsHotReloadSystem : SystemBase
@@ -46,19 +46,13 @@ namespace UnityJS.Editor
         Directory.CreateDirectory(systemsPath);
 
       if (Directory.Exists(scriptsPath))
-      {
         m_ScriptsWatcher = CreateWatcher(scriptsPath, m_ReloadQueue);
-      }
 
       if (Directory.Exists(dataPath))
-      {
         m_DataWatcher = CreateWatcher(dataPath, m_ReloadQueue);
-      }
 
       if (Directory.Exists(systemsPath))
-      {
         m_SystemsWatcher = CreateWatcher(systemsPath, m_SystemReloadQueue);
-      }
 
       m_Initialized = true;
     }
@@ -94,37 +88,29 @@ namespace UnityJS.Editor
         return;
 
       while (m_ReloadQueue.TryDequeue(out var filePath))
-      {
         try
         {
           var fileName = Path.GetFileNameWithoutExtension(filePath);
           var directory = Path.GetDirectoryName(filePath);
 
           if (directory != null && directory.Contains("data"))
-          {
             fileName = $"data.{fileName}";
-          }
 
           var source = File.ReadAllText(filePath);
           if (vm.ReloadScript(fileName, source, filePath))
-          {
             Log.Debug($"[JsHotReload] Reloaded: {fileName}");
-          }
         }
         catch (Exception ex)
         {
           Log.Error($"[JsHotReload] Error reloading {filePath}: {ex.Message}");
         }
-      }
 
       // Reload system-level JS scripts
       if (m_SystemReloadQueue.Count > 0)
       {
         var runner = World.GetExistingSystemManaged<JsSystemRunner>();
         if (runner != null)
-        {
           while (m_SystemReloadQueue.TryDequeue(out var filePath))
-          {
             try
             {
               var systemName = Path.GetFileNameWithoutExtension(filePath);
@@ -134,8 +120,6 @@ namespace UnityJS.Editor
             {
               Log.Error($"[JsHotReload] Error reloading system {filePath}: {ex.Message}");
             }
-          }
-        }
       }
     }
 

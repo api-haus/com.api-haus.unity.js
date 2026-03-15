@@ -294,6 +294,7 @@ namespace UnityJS.Editor.Tests
         if (t != null)
           return t;
       }
+
       return null;
     }
   }

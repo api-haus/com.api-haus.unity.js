@@ -5,9 +5,9 @@ namespace UnityJS.Entities.Core
   using System.Text;
   using AOT;
   using Components;
+  using QJS;
   using Unity.Entities;
   using Unity.Logging;
-  using UnityJS.QJS;
 
   /// <summary>
   /// Manages JS-defined component types.
@@ -55,24 +55,28 @@ namespace UnityJS.Entities.Core
           var fn = QJSShim.qjs_shim_new_function(ctx, EcsDefine, pDefine, 2);
           QJS.JS_SetPropertyStr(ctx, ns, pDefine, fn);
         }
+
         var pAddBytes = Encoding.UTF8.GetBytes("add\0");
         fixed (byte* pAdd = pAddBytes)
         {
           var fn = QJSShim.qjs_shim_new_function(ctx, EcsAdd, pAdd, 3);
           QJS.JS_SetPropertyStr(ctx, ns, pAdd, fn);
         }
+
         var pRemoveBytes = Encoding.UTF8.GetBytes("remove\0");
         fixed (byte* pRemove = pRemoveBytes)
         {
           var fn = QJSShim.qjs_shim_new_function(ctx, EcsRemove, pRemove, 2);
           QJS.JS_SetPropertyStr(ctx, ns, pRemove, fn);
         }
+
         var pHasBytes = Encoding.UTF8.GetBytes("has\0");
         fixed (byte* pHas = pHasBytes)
         {
           var fn = QJSShim.qjs_shim_new_function(ctx, EcsHas, pHas, 2);
           QJS.JS_SetPropertyStr(ctx, ns, pHas, fn);
         }
+
         var pGetBytes = Encoding.UTF8.GetBytes("get\0");
         fixed (byte* pGet = pGetBytes)
         {
@@ -150,7 +154,6 @@ namespace UnityJS.Entities.Core
       {
         var jsComp = QJS.JS_GetPropertyStr(ctx, global, pJsComp);
         if (QJS.IsObject(jsComp))
-        {
           foreach (var name in componentNames)
           {
             var pNameBytes = Encoding.UTF8.GetBytes(name + "\0");
@@ -158,16 +161,15 @@ namespace UnityJS.Entities.Core
             {
               var store = QJS.JS_GetPropertyStr(ctx, jsComp, pName);
               if (QJS.IsObject(store))
-              {
                 // Delete __js_comp[name][eid] by setting to undefined
                 QJS.JS_SetPropertyUint32(ctx, store, (uint)entityId, QJS.JS_UNDEFINED);
-              }
               QJS.JS_FreeValue(ctx, store);
             }
           }
-        }
+
         QJS.JS_FreeValue(ctx, jsComp);
       }
+
       QJS.JS_FreeValue(ctx, global);
     }
 
@@ -238,6 +240,7 @@ namespace UnityJS.Entities.Core
         QJS.JS_SetPropertyStr(ctx, jsComp, pN, QJS.JS_NewObject(ctx));
         QJS.JS_FreeValue(ctx, jsComp);
       }
+
       QJS.JS_FreeValue(ctx, global);
 
       Log.Info("[JsComponentStore] Defined '{0}' → slot {1}", name, slot);
@@ -303,6 +306,7 @@ namespace UnityJS.Entities.Core
         QJS.JS_FreeValue(ctx, store);
         QJS.JS_FreeValue(ctx, jsComp);
       }
+
       QJS.JS_FreeValue(ctx, global);
 
       // Track entity → component mapping
@@ -311,6 +315,7 @@ namespace UnityJS.Entities.Core
         components = new HashSet<string>();
         s_entityComponents[entityId] = components;
       }
+
       components.Add(name);
 
       // Add ECS tag via ECB
@@ -400,6 +405,7 @@ namespace UnityJS.Entities.Core
         QJS.JS_FreeValue(ctx, store);
         QJS.JS_FreeValue(ctx, jsComp);
       }
+
       QJS.JS_FreeValue(ctx, global);
 
       // Update tracking
@@ -439,26 +445,43 @@ namespace UnityJS.Entities.Core
     {
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
-      if (entityId <= 0) { JsECSBridge.SetBool(outU, outTag, ctx, false); return; }
+      if (entityId <= 0)
+      {
+        JsECSBridge.SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       var namePtr = QJS.JS_ToCString(ctx, argv[1]);
       var name = Marshal.PtrToStringUTF8((nint)namePtr);
       QJS.JS_FreeCString(ctx, namePtr);
-      if (string.IsNullOrEmpty(name)) { JsECSBridge.SetBool(outU, outTag, ctx, false); return; }
+      if (string.IsNullOrEmpty(name))
+      {
+        JsECSBridge.SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       // Check JS-defined components via data store
       if (s_nameToSlot.ContainsKey(name))
       {
-        var has = s_entityComponents.TryGetValue(entityId, out var components) && components.Contains(name);
+        var has =
+          s_entityComponents.TryGetValue(entityId, out var components) && components.Contains(name);
         JsECSBridge.SetBool(outU, outTag, ctx, has);
         return;
       }
 
       // Fall back to C#-defined components
-      if (!JsComponentRegistry.TryGetComponentType(name, out _)) { JsECSBridge.SetBool(outU, outTag, ctx, false); return; }
+      if (!JsComponentRegistry.TryGetComponentType(name, out _))
+      {
+        JsECSBridge.SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       var entity = JsECSBridge.GetEntityFromIdBurst(entityId);
-      if (entity == Entity.Null) { JsECSBridge.SetBool(outU, outTag, ctx, false); return; }
+      if (entity == Entity.Null)
+      {
+        JsECSBridge.SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       // If entity exists, assume component present (same as Lua impl)
       JsECSBridge.SetBool(outU, outTag, ctx, true);
@@ -529,6 +552,7 @@ namespace UnityJS.Entities.Core
         QJS.JS_FreeValue(ctx, store);
         QJS.JS_FreeValue(ctx, jsComp);
       }
+
       QJS.JS_FreeValue(ctx, global);
     }
 
@@ -537,8 +561,9 @@ namespace UnityJS.Entities.Core
     #region Tag Pool Dispatch
 
     // @formatter:off
-    static ComponentType GetTagType(int slot) =>
-      slot switch
+    static ComponentType GetTagType(int slot)
+    {
+      return slot switch
       {
         0 => ComponentType.ReadWrite<JsDynTag0>(),
         1 => ComponentType.ReadWrite<JsDynTag1>(),
@@ -606,6 +631,7 @@ namespace UnityJS.Entities.Core
         63 => ComponentType.ReadWrite<JsDynTag63>(),
         _ => throw new System.InvalidOperationException($"Tag pool slot {slot} out of range"),
       };
+    }
     // @formatter:on
 
     #endregion

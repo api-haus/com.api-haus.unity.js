@@ -4,9 +4,9 @@ namespace UnityJS.Entities.Core
   using System.Collections.Generic;
   using System.IO;
   using System.Text;
+  using Runtime;
   using Unity.Collections;
   using UnityEngine;
-  using UnityJS.Runtime;
   using Hash128 = Unity.Entities.Hash128;
   using Object = UnityEngine.Object;
 #if UNITY_EDITOR
@@ -22,7 +22,7 @@ namespace UnityJS.Entities.Core
     /// </summary>
     public static Hash128 HashScriptName(string scriptName)
     {
-      var state = new xxHash3.StreamingState(isHash64: false);
+      var state = new xxHash3.StreamingState(false);
       var bytes = Encoding.UTF8.GetBytes(scriptName);
       unsafe
       {
@@ -31,6 +31,7 @@ namespace UnityJS.Entities.Core
           state.Update(ptr, bytes.Length);
         }
       }
+
       var hash = state.DigestHash128();
       return new Hash128(hash.x, hash.y, hash.z, hash.w);
     }
@@ -44,29 +45,42 @@ namespace UnityJS.Entities.Core
     /// <summary>
     /// Initializes the search path registry with the default StreamingAssets path.
     /// </summary>
-    public static void Initialize() => JsScriptSearchPaths.Initialize();
+    public static void Initialize()
+    {
+      JsScriptSearchPaths.Initialize();
+    }
 
     /// <summary>
     /// Adds a search path for script loading.
     /// </summary>
-    public static void AddSearchPath(string absolutePath, int priority = 0) =>
+    public static void AddSearchPath(string absolutePath, int priority = 0)
+    {
       JsScriptSearchPaths.AddSearchPath(absolutePath, priority);
+    }
 
     /// <summary>
     /// Removes a search path from the registry.
     /// </summary>
-    public static void RemoveSearchPath(string absolutePath) =>
+    public static void RemoveSearchPath(string absolutePath)
+    {
       JsScriptSearchPaths.RemoveSearchPath(absolutePath);
+    }
 
     /// <summary>
     /// Clears all custom search paths, leaving only the default StreamingAssets path.
     /// </summary>
-    public static void ClearSearchPaths() => JsScriptSearchPaths.ClearSearchPaths();
+    public static void ClearSearchPaths()
+    {
+      JsScriptSearchPaths.ClearSearchPaths();
+    }
 
     /// <summary>
     /// Gets a copy of the current search paths.
     /// </summary>
-    public static IReadOnlyList<string> GetSearchPaths() => JsScriptSearchPaths.GetSearchPaths();
+    public static IReadOnlyList<string> GetSearchPaths()
+    {
+      return JsScriptSearchPaths.GetSearchPaths();
+    }
 
     public static bool TryNormalizeScriptId(string input, out string scriptId, out string error)
     {
@@ -207,9 +221,13 @@ namespace UnityJS.Entities.Core
       if (
         normalized.StartsWith(s_scriptsFolderRelativeWithSlash, StringComparison.OrdinalIgnoreCase)
       )
+      {
         normalized = normalized.Substring(s_scriptsFolderRelativeWithSlash.Length);
+      }
       else if (normalized.StartsWith(SCRIPTS_FOLDER_RELATIVE, StringComparison.OrdinalIgnoreCase))
+      {
         normalized = normalized.Substring(SCRIPTS_FOLDER_RELATIVE.Length);
+      }
       else
       {
         error = $"Asset must be inside '{SCRIPTS_FOLDER_RELATIVE}'.";

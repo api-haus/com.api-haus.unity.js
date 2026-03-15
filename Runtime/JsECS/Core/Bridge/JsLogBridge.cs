@@ -3,8 +3,8 @@ namespace UnityJS.Entities.Core
   using System.Runtime.InteropServices;
   using System.Text;
   using AOT;
+  using QJS;
   using Unity.Logging;
-  using UnityJS.QJS;
 
   /// <summary>
   /// Bridge functions for logging.
@@ -128,6 +128,7 @@ namespace UnityJS.Entities.Core
           QJS.JS_FreeValue(ctx, ex);
           Log.Error("[JsECS] Failed to initialize JS log helpers: {0}", msg);
         }
+
         QJS.JS_FreeValue(ctx, result);
       }
 

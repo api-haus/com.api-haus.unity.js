@@ -1,10 +1,10 @@
 namespace UnityJS.Entities.Systems.Support
 {
   using Components;
+  using Runtime;
   using Unity.Collections;
   using Unity.Entities;
   using Unity.Logging;
-  using UnityJS.Runtime;
 
   [UpdateInGroup(typeof(InitializationSystemGroup))]
   [UpdateAfter(typeof(JsScriptFulfillmentSystem))]
@@ -41,9 +41,7 @@ namespace UnityJS.Entities.Systems.Support
       var entities = query.ToEntityArray(Allocator.Temp);
 
       if (entities.Length > 0)
-      {
         Log.Verbose("[JsCleanup] Found {0} entities for cleanup", entities.Length);
-      }
 
       for (var i = 0; i < entities.Length; i++)
       {

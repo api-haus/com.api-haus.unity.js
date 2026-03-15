@@ -7,12 +7,12 @@ namespace UnityJS.Entities.PlayModeTests
   using Components;
   using Core;
   using NUnit.Framework;
+  using QJS;
+  using Runtime;
   using Unity.Collections;
   using Unity.Entities;
   using UnityEngine;
   using UnityEngine.TestTools;
-  using UnityJS.QJS;
-  using UnityJS.Runtime;
 
   public class JsEcsBenchmark
   {
@@ -101,13 +101,7 @@ namespace UnityJS.Entities.PlayModeTests
           pFilename = filenameBytes
       )
       {
-        var val = QJS.JS_Eval(
-          m_Vm.Context,
-          pSource,
-          sourceLen,
-          pFilename,
-          QJS.JS_EVAL_TYPE_GLOBAL
-        );
+        var val = QJS.JS_Eval(m_Vm.Context, pSource, sourceLen, pFilename, QJS.JS_EVAL_TYPE_GLOBAL);
         if (QJS.IsException(val))
         {
           var ex = QJS.JS_GetException(m_Vm.Context);
@@ -117,6 +111,7 @@ namespace UnityJS.Entities.PlayModeTests
           QJS.JS_FreeValue(m_Vm.Context, ex);
           Debug.LogError($"[Benchmark] EvalGlobal exception: {msg}");
         }
+
         QJS.JS_FreeValue(m_Vm.Context, val);
       }
     }
@@ -161,7 +156,8 @@ namespace UnityJS.Entities.PlayModeTests
     [UnityTest]
     public IEnumerator Bridged_ReadWrite(
       [Values(10, 100, 10_000, 100_000)] int entityCount,
-      [Values(1, 2, 3, 4, 5)] int componentCount)
+      [Values(1, 2, 3, 4, 5)] int componentCount
+    )
     {
       CreateBenchmarkEntities(entityCount, componentCount);
       yield return null;
@@ -171,8 +167,10 @@ namespace UnityJS.Entities.PlayModeTests
 
       BenchmarkHarness.Measure(
         MakeLabel("ReadWrite", entityCount, componentCount),
-        warmup, iterations,
-        () => EvalGlobal(js));
+        warmup,
+        iterations,
+        () => EvalGlobal(js)
+      );
 
       yield return null;
     }
@@ -186,13 +184,15 @@ namespace UnityJS.Entities.PlayModeTests
       // Set known initial values
       var q = m_EntityManager.CreateEntityQuery(
         ComponentType.ReadWrite<BenchComp1>(),
-        ComponentType.ReadWrite<BenchComp2>());
+        ComponentType.ReadWrite<BenchComp2>()
+      );
       var entities = q.ToEntityArray(Allocator.Temp);
       for (var i = 0; i < entities.Length; i++)
       {
         m_EntityManager.SetComponentData(entities[i], new BenchComp1 { a = 1f });
         m_EntityManager.SetComponentData(entities[i], new BenchComp2 { a = 2f, b = 3f });
       }
+
       entities.Dispose();
       q.Dispose();
 
@@ -201,18 +201,21 @@ namespace UnityJS.Entities.PlayModeTests
       yield return null;
 
       // JS: read + write via query builder for-of (per-entity set path)
-      EvalGlobal(@"(function() {
+      EvalGlobal(
+        @"(function() {
     var q = ecs.query().withAll(BenchComp1).withAll(BenchComp2).build();
     for (const [eid, c1, c2] of q) {
       c1.a += 10;
       c2.b += 100;
     }
-  })()");
+  })()"
+      );
 
       // Assert writes persisted to C#
       var q2 = m_EntityManager.CreateEntityQuery(
         ComponentType.ReadWrite<BenchComp1>(),
-        ComponentType.ReadWrite<BenchComp2>());
+        ComponentType.ReadWrite<BenchComp2>()
+      );
       var ents = q2.ToEntityArray(Allocator.Temp);
       Assert.AreEqual(count, ents.Length);
       for (var i = 0; i < ents.Length; i++)
@@ -223,6 +226,7 @@ namespace UnityJS.Entities.PlayModeTests
         Assert.AreEqual(2f, c2.a, 0.001f, $"BenchComp2.a entity {i}");
         Assert.AreEqual(103f, c2.b, 0.001f, $"BenchComp2.b entity {i}");
       }
+
       ents.Dispose();
       q2.Dispose();
       yield return null;

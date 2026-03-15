@@ -2,9 +2,9 @@ namespace UnityJS.Entities.Core
 {
   using System;
   using System.Collections.Generic;
+  using QJS;
   using Unity.Entities;
   using UnityEngine;
-  using UnityJS.QJS;
 
   public delegate void JsLookupUpdater(ref SystemState state);
 
@@ -91,9 +91,7 @@ namespace UnityJS.Entities.Core
       }
 
       foreach (var reg in s_bridgeRegistrations)
-      {
         reg(ctx);
-      }
     }
 
     public static void UpdateAllLookups(ref SystemState state)

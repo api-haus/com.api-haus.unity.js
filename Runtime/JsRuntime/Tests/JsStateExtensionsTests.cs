@@ -1,8 +1,8 @@
 namespace UnityJS.Runtime.Tests
 {
   using NUnit.Framework;
+  using QJS;
   using Unity.Mathematics;
-  using UnityJS.QJS;
 
   [TestFixture]
   public unsafe class JsStateExtensionsTests

@@ -5,7 +5,7 @@ namespace UnityJS.Runtime
   using System.Runtime.InteropServices;
   using System.Text;
   using AOT;
-  using UnityJS.QJS;
+  using QJS;
 
   /// <summary>
   /// ES module resolution. Two MonoPInvokeCallback methods called from C shim trampolines.
@@ -40,6 +40,7 @@ namespace UnityJS.Runtime
               baseDir = baseDir.Substring(0, baseDir.LastIndexOf('/'));
               relative = relative.Substring(3);
             }
+
             if (relative.StartsWith("./"))
               relative = relative.Substring(2);
             resolved = baseDir + "/" + relative;

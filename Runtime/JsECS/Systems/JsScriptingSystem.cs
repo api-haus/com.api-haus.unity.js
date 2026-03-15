@@ -3,13 +3,13 @@ namespace UnityJS.Entities.Systems
   using System.Collections.Generic;
   using Components;
   using Core;
+  using Runtime;
   using Support;
   using Unity.Collections;
   using Unity.Entities;
   using Unity.Logging;
   using Unity.Mathematics;
   using Unity.Transforms;
-  using UnityJS.Runtime;
 
   public struct JsScriptingSystemSingleton : IComponentData { }
 
@@ -73,7 +73,7 @@ namespace UnityJS.Entities.Systems
 
     public void PrimeBurstContextForOnInit()
     {
-      m_PrimedECB = new EntityCommandBuffer(Unity.Collections.Allocator.TempJob);
+      m_PrimedECB = new EntityCommandBuffer(Allocator.TempJob);
       m_PrimedECBValid = true;
 
       m_TransformLookup.Update(this);
@@ -135,12 +135,10 @@ namespace UnityJS.Entities.Systems
           .WithAll<JsEntityId>()
           .WithEntityAccess()
       )
-      {
         for (var i = 0; i < scripts.Length; i++)
         {
           var script = scripts[i];
           if (script.stateRef >= 0 && !script.disabled && script.tickGroup == JsTickGroup.Variable)
-          {
             m_PendingUpdates.Add(
               (
                 entity,
@@ -151,9 +149,7 @@ namespace UnityJS.Entities.Systems
                 script.tickGroup
               )
             );
-          }
         }
-      }
 
       foreach (
         var (entity, scriptIndex, scriptName, entityIndex, stateRef, tickGroup) in m_PendingUpdates
@@ -166,9 +162,7 @@ namespace UnityJS.Entities.Systems
         }
 
         if (!EntityManager.HasComponent<JsEntityId>(entity))
-        {
           continue;
-        }
 
         if (stateRef < 0)
         {
@@ -221,9 +215,7 @@ namespace UnityJS.Entities.Systems
 
         var eventStartIndex = ctx.eventBuffer.Length;
         for (var i = 0; i < events.Length; i++)
-        {
           JsECSBridge.AddEvent(events[i]);
-        }
         var eventCount = events.Length;
 
         var scripts = EntityManager.GetBuffer<JsScript>(entity);
@@ -231,7 +223,6 @@ namespace UnityJS.Entities.Systems
         {
           var script = scripts[i];
           if (script.stateRef >= 0 && !script.disabled)
-          {
             JsECSBridge.AddEventDispatch(
               entity,
               i,
@@ -241,9 +232,9 @@ namespace UnityJS.Entities.Systems
               eventStartIndex,
               eventCount
             );
-          }
         }
       }
+
       entities.Dispose();
     }
 
@@ -254,9 +245,7 @@ namespace UnityJS.Entities.Systems
         return;
 
       for (var i = 0; i < ctx.entitiesToClear.Length; i++)
-      {
         m_CurrentECB.SetBuffer<JsEvent>(ctx.entitiesToClear[i]);
-      }
     }
 
     void DispatchCollectedEvents()
@@ -305,6 +294,7 @@ namespace UnityJS.Entities.Systems
         Log.Error("[JsScripting] CreateEntityDeferred called outside of update");
         return -1;
       }
+
       return JsEntityRegistry.Create(position, m_CurrentECB);
     }
 
@@ -315,6 +305,7 @@ namespace UnityJS.Entities.Systems
         Log.Error("[JsScripting] AddScriptDeferred called outside of update");
         return false;
       }
+
       return JsEntityRegistry.AddScriptDeferred(entityId, scriptName, m_CurrentECB, EntityManager);
     }
 
@@ -325,6 +316,7 @@ namespace UnityJS.Entities.Systems
         Log.Error("[JsScripting] SetPositionDeferred called outside of update");
         return;
       }
+
       JsEntityRegistry.SetPositionDeferred(entityId, position, m_CurrentECB);
     }
 
@@ -335,6 +327,7 @@ namespace UnityJS.Entities.Systems
         Log.Error("[JsScripting] DestroyEntityDeferred called outside of update");
         return;
       }
+
       JsEntityRegistry.DestroyEntityDeferred(entityId, m_CurrentECB);
     }
 

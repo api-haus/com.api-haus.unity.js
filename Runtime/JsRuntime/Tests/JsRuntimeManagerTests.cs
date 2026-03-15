@@ -6,7 +6,7 @@ namespace UnityJS.Runtime.Tests
   using System.Text;
   using AOT;
   using NUnit.Framework;
-  using UnityJS.QJS;
+  using QJS;
 
   [TestFixture]
   public unsafe class JsRuntimeManagerTests
@@ -120,6 +120,7 @@ namespace UnityJS.Runtime.Tests
           QJS.JS_FreeValue(m_Manager.Context, exc);
           Assert.Fail($"bridgeFn() returned exception: {emsg}");
         }
+
         int intResult;
         QJS.JS_ToInt32(m_Manager.Context, &intResult, result);
         Assert.AreEqual(999, intResult);

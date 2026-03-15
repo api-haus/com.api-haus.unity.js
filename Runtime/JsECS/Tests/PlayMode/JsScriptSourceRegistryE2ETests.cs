@@ -8,6 +8,8 @@ namespace UnityJS.Entities.PlayModeTests
   using Components;
   using Core;
   using NUnit.Framework;
+  using QJS;
+  using Runtime;
   using Systems;
   using Unity.Collections;
   using Unity.Entities;
@@ -15,8 +17,6 @@ namespace UnityJS.Entities.PlayModeTests
   using Unity.Transforms;
   using UnityEngine;
   using UnityEngine.TestTools;
-  using UnityJS.QJS;
-  using UnityJS.Runtime;
 
   public class JsScriptSourceRegistryE2ETests
   {
@@ -60,8 +60,10 @@ namespace UnityJS.Entities.PlayModeTests
           Directory.Delete(m_TempDir, true);
         }
         catch
-        { /* best effort */
+        {
+          /* best effort */
         }
+
         m_TempDir = null;
       }
 
@@ -185,13 +187,11 @@ namespace UnityJS.Entities.PlayModeTests
       var systems = JsScriptSourceRegistry.DiscoverAllSystems();
       var found = false;
       foreach (var (name, _) in systems)
-      {
         if (name == "test_reg_a")
         {
           found = true;
           break;
         }
-      }
 
       Assert.IsTrue(found, "Should discover test_reg_a from filesystem source");
 
@@ -212,13 +212,11 @@ namespace UnityJS.Entities.PlayModeTests
       var systems = JsScriptSourceRegistry.DiscoverAllSystems();
       var found = false;
       foreach (var (name, _) in systems)
-      {
         if (name == "bundle_sys")
         {
           found = true;
           break;
         }
-      }
 
       Assert.IsTrue(found, "Should discover bundle_sys from bundle source");
 
@@ -248,13 +246,11 @@ namespace UnityJS.Entities.PlayModeTests
       var systems = JsScriptSourceRegistry.DiscoverAllSystems();
       IJsScriptSource winner = null;
       foreach (var (name, src) in systems)
-      {
         if (name == "prio_test")
         {
           winner = src;
           break;
         }
-      }
 
       Assert.IsNotNull(winner);
       Assert.AreEqual("prio-high", winner.SourceId, "Lower priority number should win");
@@ -274,13 +270,12 @@ namespace UnityJS.Entities.PlayModeTests
       var systems = JsScriptSourceRegistry.DiscoverAllSystems();
       var found = false;
       foreach (var (name, _) in systems)
-      {
         if (name == "unreg_sys")
         {
           found = true;
           break;
         }
-      }
+
       Assert.IsTrue(found, "Should find before unregister");
 
       JsScriptSourceRegistry.Unregister("test-unreg");
@@ -288,13 +283,12 @@ namespace UnityJS.Entities.PlayModeTests
       systems = JsScriptSourceRegistry.DiscoverAllSystems();
       found = false;
       foreach (var (name, _) in systems)
-      {
         if (name == "unreg_sys")
         {
           found = true;
           break;
         }
-      }
+
       Assert.IsFalse(found, "Should not find after unregister");
 
       yield return null;
@@ -313,13 +307,12 @@ namespace UnityJS.Entities.PlayModeTests
       var systems = JsScriptSourceRegistry.DiscoverAllSystems();
       var found = false;
       foreach (var (name, _) in systems)
-      {
         if (name == "reset_sys")
         {
           found = true;
           break;
         }
-      }
+
       Assert.IsFalse(found, "Should be empty after removing the source");
 
       yield return null;
@@ -506,7 +499,7 @@ namespace UnityJS.Entities.PlayModeTests
     public IEnumerator Import_RelativePath_FileSystem()
     {
       // test_import_main.js imports ./test_import_helper.js
-      JsScriptSearchPaths.AddSearchPath(s_testsPath, priority: 0);
+      JsScriptSearchPaths.AddSearchPath(s_testsPath, 0);
 
       var mainPath = Path.Combine(s_testsPath, "test_import_main.js");
       var source = File.ReadAllText(mainPath);
@@ -557,7 +550,7 @@ namespace UnityJS.Entities.PlayModeTests
     public IEnumerator Import_BareModule_FileSystem()
     {
       // test_bare_importer.js imports ./test_bare_module.js (relative, not bare)
-      JsScriptSearchPaths.AddSearchPath(s_testsPath, priority: 0);
+      JsScriptSearchPaths.AddSearchPath(s_testsPath, 0);
 
       var importerPath = Path.Combine(s_testsPath, "test_bare_importer.js");
       var source = File.ReadAllText(importerPath);
@@ -626,13 +619,11 @@ namespace UnityJS.Entities.PlayModeTests
       var systems = JsScriptSourceRegistry.DiscoverAllSystems();
       var found = false;
       foreach (var (name, src) in systems)
-      {
         if (src.SourceId == "test-empty")
         {
           found = true;
           break;
         }
-      }
 
       Assert.IsFalse(found, "Empty source should not contribute any systems");
 

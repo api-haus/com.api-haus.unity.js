@@ -40,10 +40,8 @@ namespace UnityJS.Runtime
     {
       var systems = new List<string>();
       foreach (var key in m_Scripts.Keys)
-      {
         if (key.StartsWith("systems/", StringComparison.Ordinal))
           systems.Add(key.Substring("systems/".Length));
-      }
       return systems;
     }
 

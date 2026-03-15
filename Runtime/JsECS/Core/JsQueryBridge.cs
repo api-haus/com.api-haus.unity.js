@@ -5,19 +5,19 @@ namespace UnityJS.Entities.Core
   using System.Text;
   using AOT;
   using Components;
+  using QJS;
   using Unity.Collections;
   using Unity.Collections.LowLevel.Unsafe;
   using Unity.Entities;
-  using UnityJS.QJS;
 
   public static class JsQueryBridge
   {
     static readonly Dictionary<int, EntityQuery> s_queryCache = new();
-    static readonly Dictionary<int, (ComponentType[] all, ComponentType[] none)> s_pendingQueries = new();
+    static readonly Dictionary<int, (ComponentType[] all, ComponentType[] none)> s_pendingQueries =
+      new();
     static readonly Dictionary<int, int[]> s_precomputedIds = new();
     static EntityManager s_entityManager;
     static bool s_initialized;
-
 
     public static void Initialize(EntityManager entityManager)
     {
@@ -41,6 +41,7 @@ namespace UnityJS.Entities.Core
         var desc = new EntityQueryDesc { All = all, None = none };
         s_queryCache[kvp.Key] = entityManager.CreateEntityQuery(desc);
       }
+
       s_pendingQueries.Clear();
     }
 
@@ -54,7 +55,8 @@ namespace UnityJS.Entities.Core
       foreach (var kvp in s_queryCache)
       {
         var query = kvp.Value;
-        if (query == default) continue;
+        if (query == default)
+          continue;
 
         var entities = query.ToEntityArray(Allocator.Temp);
         var ids = new int[entities.Length];
@@ -70,6 +72,7 @@ namespace UnityJS.Entities.Core
           if (entityId > 0)
             ids[count++] = entityId;
         }
+
         entities.Dispose();
 
         if (count < ids.Length)
@@ -82,10 +85,8 @@ namespace UnityJS.Entities.Core
     public static void Shutdown()
     {
       foreach (var kvp in s_queryCache)
-      {
         if (kvp.Value != default)
           kvp.Value.Dispose();
-      }
       s_queryCache.Clear();
       s_pendingQueries.Clear();
       s_precomputedIds.Clear();
@@ -119,6 +120,7 @@ namespace UnityJS.Entities.Core
 
         QJS.JS_SetPropertyStr(ctx, global, pEcs, ns);
       }
+
       QJS.JS_FreeValue(ctx, global);
     }
 
@@ -208,9 +210,8 @@ namespace UnityJS.Entities.Core
       if (!s_queryCache.ContainsKey(hash))
       {
         var allArray = allComponents.ToArray();
-        var noneArray = noneComponents.Count > 0
-          ? noneComponents.ToArray()
-          : System.Array.Empty<ComponentType>();
+        var noneArray =
+          noneComponents.Count > 0 ? noneComponents.ToArray() : System.Array.Empty<ComponentType>();
         s_pendingQueries[hash] = (allArray, noneArray);
       }
 
@@ -241,6 +242,7 @@ namespace UnityJS.Entities.Core
             if (name != null && JsComponentRegistry.TryGetComponentType(name, out var ct))
               result.Add(ct);
           }
+
           QJS.JS_FreeValue(ctx, elem);
         }
       }
@@ -253,10 +255,10 @@ namespace UnityJS.Entities.Core
     {
       var hash = 17;
       foreach (var ct in allComponents)
-        hash = hash * 31 + ct.TypeIndex.GetHashCode();
-      hash = hash * 31 + 0x7F7F;
+        hash = (hash * 31) + ct.TypeIndex.GetHashCode();
+      hash = (hash * 31) + 0x7F7F;
       foreach (var ct in noneComponents)
-        hash = hash * 31 + ct.TypeIndex.GetHashCode();
+        hash = (hash * 31) + ct.TypeIndex.GetHashCode();
       return hash;
     }
   }

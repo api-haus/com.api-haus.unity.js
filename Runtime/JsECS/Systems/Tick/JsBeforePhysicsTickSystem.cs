@@ -8,6 +8,9 @@ namespace UnityJS.Entities.Systems.Tick
   [UpdateBefore(typeof(PhysicsSystemGroup))]
   public partial class JsBeforePhysicsTickSystem : JsTickSystemBase
   {
-    protected override JsTickGroup GetTickGroup() => JsTickGroup.BeforePhysics;
+    protected override JsTickGroup GetTickGroup()
+    {
+      return JsTickGroup.BeforePhysics;
+    }
   }
 }

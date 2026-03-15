@@ -2,10 +2,10 @@ namespace UnityJS.Entities.Systems.Support
 {
   using Components;
   using Core;
+  using Runtime;
   using Unity.Collections;
   using Unity.Entities;
   using Unity.Logging;
-  using UnityJS.Runtime;
 
   [UpdateInGroup(typeof(InitializationSystemGroup))]
   public partial class JsScriptFulfillmentSystem : SystemBase
@@ -64,13 +64,11 @@ namespace UnityJS.Entities.Systems.Support
 
         var hasUnfulfilled = false;
         for (var i = 0; i < requests.Length; i++)
-        {
           if (!requests[i].fulfilled)
           {
             hasUnfulfilled = true;
             break;
           }
-        }
 
         if (!hasUnfulfilled)
           continue;
@@ -176,10 +174,8 @@ namespace UnityJS.Entities.Systems.Support
     static bool HasScriptWithHash(DynamicBuffer<JsScript> scripts, Hash128 hash)
     {
       for (var i = 0; i < scripts.Length; i++)
-      {
         if (scripts[i].requestHash == hash)
           return true;
-      }
       return false;
     }
 
@@ -198,6 +194,7 @@ namespace UnityJS.Entities.Systems.Support
           return true;
         }
       }
+
       return false;
     }
 
@@ -216,6 +213,7 @@ namespace UnityJS.Entities.Systems.Support
           return true;
         }
       }
+
       return false;
     }
 
@@ -241,9 +239,14 @@ namespace UnityJS.Entities.Systems.Support
       scripts[index] = script;
     }
 
-    public int GetEntityIdFromEntity(Entity entity) =>
-      JsEntityRegistry.GetEntityIdFromEntity(entity, EntityManager);
+    public int GetEntityIdFromEntity(Entity entity)
+    {
+      return JsEntityRegistry.GetEntityIdFromEntity(entity, EntityManager);
+    }
 
-    public Entity GetEntityFromId(int entityId) => JsEntityRegistry.GetEntityFromId(entityId);
+    public Entity GetEntityFromId(int entityId)
+    {
+      return JsEntityRegistry.GetEntityFromId(entityId);
+    }
   }
 }
