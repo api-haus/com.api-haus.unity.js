@@ -57,6 +57,11 @@ namespace UnityJS.Runtime
             resolved = Path.GetFullPath(Path.Combine(baseDir, nameStr));
           }
         }
+        else if (nameStr.StartsWith("unity.js/"))
+        {
+          // Synthetic built-in module — pass specifier through as-is
+          resolved = nameStr;
+        }
         else
         {
           // Bare module import — try registry then search paths
@@ -72,7 +77,7 @@ namespace UnityJS.Runtime
             resolved = nameStr;
         }
 
-        if (!resolved.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+        if (!resolved.StartsWith("unity.js/") && !resolved.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
           resolved += ".js";
 
         var bytes = Encoding.UTF8.GetBytes(resolved);
@@ -96,6 +101,26 @@ namespace UnityJS.Runtime
         var nameStr = Marshal.PtrToStringUTF8((nint)name);
         if (string.IsNullOrEmpty(nameStr))
           return 0;
+
+        // Handle unity.js/* synthetic modules
+        if (nameStr.StartsWith("unity.js/"))
+        {
+          var source = JsBuiltinModules.GetModuleSource(nameStr);
+          if (source == null)
+            return 0;
+
+          var moduleData = Encoding.UTF8.GetBytes(source + '\0');
+          var moduleLen = moduleData.Length - 1;
+
+          if (outBuf == null)
+            return moduleLen;
+
+          if (moduleLen > outBufLen)
+            return 0;
+
+          Marshal.Copy(moduleData, 0, (nint)outBuf, moduleLen);
+          return moduleLen;
+        }
 
         // Handle bundle:// virtual paths
         if (nameStr.StartsWith("bundle://"))

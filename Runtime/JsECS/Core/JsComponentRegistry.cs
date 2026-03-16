@@ -5,6 +5,7 @@ namespace UnityJS.Entities.Core
   using QJS;
   using Unity.Entities;
   using UnityEngine;
+  using UnityJS.Runtime;
 
   public delegate void JsLookupUpdater(ref SystemState state);
 
@@ -14,6 +15,12 @@ namespace UnityJS.Entities.Core
     static readonly Dictionary<string, Func<ComponentType>> s_deferredComponents = new();
     static readonly List<Action<JSContext>> s_bridgeRegistrations = new();
     static readonly List<JsLookupUpdater> s_lookupUpdaters = new();
+    static readonly HashSet<string> s_globalNames = new();
+
+    static JsComponentRegistry()
+    {
+      JsBuiltinModules.GlobalNamesProvider = GetGlobalNames;
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetSession()
@@ -22,6 +29,8 @@ namespace UnityJS.Entities.Core
       s_deferredComponents.Clear();
       s_bridgeRegistrations.Clear();
       s_lookupUpdaters.Clear();
+      s_globalNames.Clear();
+      JsBuiltinModules.GlobalNamesProvider = GetGlobalNames;
     }
 
     public static void Register(string jsName, ComponentType componentType)
@@ -37,6 +46,7 @@ namespace UnityJS.Entities.Core
     )
     {
       s_components[jsName] = componentType;
+      s_globalNames.Add(jsName);
       s_bridgeRegistrations.Add(registerFunc);
       s_lookupUpdaters.Add(updateLookupFunc);
     }
@@ -53,14 +63,18 @@ namespace UnityJS.Entities.Core
     )
     {
       s_deferredComponents[jsName] = componentTypeFactory;
+      s_globalNames.Add(jsName);
       s_bridgeRegistrations.Add(registerFunc);
       s_lookupUpdaters.Add(updateLookupFunc);
     }
 
-    public static void RegisterEnum(Action<JSContext> registerFunc)
+    public static void RegisterEnum(string jsName, Action<JSContext> registerFunc)
     {
+      s_globalNames.Add(jsName);
       s_bridgeRegistrations.Add(registerFunc);
     }
+
+    public static IReadOnlyCollection<string> GetGlobalNames() => s_globalNames;
 
     public static bool TryGetComponentType(string jsName, out ComponentType componentType)
     {

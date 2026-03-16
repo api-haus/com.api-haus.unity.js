@@ -409,6 +409,8 @@ namespace UnityJS.Runtime
         QJS.JS_FreeValue(m_Context, kv.Value);
       m_ScriptRefs.Clear();
 
+      JsBuiltinModules.ClearCache();
+
       if (!m_Context.IsNull)
       {
         JsStateExtensions.ClearVectorPrototypes(m_Context);
@@ -428,14 +430,23 @@ namespace UnityJS.Runtime
       s_shimDirty = true;
     }
 
+    static readonly byte[] s_stackProp = Encoding.UTF8.GetBytes("stack\0");
+
     unsafe void LogException(string context)
     {
       var exc = QJS.JS_GetException(m_Context);
-      var ptr = QJS.JS_ToCString(m_Context, exc);
-      var msg = Marshal.PtrToStringUTF8((nint)ptr);
-      QJS.JS_FreeCString(m_Context, ptr);
+      var msg = QJS.ToManagedString(m_Context, exc);
+
+      string stack = null;
+      fixed (byte* pStack = s_stackProp)
+        stack = QJS.GetStringProperty(m_Context, exc, pStack);
+
       QJS.JS_FreeValue(m_Context, exc);
-      Debug.LogError($"[JsRuntime] Exception in {context}: {msg}");
+
+      if (!string.IsNullOrEmpty(stack))
+        Debug.LogError($"[JsRuntime] Exception in {context}: {msg}\n{stack}");
+      else
+        Debug.LogError($"[JsRuntime] Exception in {context}: {msg}");
     }
   }
 }

@@ -538,7 +538,7 @@ namespace JsGameCodegen
       }
       else
       {
-        sb.AppendLine("\t\t\tJsComponentRegistry.RegisterEnum(Register);");
+        sb.AppendLine("\t\t\tJsComponentRegistry.RegisterEnum(\"" + jsName + "\", Register);");
       }
       sb.AppendLine("\t\t}");
       sb.AppendLine();
@@ -1333,7 +1333,7 @@ namespace JsGameCodegen
         "\t\t[UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.AfterAssembliesLoaded)]"
       );
       sb.AppendLine(
-        "\t\tstatic void AutoRegister() => JsComponentRegistry.RegisterEnum(Register);"
+        "\t\tstatic void AutoRegister() => JsComponentRegistry.RegisterEnum(\"" + target.JsName + "\", Register);"
       );
       sb.AppendLine();
 

@@ -297,6 +297,38 @@ namespace UnityJS.QJS
     [DllImport(Lib, CallingConvention = CC)]
     public static extern unsafe void JS_FreeCString(JSContext ctx, byte* ptr);
 
+    /// <summary>
+    /// Converts a JSValue to a managed string.  Returns null when the value is
+    /// undefined/null or when JS_ToCString returns a null pointer.
+    /// </summary>
+    public static unsafe string ToManagedString(JSContext ctx, JSValue val)
+    {
+      var ptr = JS_ToCString(ctx, val);
+      if (ptr == null) return null;
+      var str = System.Runtime.InteropServices.Marshal.PtrToStringUTF8((nint)ptr);
+      JS_FreeCString(ctx, ptr);
+      return str;
+    }
+
+    /// <summary>
+    /// Reads a named string property from an object.
+    /// The property name bytes must be null-terminated.
+    /// Returns null when the property is missing/undefined or not a string.
+    /// Frees the intermediate JSValue.
+    /// </summary>
+    public static unsafe string GetStringProperty(JSContext ctx, JSValue obj, byte* propName)
+    {
+      var val = JS_GetPropertyStr(ctx, obj, propName);
+      if (IsUndefined(val) || IsNull(val))
+      {
+        JS_FreeValue(ctx, val);
+        return null;
+      }
+      var result = ToManagedString(ctx, val);
+      JS_FreeValue(ctx, val);
+      return result;
+    }
+
     // Properties
     [DllImport(Lib, CallingConvention = CC)]
     public static extern unsafe JSValue JS_GetPropertyStr(

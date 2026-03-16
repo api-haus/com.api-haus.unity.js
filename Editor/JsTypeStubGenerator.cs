@@ -75,12 +75,8 @@ namespace UnityJS.Editor
       sb.AppendLine("// </auto-generated>");
       sb.AppendLine();
 
-      sb.AppendLine("type entity = number;");
-      sb.AppendLine();
-
       GenerateEnums(sb);
       GenerateBridgedComponents(sb);
-      GenerateLifecycleCallbacks(sb);
 
       return sb.ToString();
     }
@@ -90,8 +86,6 @@ namespace UnityJS.Editor
     static void GenerateEnums(StringBuilder sb)
     {
       s_enumNames.Clear();
-      sb.AppendLine("// ── Enum Constants (auto-discovered) ─────────────────────");
-      sb.AppendLine();
 
       var enums = new List<(string jsName, Type type)>();
 
@@ -124,33 +118,24 @@ namespace UnityJS.Editor
 
       enums.Sort((a, b) => string.Compare(a.jsName, b.jsName, StringComparison.Ordinal));
 
+      // Emit type aliases at top level (ambient)
+      sb.AppendLine("// ── Enum Type Aliases ────────────────────────────────────");
+      sb.AppendLine();
       foreach (var (jsName, type) in enums)
       {
-        var enumDocs = GetEnumDocs(type);
-
-        if (enumDocs != null && enumDocs.TryGetValue("", out var enumDesc))
-          sb.AppendLine($"/** {enumDesc} */");
-
-        sb.AppendLine($"declare const {jsName}: {{");
         var enumValues = new List<string>();
         foreach (var name in Enum.GetNames(type))
-        {
-          var val = Convert.ToInt32(Enum.Parse(type, name));
-          if (enumDocs != null && enumDocs.TryGetValue(name, out var memberDesc))
-            sb.AppendLine($"  /** {memberDesc} */");
-          sb.AppendLine($"  readonly {name}: {val};");
-          enumValues.Add(val.ToString());
-        }
-
-        sb.AppendLine("};");
-        sb.AppendLine();
-
-        // Emit a type alias so enum fields can reference the type by name
+          enumValues.Add(Convert.ToInt32(Enum.Parse(type, name)).ToString());
         var typeName = s_enumNames[type];
         sb.AppendLine($"type {typeName} = {string.Join(" | ", enumValues)};");
         sb.AppendLine();
       }
+
+      // Store enums for later use in the module block
+      s_enumList = enums;
     }
+
+    static List<(string jsName, Type type)> s_enumList;
 
     static Dictionary<string, string> GetComponentDocs(Type componentType)
     {
@@ -184,7 +169,7 @@ namespace UnityJS.Editor
 
     static void GenerateBridgedComponents(StringBuilder sb)
     {
-      sb.AppendLine("// ── Component Bridges (auto-discovered) ──────────────────");
+      sb.AppendLine("// ── Component Interfaces (ambient) ──────────────────────");
       sb.AppendLine();
 
       var targets = new List<(string jsName, Type type, bool needAccessors, bool needSetters)>();
@@ -224,11 +209,11 @@ namespace UnityJS.Editor
 
       targets.Sort((a, b) => string.Compare(a.jsName, b.jsName, StringComparison.Ordinal));
 
+      // Emit interfaces at top level (ambient)
       foreach (var (jsName, type, needAccessors, needSetters) in targets)
       {
         var className = type.Name;
         var docs = GetComponentDocs(type);
-        var isComponent = typeof(Unity.Entities.IComponentData).IsAssignableFrom(type);
 
         if (docs != null && docs.TryGetValue("", out var classDesc))
           sb.AppendLine($"/** {classDesc} */");
@@ -248,29 +233,57 @@ namespace UnityJS.Editor
 
         sb.AppendLine("}");
         sb.AppendLine();
+      }
 
-        if (isComponent)
+      // Emit module declaration for component accessors and enums
+      sb.AppendLine("// ── Module: unity.js/components ─────────────────────────");
+      sb.AppendLine();
+      sb.AppendLine("declare module 'unity.js/components' {");
+
+      // Enum constants
+      if (s_enumList != null)
+      {
+        foreach (var (jsName, type) in s_enumList)
         {
-          if (needSetters)
+          var enumDocs = GetEnumDocs(type);
+
+          if (enumDocs != null && enumDocs.TryGetValue("", out var enumDesc))
+            sb.AppendLine($"  /** {enumDesc} */");
+
+          sb.AppendLine($"  export const {jsName}: {{");
+          foreach (var name in Enum.GetNames(type))
           {
-            sb.AppendLine($"declare const {jsName}: ComponentAccessor<{className}>;");
-            sb.AppendLine();
+            var val = Convert.ToInt32(Enum.Parse(type, name));
+            if (enumDocs != null && enumDocs.TryGetValue(name, out var memberDesc))
+              sb.AppendLine($"    /** {memberDesc} */");
+            sb.AppendLine($"    readonly {name}: {val};");
           }
-          else if (needAccessors)
-          {
-            sb.AppendLine($"declare const {jsName}: ReadonlyComponentAccessor<{className}>;");
-            sb.AppendLine();
-          }
+
+          sb.AppendLine("  };");
+          sb.AppendLine();
         }
       }
-    }
 
-    static void GenerateLifecycleCallbacks(StringBuilder sb)
-    {
-      sb.AppendLine("// ── ECS System Lifecycle ─────────────────────────────────");
+      // Component accessors
+      foreach (var (jsName, type, needAccessors, needSetters) in targets)
+      {
+        var className = type.Name;
+        var isComponent = typeof(Unity.Entities.IComponentData).IsAssignableFrom(type);
+        if (!isComponent)
+          continue;
+
+        if (needSetters)
+        {
+          sb.AppendLine($"  export const {jsName}: ComponentAccessor<{className}>;");
+        }
+        else if (needAccessors)
+        {
+          sb.AppendLine($"  export const {jsName}: ReadonlyComponentAccessor<{className}>;");
+        }
+      }
+
+      sb.AppendLine("}");
       sb.AppendLine();
-      sb.AppendLine("/** State passed to onUpdate each tick. */");
-      sb.AppendLine("interface UpdateState { deltaTime: number; elapsedTime: number; }");
     }
 
     static string MapType(Type type)

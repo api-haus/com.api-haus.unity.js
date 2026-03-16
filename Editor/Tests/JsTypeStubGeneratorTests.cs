@@ -19,28 +19,21 @@ namespace UnityJS.Editor.Tests
     // ── Structure ────────────────────────────────────────────────
 
     [Test]
-    public void GenerateContent_HasTypeAlias()
-    {
-      StringAssert.Contains("type entity = number;", m_Content);
-    }
-
-    [Test]
     public void GenerateContent_HasEnumSection()
     {
-      StringAssert.Contains("Enum Constants", m_Content);
+      StringAssert.Contains("Enum Type Aliases", m_Content);
     }
 
     [Test]
     public void GenerateContent_HasComponentSection()
     {
-      StringAssert.Contains("Component Bridges", m_Content);
+      StringAssert.Contains("Component Interfaces", m_Content);
     }
 
     [Test]
-    public void GenerateContent_HasLifecycleSection()
+    public void GenerateContent_HasComponentsModule()
     {
-      StringAssert.Contains("ECS System Lifecycle", m_Content);
-      StringAssert.Contains("interface UpdateState", m_Content);
+      StringAssert.Contains("declare module 'unity.js/components'", m_Content);
     }
 
     // ── Bridged Components ───────────────────────────────────────
@@ -55,9 +48,9 @@ namespace UnityJS.Editor.Tests
     [Test]
     public void GenerateContent_ComponentHasGetSet()
     {
-      // LocalTransform uses ComponentAccessor (get + set); actual get/set are in bridges.d.ts
+      // LocalTransform uses ComponentAccessor (get + set) inside the module declaration
       StringAssert.Contains(
-        "declare const LocalTransform: ComponentAccessor<LocalTransform>;",
+        "export const LocalTransform: ComponentAccessor<LocalTransform>;",
         m_Content
       );
     }
@@ -186,13 +179,13 @@ namespace UnityJS.Editor.Tests
       // Enum-level doc
       if (dict != null && dict.TryGetValue("", out var enumDesc))
       {
-        var enumIdx = m_Content.IndexOf("declare const WANDER_PLANE:", StringComparison.Ordinal);
-        Assert.Greater(enumIdx, 0, "declare const WANDER_PLANE should exist");
+        var enumIdx = m_Content.IndexOf("export const WANDER_PLANE:", StringComparison.Ordinal);
+        Assert.Greater(enumIdx, 0, "export const WANDER_PLANE should exist in module");
 
         var docLine = $"/** {enumDesc} */";
         var docIdx = m_Content.IndexOf(docLine, StringComparison.Ordinal);
         Assert.Greater(docIdx, 0, $"Enum doc should appear in stub: {docLine}");
-        Assert.Less(docIdx, enumIdx, "Enum doc should appear BEFORE declare const");
+        Assert.Less(docIdx, enumIdx, "Enum doc should appear BEFORE export const");
       }
     }
 
@@ -209,7 +202,7 @@ namespace UnityJS.Editor.Tests
       }
 
       StringAssert.Contains(
-        "declare const ECSCharacterState: ReadonlyComponentAccessor<ECSCharacterState>;",
+        "export const ECSCharacterState: ReadonlyComponentAccessor<ECSCharacterState>;",
         m_Content
       );
     }
@@ -234,7 +227,7 @@ namespace UnityJS.Editor.Tests
     [Test]
     public void GenerateContent_EnumHasTypeAlias()
     {
-      if (!m_Content.Contains("declare const WANDER_PLANE:"))
+      if (!m_Content.Contains("export const WANDER_PLANE:"))
       {
         Assert.Inconclusive("WANDER_PLANE not in stub");
         return;
