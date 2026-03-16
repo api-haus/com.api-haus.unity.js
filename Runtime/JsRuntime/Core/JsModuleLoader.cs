@@ -103,16 +103,15 @@ namespace UnityJS.Runtime
           return 0;
 
         // Handle unity.js/* synthetic modules
-        // NOTE: the C shim passes buf directly to JS_Eval without adding a null
-        // terminator (see loader_trampoline in qjs_shim.c), so we must include
-        // the '\0' in the returned data. JS_Eval requires null-terminated input.
+        // The C shim null-terminates the buffer itself (loader_trampoline),
+        // so we return raw content bytes without a trailing '\0'.
         if (nameStr.StartsWith("unity.js/"))
         {
           var source = JsBuiltinModules.GetModuleSource(nameStr);
           if (source == null)
             return 0;
 
-          var moduleData = Encoding.UTF8.GetBytes(source + '\0');
+          var moduleData = Encoding.UTF8.GetBytes(source);
 
           if (outBuf == null)
             return moduleData.Length;

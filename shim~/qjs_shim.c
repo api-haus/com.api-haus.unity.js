@@ -78,10 +78,11 @@ static JSModuleDef *loader_trampoline(JSContext *ctx, const char *name, void *op
     /* Query length */
     int len = s_read_file_cb(name, NULL, 0);
     if (len <= 0) return NULL;
-    /* Allocate and read */
-    char *buf = js_malloc(ctx, len);
+    /* Allocate and read — +1 for null terminator required by JS_Eval */
+    char *buf = js_malloc(ctx, len + 1);
     if (!buf) return NULL;
     s_read_file_cb(name, buf, len);
+    buf[len] = '\0';
     JSValue val = JS_Eval(ctx, buf, len, name,
                           JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
     js_free(ctx, buf);
