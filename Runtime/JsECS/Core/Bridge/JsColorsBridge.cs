@@ -1,10 +1,10 @@
 namespace UnityJS.Entities.Core
 {
-  using System.Text;
   using AOT;
   using QJS;
   using Runtime;
   using Unity.Mathematics;
+  using static Runtime.QJSHelpers;
 
   static partial class JsColorsBridge
   {
@@ -108,9 +108,9 @@ namespace UnityJS.Entities.Core
       var s = cMax > 1e-6f ? delta / cMax : 0f;
 
       var obj = QJS.JS_NewObject(ctx);
-      var pHBytes = Encoding.UTF8.GetBytes("h\0");
-      var pSBytes = Encoding.UTF8.GetBytes("s\0");
-      var pVBytes = Encoding.UTF8.GetBytes("v\0");
+      var pHBytes = QJS.U8("h");
+      var pSBytes = QJS.U8("s");
+      var pVBytes = QJS.U8("v");
       fixed (
         byte* pH = pHBytes,
           pS = pSBytes,
@@ -122,8 +122,7 @@ namespace UnityJS.Entities.Core
         QJS.JS_SetPropertyStr(ctx, obj, pV, QJS.NewFloat64(ctx, cMax));
       }
 
-      *outU = obj.u;
-      *outTag = obj.tag;
+      SetResult(outU, outTag, obj);
     }
   }
 }

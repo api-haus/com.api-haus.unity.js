@@ -1,6 +1,5 @@
 namespace UnityJS.Entities.Core
 {
-  using System.Runtime.InteropServices;
   using AOT;
   using Components;
   using QJS;
@@ -9,6 +8,7 @@ namespace UnityJS.Entities.Core
   using Unity.Entities;
   using Unity.Mathematics;
   using Unity.Transforms;
+  using static Runtime.QJSHelpers;
 
   /// <summary>
   /// Bridge functions for entity lifecycle operations.
@@ -27,11 +27,7 @@ namespace UnityJS.Entities.Core
     )
     {
       result = default;
-      var ptr = QJS.JS_ToCString(ctx, argv[index]);
-      if (ptr == null)
-        return false;
-      var str = Marshal.PtrToStringUTF8((nint)ptr);
-      QJS.JS_FreeCString(ctx, ptr);
+      var str = ArgString(ctx, argv, index);
       if (string.IsNullOrEmpty(str))
         return false;
       if (str.Length > FixedString64Bytes.UTF8MaxLengthInBytes)
@@ -225,9 +221,7 @@ namespace UnityJS.Entities.Core
         return;
       }
 
-      var ptr = QJS.JS_ToCString(ctx, argv[1]);
-      var componentName = Marshal.PtrToStringUTF8((nint)ptr);
-      QJS.JS_FreeCString(ctx, ptr);
+      var componentName = ArgString(ctx, argv, 1);
       if (string.IsNullOrEmpty(componentName))
       {
         SetBool(outU, outTag, ctx, false);

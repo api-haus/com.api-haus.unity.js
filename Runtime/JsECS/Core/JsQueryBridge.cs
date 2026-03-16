@@ -1,14 +1,13 @@
 namespace UnityJS.Entities.Core
 {
   using System.Collections.Generic;
-  using System.Runtime.InteropServices;
-  using System.Text;
   using AOT;
   using Components;
   using QJS;
   using Unity.Collections;
   using Unity.Collections.LowLevel.Unsafe;
   using Unity.Entities;
+  using static Runtime.QJSHelpers;
 
   public static class JsQueryBridge
   {
@@ -96,7 +95,7 @@ namespace UnityJS.Entities.Core
     public static unsafe void Register(JSContext ctx)
     {
       var global = QJS.JS_GetGlobalObject(ctx);
-      var pEcsBytes = Encoding.UTF8.GetBytes("ecs\0");
+      var pEcsBytes = QJS.U8("ecs");
       fixed (byte* pEcs = pEcsBytes)
       {
         var existing = QJS.JS_GetPropertyStr(ctx, global, pEcs);
@@ -111,12 +110,7 @@ namespace UnityJS.Entities.Core
           ns = existing;
         }
 
-        var pQueryBytes = Encoding.UTF8.GetBytes("query\0");
-        fixed (byte* pQuery = pQueryBytes)
-        {
-          var fn = QJSShim.qjs_shim_new_function(ctx, Query, pQuery, 0);
-          QJS.JS_SetPropertyStr(ctx, ns, pQuery, fn);
-        }
+        AddFunction(ctx, ns, "query", Query, 0);
 
         QJS.JS_SetPropertyStr(ctx, global, pEcs, ns);
       }
@@ -138,9 +132,7 @@ namespace UnityJS.Entities.Core
     {
       if (!s_initialized)
       {
-        var empty = QJS.JS_NewArray(ctx);
-        *outU = empty.u;
-        *outTag = empty.tag;
+        SetResult(outU, outTag, QJS.JS_NewArray(ctx));
         return;
       }
 
@@ -150,8 +142,8 @@ namespace UnityJS.Entities.Core
       if (argc >= 1 && QJS.IsObject(argv[0]) && QJS.JS_IsArray(ctx, argv[0]) == 0)
       {
         // Table form: { all: [...], none: [...] }
-        var pAllBytes = Encoding.UTF8.GetBytes("all\0");
-        var pNoneBytes = Encoding.UTF8.GetBytes("none\0");
+        var pAllBytes = QJS.U8("all");
+        var pNoneBytes = QJS.U8("none");
         fixed (
           byte* pAll = pAllBytes,
             pNone = pNoneBytes
@@ -175,9 +167,7 @@ namespace UnityJS.Entities.Core
         {
           if (!QJS.IsString(argv[i]))
             continue;
-          var ptr = QJS.JS_ToCString(ctx, argv[i]);
-          var name = Marshal.PtrToStringUTF8((nint)ptr);
-          QJS.JS_FreeCString(ctx, ptr);
+          var name = ArgString(ctx, argv, i);
           if (name != null && JsComponentRegistry.TryGetComponentType(name, out var ct))
             allComponents.Add(ct);
         }
@@ -185,9 +175,7 @@ namespace UnityJS.Entities.Core
 
       if (allComponents.Count == 0)
       {
-        var empty = QJS.JS_NewArray(ctx);
-        *outU = empty.u;
-        *outTag = empty.tag;
+        SetResult(outU, outTag, QJS.JS_NewArray(ctx));
         return;
       }
 
@@ -201,8 +189,7 @@ namespace UnityJS.Entities.Core
         var arr = QJS.JS_NewArray(ctx);
         for (var i = 0; i < ids.Length; i++)
           QJS.JS_SetPropertyUint32(ctx, arr, (uint)i, QJS.NewInt32(ctx, ids[i]));
-        *outU = arr.u;
-        *outTag = arr.tag;
+        SetResult(outU, outTag, arr);
         return;
       }
 
@@ -216,14 +203,12 @@ namespace UnityJS.Entities.Core
       }
 
       // Return empty for this frame
-      var emptyArr = QJS.JS_NewArray(ctx);
-      *outU = emptyArr.u;
-      *outTag = emptyArr.tag;
+      SetResult(outU, outTag, QJS.JS_NewArray(ctx));
     }
 
     static unsafe void ReadJsComponentArray(JSContext ctx, JSValue arr, List<ComponentType> result)
     {
-      var pLengthBytes = Encoding.UTF8.GetBytes("length\0");
+      var pLengthBytes = QJS.U8("length");
       fixed (byte* pLength = pLengthBytes)
       {
         var lenVal = QJS.JS_GetPropertyStr(ctx, arr, pLength);
@@ -236,9 +221,7 @@ namespace UnityJS.Entities.Core
           var elem = QJS.JS_GetPropertyUint32(ctx, arr, i);
           if (QJS.IsString(elem))
           {
-            var ptr = QJS.JS_ToCString(ctx, elem);
-            var name = Marshal.PtrToStringUTF8((nint)ptr);
-            QJS.JS_FreeCString(ctx, ptr);
+            var name = QJS.ToManagedString(ctx, elem);
             if (name != null && JsComponentRegistry.TryGetComponentType(name, out var ct))
               result.Add(ct);
           }

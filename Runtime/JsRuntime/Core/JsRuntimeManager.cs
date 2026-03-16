@@ -135,19 +135,14 @@ namespace UnityJS.Runtime
     /// Creates a JS state object for an entity script instance.
     /// Returns a monotonic int key into the state dictionary.
     /// </summary>
-    static byte[] U8(string s)
-    {
-      return Encoding.UTF8.GetBytes(s + '\0');
-    }
-
-    static readonly byte[] s_script = U8("_script");
-    static readonly byte[] s_entityId = U8("entityId");
-    static readonly byte[] s_deltaTime = U8("deltaTime");
-    static readonly byte[] s_elapsedTime = U8("elapsedTime");
-    static readonly byte[] s_onInit = U8("onInit");
-    static readonly byte[] s_onTick = U8("onTick");
-    static readonly byte[] s_onEvent = U8("onEvent");
-    static readonly byte[] s_onCommand = U8("onCommand");
+    static readonly byte[] s_script = QJS.U8("_script");
+    static readonly byte[] s_entityId = QJS.U8("entityId");
+    static readonly byte[] s_deltaTime = QJS.U8("deltaTime");
+    static readonly byte[] s_elapsedTime = QJS.U8("elapsedTime");
+    static readonly byte[] s_onInit = QJS.U8("onInit");
+    static readonly byte[] s_onTick = QJS.U8("onTick");
+    static readonly byte[] s_onEvent = QJS.U8("onEvent");
+    static readonly byte[] s_onCommand = QJS.U8("onCommand");
 
     public unsafe int CreateEntityState(string scriptName, int entityId)
     {
@@ -430,7 +425,7 @@ namespace UnityJS.Runtime
       s_shimDirty = true;
     }
 
-    static readonly byte[] s_stackProp = Encoding.UTF8.GetBytes("stack\0");
+    static readonly byte[] s_stackProp = QJS.U8("stack");
 
     unsafe void LogException(string context)
     {

@@ -5,6 +5,7 @@ namespace UnityJS.Entities.Core
   using QJS;
   using Runtime;
   using Unity.Burst;
+  using static Runtime.QJSHelpers;
   using Unity.Collections;
   using Unity.Collections.LowLevel.Unsafe;
   using Unity.Entities;
@@ -416,22 +417,17 @@ namespace UnityJS.Entities.Core
 
       var result = QJS.EvalGlobal(ctx, bootstrap, "<math_bootstrap>");
       if (QJS.IsException(result))
-      {
-        var ex = QJS.JS_GetException(ctx);
-        var pMsg = QJS.JS_ToCString(ctx, ex);
-        var msg =
-          System.Runtime.InteropServices.Marshal.PtrToStringUTF8((nint)pMsg) ?? "unknown error";
-        QJS.JS_FreeCString(ctx, pMsg);
-        QJS.JS_FreeValue(ctx, ex);
-        Unity.Logging.Log.Error("[JsECS] Failed to initialize math bootstrap: {0}", msg);
-      }
+        Unity.Logging.Log.Error(
+          "[JsECS] Failed to initialize math bootstrap: {0}",
+          QJS.GetExceptionMessage(ctx)
+        );
 
       QJS.JS_FreeValue(ctx, result);
 
       // Cache vector prototypes for JsStateExtensions
-      var f2pBytes = System.Text.Encoding.UTF8.GetBytes("__F2P\0");
-      var f3pBytes = System.Text.Encoding.UTF8.GetBytes("__F3P\0");
-      var f4pBytes = System.Text.Encoding.UTF8.GetBytes("__F4P\0");
+      var f2pBytes = QJS.U8("__F2P");
+      var f3pBytes = QJS.U8("__F3P");
+      var f4pBytes = QJS.U8("__F4P");
       var global = QJS.JS_GetGlobalObject(ctx);
       fixed (
         byte* pF2 = f2pBytes,
@@ -603,63 +599,5 @@ namespace UnityJS.Entities.Core
       return ctx.eventBuffer[index];
     }
 
-    /// <summary>
-    /// Helper: set JS_UNDEFINED on the output pointers of a QJSShimCallback.
-    /// </summary>
-    /// <summary>
-    /// Helper: register a JS function on a namespace object.
-    /// </summary>
-    internal static unsafe void AddFunction(
-      JSContext ctx,
-      JSValue ns,
-      string name,
-      QJSShimCallback callback,
-      int argc
-    )
-    {
-      var bytes = System.Text.Encoding.UTF8.GetBytes(name + '\0');
-      fixed (byte* p = bytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, callback, p, argc);
-        QJS.JS_SetPropertyStr(ctx, ns, p, fn);
-      }
-    }
-
-    internal static unsafe void SetNamespace(JSContext ctx, JSValue global, string name, JSValue ns)
-    {
-      var bytes = System.Text.Encoding.UTF8.GetBytes(name + '\0');
-      fixed (byte* p = bytes)
-      {
-        QJS.JS_SetPropertyStr(ctx, global, p, ns);
-      }
-    }
-
-    internal static unsafe void SetUndefined(long* outU, long* outTag)
-    {
-      var undef = QJS.JS_UNDEFINED;
-      *outU = undef.u;
-      *outTag = undef.tag;
-    }
-
-    internal static unsafe void SetNull(long* outU, long* outTag)
-    {
-      var n = QJS.JS_NULL;
-      *outU = n.u;
-      *outTag = n.tag;
-    }
-
-    internal static unsafe void SetBool(long* outU, long* outTag, JSContext ctx, bool value)
-    {
-      var v = QJS.NewBool(ctx, value);
-      *outU = v.u;
-      *outTag = v.tag;
-    }
-
-    internal static unsafe void SetInt(long* outU, long* outTag, JSContext ctx, int value)
-    {
-      var v = QJS.NewInt32(ctx, value);
-      *outU = v.u;
-      *outTag = v.tag;
-    }
   }
 }

@@ -1,11 +1,11 @@
 namespace UnityJS.Entities.Core
 {
-  using System.Runtime.InteropServices;
   using AOT;
   using Drawing;
   using QJS;
   using Runtime;
   using UnityEngine;
+  using static Runtime.QJSHelpers;
 
   /// <summary>
   /// Bridge functions for debug drawing.
@@ -354,11 +354,9 @@ namespace UnityJS.Entities.Core
       }
 
       var position = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
-      var ptr = QJS.JS_ToCString(ctx, argv[1]);
-      if (ptr != null)
+      var text = QJS.ToManagedString(ctx, argv[1]);
+      if (text != null)
       {
-        var text = Marshal.PtrToStringUTF8((nint)ptr) ?? "";
-        QJS.JS_FreeCString(ctx, ptr);
         if (s_currentDuration > 0)
           using (Draw.ingame.WithDuration(s_currentDuration))
           {

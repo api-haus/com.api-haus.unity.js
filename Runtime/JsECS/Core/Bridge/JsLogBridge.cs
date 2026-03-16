@@ -1,10 +1,9 @@
 namespace UnityJS.Entities.Core
 {
-  using System.Runtime.InteropServices;
-  using System.Text;
   using AOT;
   using QJS;
   using Unity.Logging;
+  using static Runtime.QJSHelpers;
 
   /// <summary>
   /// Bridge functions for logging.
@@ -24,18 +23,9 @@ namespace UnityJS.Entities.Core
       long* outTag
     )
     {
-      var pLevel = QJS.JS_ToCString(ctx, argv[0]);
-      var pMessage = QJS.JS_ToCString(ctx, argv[1]);
-      var pStack = argc >= 3 ? QJS.JS_ToCString(ctx, argv[2]) : null;
-
-      var level = Marshal.PtrToStringUTF8((nint)pLevel) ?? "info";
-      var message = Marshal.PtrToStringUTF8((nint)pMessage) ?? "";
-      var stackTrace = pStack != null ? Marshal.PtrToStringUTF8((nint)pStack) ?? "" : "";
-
-      QJS.JS_FreeCString(ctx, pLevel);
-      QJS.JS_FreeCString(ctx, pMessage);
-      if (pStack != null)
-        QJS.JS_FreeCString(ctx, pStack);
+      var level = ArgString(ctx, argv, 0) ?? "info";
+      var message = ArgString(ctx, argv, 1) ?? "";
+      var stackTrace = argc >= 3 ? ArgString(ctx, argv, 2) ?? "" : "";
 
       var formatted = FormatJsStackTrace(stackTrace);
 
@@ -113,14 +103,10 @@ namespace UnityJS.Entities.Core
 
       var result = QJS.EvalGlobal(ctx, logBootstrap, "<log_bootstrap>");
       if (QJS.IsException(result))
-      {
-        var ex = QJS.JS_GetException(ctx);
-        var pMsg = QJS.JS_ToCString(ctx, ex);
-        var msg = Marshal.PtrToStringUTF8((nint)pMsg) ?? "unknown error";
-        QJS.JS_FreeCString(ctx, pMsg);
-        QJS.JS_FreeValue(ctx, ex);
-        Log.Error("[JsECS] Failed to initialize JS log helpers: {0}", msg);
-      }
+        Log.Error(
+          "[JsECS] Failed to initialize JS log helpers: {0}",
+          QJS.GetExceptionMessage(ctx)
+        );
 
       QJS.JS_FreeValue(ctx, result);
 

@@ -1,10 +1,10 @@
 namespace UnityJS.Entities.Core
 {
-  using System.Text;
   using AOT;
   using QJS;
   using Unity.Burst;
   using Unity.Mathematics;
+  using static Runtime.QJSHelpers;
 
   public static class JsSystemBridge
   {
@@ -32,41 +32,13 @@ namespace UnityJS.Entities.Core
 
       var ns = QJS.JS_NewObject(ctx);
 
-      var pDeltaTimeBytes = Encoding.UTF8.GetBytes("deltaTime\0");
-      fixed (byte* pDeltaTime = pDeltaTimeBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, System_DeltaTime, pDeltaTime, 0);
-        QJS.JS_SetPropertyStr(ctx, ns, pDeltaTime, fn);
-      }
-
-      var pTimeBytes = Encoding.UTF8.GetBytes("time\0");
-      fixed (byte* pTime = pTimeBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, System_Time, pTime, 0);
-        QJS.JS_SetPropertyStr(ctx, ns, pTime, fn);
-      }
-
-      var pRandomBytes = Encoding.UTF8.GetBytes("random\0");
-      fixed (byte* pRandom = pRandomBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, System_Random, pRandom, 2);
-        QJS.JS_SetPropertyStr(ctx, ns, pRandom, fn);
-      }
-
-      var pRandomIntBytes = Encoding.UTF8.GetBytes("randomInt\0");
-      fixed (byte* pRandomInt = pRandomIntBytes)
-      {
-        var fn = QJSShim.qjs_shim_new_function(ctx, System_RandomInt, pRandomInt, 2);
-        QJS.JS_SetPropertyStr(ctx, ns, pRandomInt, fn);
-      }
+      AddFunction(ctx, ns, "deltaTime", System_DeltaTime, 0);
+      AddFunction(ctx, ns, "time", System_Time, 0);
+      AddFunction(ctx, ns, "random", System_Random, 2);
+      AddFunction(ctx, ns, "randomInt", System_RandomInt, 2);
 
       var global = QJS.JS_GetGlobalObject(ctx);
-      var pSystemBytes = Encoding.UTF8.GetBytes("system\0");
-      fixed (byte* pSystem = pSystemBytes)
-      {
-        QJS.JS_SetPropertyStr(ctx, global, pSystem, ns);
-      }
-
+      SetNamespace(ctx, global, "system", ns);
       QJS.JS_FreeValue(ctx, global);
     }
 
@@ -81,9 +53,7 @@ namespace UnityJS.Entities.Core
       long* outTag
     )
     {
-      var val = QJS.NewFloat64(ctx, s_deltaTime.Data);
-      *outU = val.u;
-      *outTag = val.tag;
+      SetFloat(outU, outTag, ctx, s_deltaTime.Data);
     }
 
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
@@ -97,9 +67,7 @@ namespace UnityJS.Entities.Core
       long* outTag
     )
     {
-      var val = QJS.NewFloat64(ctx, s_elapsedTime.Data);
-      *outU = val.u;
-      *outTag = val.tag;
+      SetFloat(outU, outTag, ctx, s_elapsedTime.Data);
     }
 
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
@@ -125,9 +93,7 @@ namespace UnityJS.Entities.Core
       }
 
       var value = s_random.NextFloat(min, max);
-      var val = QJS.NewFloat64(ctx, value);
-      *outU = val.u;
-      *outTag = val.tag;
+      SetFloat(outU, outTag, ctx, value);
     }
 
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
@@ -153,9 +119,7 @@ namespace UnityJS.Entities.Core
       }
 
       var value = s_random.NextInt(min, max + 1);
-      var val = QJS.NewInt32(ctx, value);
-      *outU = val.u;
-      *outTag = val.tag;
+      SetInt(outU, outTag, ctx, value);
     }
   }
 }

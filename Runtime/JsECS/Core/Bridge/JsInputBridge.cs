@@ -1,13 +1,13 @@
 namespace UnityJS.Entities.Core
 {
   using System.Collections.Generic;
-  using System.Runtime.InteropServices;
   using AOT;
   using QJS;
   using Runtime;
   using Unity.Mathematics;
   using UnityEngine;
   using UnityEngine.InputSystem;
+  using static Runtime.QJSHelpers;
 
   /// <summary>
   /// Bridge functions for input operations.
@@ -45,13 +45,7 @@ namespace UnityJS.Entities.Core
       if (!s_inputInitialized || s_inputActions == null)
         return null;
 
-      var ptr = QJS.JS_ToCString(ctx, argv[index]);
-      if (ptr == null)
-        return null;
-
-      var actionName = Marshal.PtrToStringUTF8((nint)ptr);
-      QJS.JS_FreeCString(ctx, ptr);
-
+      var actionName = ArgString(ctx, argv, index);
       if (string.IsNullOrEmpty(actionName))
         return null;
       s_inputActions.TryGetValue(actionName, out var action);
@@ -79,18 +73,13 @@ namespace UnityJS.Entities.Core
       if (action.expectedControlType == "Vector2")
       {
         var value = action.ReadValue<Vector2>();
-        var result = JsStateExtensions.Float3ToJsObject(ctx, new float3(value.x, value.y, 0));
-        *outU = result.u;
-        *outTag = result.tag;
+        SetResult(outU, outTag, JsStateExtensions.Float3ToJsObject(ctx, new float3(value.x, value.y, 0)));
         return;
       }
 
       if (action.expectedControlType is "Axis" or "")
       {
-        var value = action.ReadValue<float>();
-        var result = QJS.NewFloat64(ctx, value);
-        *outU = result.u;
-        *outTag = result.tag;
+        SetFloat(outU, outTag, ctx, action.ReadValue<float>());
         return;
       }
 

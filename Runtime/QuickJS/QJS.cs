@@ -430,5 +430,24 @@ namespace UnityJS.QJS
     {
       return JS_NewCFunction2(ctx, func, name, length, 0, 0);
     }
+
+    /// <summary>
+    /// Returns null-terminated UTF-8 bytes for a string. The null terminator is included in the array.
+    /// </summary>
+    public static byte[] U8(string s)
+    {
+      return System.Text.Encoding.UTF8.GetBytes(s + '\0');
+    }
+
+    /// <summary>
+    /// Gets the pending exception message from a context, frees the exception, and returns the string.
+    /// </summary>
+    public static unsafe string GetExceptionMessage(JSContext ctx)
+    {
+      var ex = JS_GetException(ctx);
+      var msg = ToManagedString(ctx, ex) ?? "unknown error";
+      JS_FreeValue(ctx, ex);
+      return msg;
+    }
   }
 }
