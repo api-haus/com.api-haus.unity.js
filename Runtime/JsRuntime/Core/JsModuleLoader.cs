@@ -15,6 +15,12 @@ namespace UnityJS.Runtime
     static QJSNormalizeCallback s_normalizeDelegate;
     static QJSReadFileCallback s_readFileDelegate;
 
+    static string StripVersionSuffix(string path)
+    {
+      var idx = path.IndexOf("?v=", StringComparison.Ordinal);
+      return idx >= 0 ? path.Substring(0, idx) : path;
+    }
+
     [MonoPInvokeCallback(typeof(QJSNormalizeCallback))]
     static int Normalize(JSContext ctx, byte* baseName, byte* name, byte* outBuf, int outBufLen)
     {
@@ -28,7 +34,7 @@ namespace UnityJS.Runtime
 
         if (nameStr.StartsWith("./") || nameStr.StartsWith("../"))
         {
-          var baseStr = Marshal.PtrToStringUTF8((nint)baseName) ?? "";
+          var baseStr = StripVersionSuffix(Marshal.PtrToStringUTF8((nint)baseName) ?? "");
 
           if (baseStr.StartsWith("bundle://"))
           {
@@ -107,11 +113,12 @@ namespace UnityJS.Runtime
           return bundleData.Length;
         }
 
-        // Filesystem path
-        if (!File.Exists(nameStr))
+        // Filesystem path — strip ?v=N version suffix used for cache invalidation
+        var fsPath = StripVersionSuffix(nameStr);
+        if (!File.Exists(fsPath))
           return 0;
 
-        var data = File.ReadAllBytes(nameStr);
+        var data = File.ReadAllBytes(fsPath);
 
         // Size query
         if (outBuf == null)

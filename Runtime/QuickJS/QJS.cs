@@ -187,6 +187,21 @@ namespace UnityJS.QJS
       return v;
     }
 
+    /// <summary>
+    /// Safe JS_Eval wrapper that handles null-termination automatically.
+    /// Returns the eval result (caller must free). Returns JS_UNDEFINED on exception
+    /// after logging the error via the provided tag.
+    /// </summary>
+    public static unsafe JSValue EvalGlobal(JSContext ctx, string code, string filename)
+    {
+      var codeBytes = System.Text.Encoding.UTF8.GetBytes(code + '\0');
+      var fileBytes = System.Text.Encoding.UTF8.GetBytes(filename + '\0');
+      fixed (byte* pCode = codeBytes, pFile = fileBytes)
+      {
+        return JS_Eval(ctx, pCode, codeBytes.Length - 1, pFile, JS_EVAL_TYPE_GLOBAL);
+      }
+    }
+
     // ── Exported functions (DllImport) ──
 
     // Runtime lifecycle

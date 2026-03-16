@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("UnityJS.Runtime.Tests")]
+[assembly: InternalsVisibleTo("UnityJS.Entities.PlayModeTests")]
 
 namespace UnityJS.Runtime
 {

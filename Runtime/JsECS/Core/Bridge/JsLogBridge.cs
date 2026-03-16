@@ -111,26 +111,18 @@ namespace UnityJS.Entities.Core
   };
 })();";
 
-      var codeBytes = Encoding.UTF8.GetBytes(logBootstrap);
-      var filenameBytes = Encoding.UTF8.GetBytes("<log_bootstrap>\0");
-      fixed (
-        byte* pCode = codeBytes,
-          pFilename = filenameBytes
-      )
+      var result = QJS.EvalGlobal(ctx, logBootstrap, "<log_bootstrap>");
+      if (QJS.IsException(result))
       {
-        var result = QJS.JS_Eval(ctx, pCode, codeBytes.Length, pFilename, QJS.JS_EVAL_TYPE_GLOBAL);
-        if (QJS.IsException(result))
-        {
-          var ex = QJS.JS_GetException(ctx);
-          var pMsg = QJS.JS_ToCString(ctx, ex);
-          var msg = Marshal.PtrToStringUTF8((nint)pMsg) ?? "unknown error";
-          QJS.JS_FreeCString(ctx, pMsg);
-          QJS.JS_FreeValue(ctx, ex);
-          Log.Error("[JsECS] Failed to initialize JS log helpers: {0}", msg);
-        }
-
-        QJS.JS_FreeValue(ctx, result);
+        var ex = QJS.JS_GetException(ctx);
+        var pMsg = QJS.JS_ToCString(ctx, ex);
+        var msg = Marshal.PtrToStringUTF8((nint)pMsg) ?? "unknown error";
+        QJS.JS_FreeCString(ctx, pMsg);
+        QJS.JS_FreeValue(ctx, ex);
+        Log.Error("[JsECS] Failed to initialize JS log helpers: {0}", msg);
       }
+
+      QJS.JS_FreeValue(ctx, result);
 
       QJS.JS_FreeValue(ctx, global);
     }

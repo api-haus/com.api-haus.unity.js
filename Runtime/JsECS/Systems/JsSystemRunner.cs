@@ -301,14 +301,26 @@ BuiltQuery.prototype[Symbol.iterator] = function() {
         m_SystemNames.Remove(systemName);
       }
 
-      if (
-        JsScriptSourceRegistry.TryReadScript(
-          "systems/" + systemName,
-          out var source,
-          out var resolvedId
-        )
-      )
-        LoadSystem(systemName, source, resolvedId);
+      if (!JsScriptSourceRegistry.TryReadScript(
+            "systems/" + systemName, out var source, out var resolvedId))
+        return;
+
+      var scriptId = "system:" + systemName;
+      if (!m_Vm.ReloadScript(scriptId, source, resolvedId))
+      {
+        Log.Error("[JsSystemRunner] Failed to reload system '{0}'", systemName);
+        return;
+      }
+
+      var stateRef = m_Vm.CreateEntityState(scriptId, -1);
+      if (stateRef < 0)
+      {
+        Log.Error("[JsSystemRunner] Failed to create state for system '{0}'", systemName);
+        return;
+      }
+
+      m_SystemStateRefs[systemName] = stateRef;
+      m_SystemNames.Add(systemName);
     }
 
     protected override void OnUpdate()

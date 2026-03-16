@@ -24,6 +24,7 @@ namespace UnityJS.Runtime
     JSRuntime m_Runtime;
     JSContext m_Context;
     readonly Dictionary<string, JSValue> m_ScriptRefs = new();
+    readonly Dictionary<string, int> m_ReloadVersions = new();
 
     int m_NextStateId = 1;
     readonly Dictionary<int, JSValue> m_StateRefs = new();
@@ -367,7 +368,9 @@ namespace UnityJS.Runtime
     }
 
     /// <summary>
-    /// Reloads a script by freeing the old ref and re-evaluating.
+    /// Reloads a script by freeing the old ref and re-evaluating with a versioned
+    /// filename. QuickJS caches modules by filename — appending ?v=N ensures the
+    /// re-evaluated module gets a fresh cache entry instead of resolving to the stale one.
     /// </summary>
     public unsafe bool ReloadScript(string scriptName, string source, string filename)
     {
@@ -377,7 +380,12 @@ namespace UnityJS.Runtime
         m_ScriptRefs.Remove(scriptName);
       }
 
-      return LoadScriptAsModule(scriptName, source, filename);
+      m_ReloadVersions.TryGetValue(filename, out var version);
+      version++;
+      m_ReloadVersions[filename] = version;
+      var versionedFilename = filename + "?v=" + version;
+
+      return LoadScriptAsModule(scriptName, source, versionedFilename);
     }
 
     public void RegisterBridgeNow(Action<JSContext> registration)

@@ -414,33 +414,19 @@ namespace UnityJS.Entities.Core
   globalThis.__F4P = F4P;
 })();";
 
-      var codeBytes = System.Text.Encoding.UTF8.GetBytes(bootstrap + '\0');
-      var filenameBytes = System.Text.Encoding.UTF8.GetBytes("<math_bootstrap>\0");
-      fixed (
-        byte* pCode = codeBytes,
-          pFilename = filenameBytes
-      )
+      var result = QJS.EvalGlobal(ctx, bootstrap, "<math_bootstrap>");
+      if (QJS.IsException(result))
       {
-        var result = QJS.JS_Eval(
-          ctx,
-          pCode,
-          codeBytes.Length - 1,
-          pFilename,
-          QJS.JS_EVAL_TYPE_GLOBAL
-        );
-        if (QJS.IsException(result))
-        {
-          var ex = QJS.JS_GetException(ctx);
-          var pMsg = QJS.JS_ToCString(ctx, ex);
-          var msg =
-            System.Runtime.InteropServices.Marshal.PtrToStringUTF8((nint)pMsg) ?? "unknown error";
-          QJS.JS_FreeCString(ctx, pMsg);
-          QJS.JS_FreeValue(ctx, ex);
-          Unity.Logging.Log.Error("[JsECS] Failed to initialize math bootstrap: {0}", msg);
-        }
-
-        QJS.JS_FreeValue(ctx, result);
+        var ex = QJS.JS_GetException(ctx);
+        var pMsg = QJS.JS_ToCString(ctx, ex);
+        var msg =
+          System.Runtime.InteropServices.Marshal.PtrToStringUTF8((nint)pMsg) ?? "unknown error";
+        QJS.JS_FreeCString(ctx, pMsg);
+        QJS.JS_FreeValue(ctx, ex);
+        Unity.Logging.Log.Error("[JsECS] Failed to initialize math bootstrap: {0}", msg);
       }
+
+      QJS.JS_FreeValue(ctx, result);
 
       // Cache vector prototypes for JsStateExtensions
       var f2pBytes = System.Text.Encoding.UTF8.GetBytes("__F2P\0");

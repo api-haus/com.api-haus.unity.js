@@ -10,16 +10,15 @@ namespace UnityJS.Editor
 {
   static class TscCompiler
   {
-    static string TsconfigPath =>
+    internal static string TsconfigPath =>
       Path.GetFullPath(
         Path.Combine(Application.dataPath, "StreamingAssets", "unity.js", "tsconfig.json")
       );
 
-    static string OutDir =>
+    internal static string OutDir =>
       Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "TscBuild"));
 
-    [InitializeOnLoadMethod]
-    static void OnDomainReload()
+    internal static void OnDomainReload()
     {
       if (ShouldCompile())
         RunTsc();
