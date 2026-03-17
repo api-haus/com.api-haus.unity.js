@@ -236,7 +236,7 @@ namespace UnityJS.Entities.Core
 
       QJS.JS_FreeValue(ctx, global);
 
-      Log.Info("[JsComponentStore] Defined '{0}' → slot {1}", name, slot);
+      Log.Debug("[JsComponentStore] Defined '{0}' → slot {1}", name, slot);
       SetUndefined(outU, outTag);
     }
 
@@ -304,7 +304,7 @@ namespace UnityJS.Entities.Core
         }
         QJS.JS_FreeValue(ctx, g);
 
-        Log.Info("[JsComponentStore] Auto-defined '{0}' → slot {1}", name, slot);
+        Log.Debug("[JsComponentStore] Auto-defined '{0}' → slot {1}", name, slot);
       }
 
       // Store data in __js_comp[name][eid]

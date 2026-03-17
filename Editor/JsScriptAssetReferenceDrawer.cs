@@ -3,6 +3,7 @@ namespace UnityJS.Editor
 {
   using Entities.Components;
   using Entities.Core;
+  using Unity.Logging;
   using UnityEditor;
   using UnityEngine;
 
@@ -57,7 +58,7 @@ namespace UnityJS.Editor
         }
         else
         {
-          Debug.LogWarning(error);
+          Log.Warning(error);
         }
       }
 
@@ -87,7 +88,7 @@ namespace UnityJS.Editor
         }
         else
         {
-          Debug.LogWarning(assetError);
+          Log.Warning(assetError);
         }
       }
 

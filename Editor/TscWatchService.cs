@@ -3,8 +3,8 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using UnityEditor;
+using Unity.Logging;
 using UnityEngine;
-using Debug = UnityEngine.Debug;
 
 namespace UnityJS.Editor
 {
@@ -63,7 +63,7 @@ namespace UnityJS.Editor
       var tsconfigPath = TscCompiler.TsconfigPath;
       if (!File.Exists(tsconfigPath))
       {
-        Debug.LogWarning("[TscWatchService] tsconfig.json not found — falling back to one-shot compile");
+        Log.Warning("[TscWatchService] tsconfig.json not found — falling back to one-shot compile");
         TscCompiler.OnDomainReload();
         return;
       }
@@ -73,7 +73,7 @@ namespace UnityJS.Editor
 
       if (s_NodePath == null)
       {
-        Debug.LogWarning("[TscWatchService] node not found — falling back to one-shot compile");
+        Log.Warning("[TscWatchService] node not found — falling back to one-shot compile");
         TscCompiler.OnDomainReload();
         return;
       }
@@ -82,7 +82,7 @@ namespace UnityJS.Editor
       var tscPath = Path.Combine(projectRoot, "node_modules", ".bin", "tsc");
       if (!File.Exists(tscPath))
       {
-        Debug.LogWarning("[TscWatchService] node_modules/.bin/tsc not found — falling back to one-shot compile");
+        Log.Warning("[TscWatchService] node_modules/.bin/tsc not found — falling back to one-shot compile");
         TscCompiler.OnDomainReload();
         return;
       }
@@ -105,7 +105,7 @@ namespace UnityJS.Editor
         s_Process = Process.Start(psi);
         if (s_Process == null)
         {
-          Debug.LogError("[TscWatchService] Failed to start tsc --watch process");
+          Log.Error("[TscWatchService] Failed to start tsc --watch process");
           return;
         }
 
@@ -119,11 +119,11 @@ namespace UnityJS.Editor
         s_Process.BeginOutputReadLine();
         s_Process.BeginErrorReadLine();
 
-        Debug.Log($"[TscWatchService] Started tsc --watch (PID {s_Process.Id})");
+        Log.Debug("[TscWatchService] Started tsc --watch (PID {0})", s_Process.Id);
       }
       catch (Exception ex)
       {
-        Debug.LogError($"[TscWatchService] Failed to start tsc --watch: {ex.Message}");
+        Log.Error("[TscWatchService] Failed to start tsc --watch: {0}", ex.Message);
       }
     }
 
@@ -135,15 +135,15 @@ namespace UnityJS.Editor
       if (e.Data.Contains("Watching for file changes"))
       {
         s_ConsecutiveFails = 0;
-        Debug.Log("[TscWatchService] tsc --watch ready");
+        Log.Debug("[TscWatchService] tsc --watch ready");
       }
       else if (e.Data.Contains("File change detected"))
       {
-        Debug.Log("[TscWatchService] Recompiling...");
+        Log.Debug("[TscWatchService] Recompiling...");
       }
       else if (e.Data.Contains("Found 0 errors"))
       {
-        Debug.Log("[TscWatchService] Compilation successful");
+        Log.Debug("[TscWatchService] Compilation successful");
       }
     }
 
@@ -153,16 +153,16 @@ namespace UnityJS.Editor
         return;
 
       if (e.Data.Contains("error TS"))
-        Debug.LogError($"[TscWatchService] {e.Data}");
+        Log.Error("[TscWatchService] {0}", e.Data);
       else
-        Debug.LogWarning($"[TscWatchService] stderr: {e.Data}");
+        Log.Warning("[TscWatchService] stderr: {0}", e.Data);
     }
 
     static void OnProcessExited(object sender, EventArgs e)
     {
       var exitCode = -1;
       try { exitCode = s_Process?.ExitCode ?? -1; } catch { }
-      Debug.LogWarning($"[TscWatchService] tsc --watch exited (code {exitCode})");
+      Log.Warning("[TscWatchService] tsc --watch exited (code {0})", exitCode);
 
       SessionState.EraseInt(PidKey);
 
@@ -172,8 +172,8 @@ namespace UnityJS.Editor
         s_ConsecutiveFails++;
         if (s_ConsecutiveFails >= MaxConsecutiveFails)
         {
-          Debug.LogError(
-            $"[TscWatchService] tsc --watch crashed {MaxConsecutiveFails} times in a row — giving up");
+          Log.Error(
+            "[TscWatchService] tsc --watch crashed {0} times in a row — giving up", MaxConsecutiveFails);
           return;
         }
       }
@@ -193,7 +193,7 @@ namespace UnityJS.Editor
     static void StopMenu()
     {
       StopWatch();
-      Debug.Log("[TscWatchService] Stopped tsc --watch");
+      Log.Debug("[TscWatchService] Stopped tsc --watch");
     }
 
     static void StopWatch()

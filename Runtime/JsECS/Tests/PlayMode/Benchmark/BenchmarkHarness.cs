@@ -2,7 +2,7 @@ namespace UnityJS.Entities.PlayModeTests
 {
   using System;
   using System.Diagnostics;
-  using Debug = UnityEngine.Debug;
+  using Unity.Logging;
 
   public static class BenchmarkHarness
   {
@@ -46,9 +46,7 @@ namespace UnityJS.Entities.PlayModeTests
       var min = timings[0];
       var max = timings[iterations - 1];
 
-      Debug.Log(
-        $"BENCHMARK: {label} | mean={mean:F4}ms median={median:F4}ms min={min:F4}ms max={max:F4}ms (n={iterations})"
-      );
+      Log.Debug("BENCHMARK: {0}", $"{label} | mean={mean:F4}ms median={median:F4}ms min={min:F4}ms max={max:F4}ms (n={iterations})");
 
       return new Result
       {

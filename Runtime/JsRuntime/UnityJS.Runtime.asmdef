@@ -5,7 +5,8 @@
     "UnityJS.QJS",
     "Unity.Mathematics",
     "Unity.Collections",
-    "Unity.Burst"
+    "Unity.Burst",
+    "Unity.Logging"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

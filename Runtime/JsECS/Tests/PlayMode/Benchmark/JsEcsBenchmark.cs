@@ -11,6 +11,7 @@ namespace UnityJS.Entities.PlayModeTests
   using Runtime;
   using Unity.Collections;
   using Unity.Entities;
+  using Unity.Logging;
   using UnityEngine;
   using UnityEngine.TestTools;
 
@@ -109,7 +110,7 @@ namespace UnityJS.Entities.PlayModeTests
           var msg = Marshal.PtrToStringUTF8((nint)pMsg) ?? "unknown error";
           QJS.JS_FreeCString(m_Vm.Context, pMsg);
           QJS.JS_FreeValue(m_Vm.Context, ex);
-          Debug.LogError($"[Benchmark] EvalGlobal exception: {msg}");
+          Log.Error("[Benchmark] EvalGlobal exception: {0}", msg);
         }
 
         QJS.JS_FreeValue(m_Vm.Context, val);

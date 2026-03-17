@@ -44,7 +44,7 @@ namespace UnityJS.Entities.Core
           Log.Error("[JS TRACE] {0}\n{1}", message, formatted);
           break;
         default:
-          Log.Info("[JS] {0}\n{1}", message, formatted);
+          Log.Debug("[JS] {0}\n{1}", message, formatted);
           break;
       }
 

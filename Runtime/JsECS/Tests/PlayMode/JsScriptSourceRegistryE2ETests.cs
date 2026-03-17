@@ -15,6 +15,7 @@ namespace UnityJS.Entities.PlayModeTests
   using Unity.Entities;
   using Unity.Mathematics;
   using Unity.Transforms;
+  using Unity.Logging;
   using UnityEngine;
   using UnityEngine.TestTools;
 
@@ -105,7 +106,7 @@ namespace UnityJS.Entities.PlayModeTests
       {
         var val = QJS.JS_Eval(m_Vm.Context, pSource, sourceLen, pFilename, QJS.JS_EVAL_TYPE_GLOBAL);
         if (QJS.IsException(val))
-          Debug.LogError("[E2E] EvalGlobal exception");
+          Log.Error("[E2E] EvalGlobal exception");
         QJS.JS_FreeValue(m_Vm.Context, val);
       }
     }

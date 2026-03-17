@@ -10,6 +10,7 @@ namespace UnityJS.Entities.PlayModeTests
   using QJS;
   using Runtime;
   using Unity.Entities;
+  using Unity.Logging;
   using UnityEngine;
   using UnityEngine.TestTools;
 
@@ -96,7 +97,7 @@ namespace UnityJS.Entities.PlayModeTests
       {
         var val = QJS.JS_Eval(m_Vm.Context, pSource, sourceLen, pFilename, QJS.JS_EVAL_TYPE_GLOBAL);
         if (QJS.IsException(val))
-          Debug.LogError("[Test] EvalGlobal exception");
+          Log.Error("[Test] EvalGlobal exception");
         QJS.JS_FreeValue(m_Vm.Context, val);
       }
     }

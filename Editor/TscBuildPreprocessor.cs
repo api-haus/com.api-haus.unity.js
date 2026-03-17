@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
+using Unity.Logging;
 using UnityEngine;
 
 namespace UnityJS.Editor
@@ -43,7 +44,7 @@ namespace UnityJS.Editor
       }
 
       UnityEditor.AssetDatabase.Refresh();
-      Debug.Log($"[TscBuildPreprocessor] Copied {s_CopiedFiles.Count} compiled JS file(s) to StreamingAssets for build");
+      Log.Debug("[TscBuildPreprocessor] Copied {0} compiled JS file(s) to StreamingAssets for build", s_CopiedFiles.Count);
     }
 
     public void OnPostprocessBuild(BuildReport report)
@@ -60,7 +61,7 @@ namespace UnityJS.Editor
       s_CopiedFiles.Clear();
 
       UnityEditor.AssetDatabase.Refresh();
-      Debug.Log("[TscBuildPreprocessor] Cleaned up temporary JS from StreamingAssets");
+      Log.Debug("[TscBuildPreprocessor] Cleaned up temporary JS from StreamingAssets");
     }
   }
 }

@@ -5,7 +5,7 @@ namespace UnityJS.Runtime
   using System.Runtime.InteropServices;
   using System.Text;
   using QJS;
-  using UnityEngine;
+  using Unity.Logging;
 
   /// <summary>
   /// Core runtime host. Owns JSRuntime + JSContext lifecycle.
@@ -73,7 +73,7 @@ namespace UnityJS.Runtime
       var result = JsScriptLoader.FromSearchPaths(scriptName);
       if (!result.isValid)
       {
-        Debug.LogError($"[JsRuntime] Failed to find script '{scriptName}': {result.error}");
+        Log.Error("[JsRuntime] Failed to find script '{0}': {1}", scriptName, result.error);
         return false;
       }
 
@@ -87,7 +87,7 @@ namespace UnityJS.Runtime
 
       if (!JsScriptLoader.TryReadSource(in result, out var source))
       {
-        Debug.LogError($"[JsRuntime] Failed to read source for '{result.scriptId}'");
+        Log.Error("[JsRuntime] Failed to read source for '{0}'", result.scriptId);
         return false;
       }
 
@@ -473,7 +473,7 @@ namespace UnityJS.Runtime
     {
       if (!IsValid)
       {
-        Debug.LogError("[JsRuntime] Cannot register bridge — context is not valid");
+        Log.Error("[JsRuntime] Cannot register bridge — context is not valid");
         return;
       }
 
@@ -525,9 +525,9 @@ namespace UnityJS.Runtime
       QJS.JS_FreeValue(m_Context, exc);
 
       if (!string.IsNullOrEmpty(stack))
-        Debug.LogError($"[JsRuntime] Exception in {context}: {msg}\n{stack}");
+        Log.Error("[JsRuntime] Exception in {0}: {1}\n{2}", context, msg, stack);
       else
-        Debug.LogError($"[JsRuntime] Exception in {context}: {msg}");
+        Log.Error("[JsRuntime] Exception in {0}: {1}", context, msg);
     }
   }
 }

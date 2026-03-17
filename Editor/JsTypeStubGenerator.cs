@@ -5,8 +5,8 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using Unity.Logging;
 using UnityEditor;
-using UnityEngine;
 using UnityJS.Entities.Core;
 
 namespace UnityJS.Editor
@@ -56,7 +56,7 @@ namespace UnityJS.Editor
 
       File.WriteAllText(OutputPath, content);
       AssetDatabase.Refresh();
-      Debug.Log($"[JsTypeStubs] Generated {OutputPath}");
+      Log.Debug("[JsTypeStubs] Generated {0}", OutputPath);
     }
 
     static string ComputeHash(string text)

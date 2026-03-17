@@ -3,8 +3,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using Unity.Logging;
 using UnityEngine;
-using Debug = UnityEngine.Debug;
 
 namespace UnityJS.Editor
 {
@@ -75,7 +75,7 @@ namespace UnityJS.Editor
       var tsconfigPath = TsconfigPath;
       if (!File.Exists(tsconfigPath))
       {
-        Debug.LogWarning($"[TscCompiler] tsconfig.json not found at {tsconfigPath}");
+        Log.Warning("[TscCompiler] tsconfig.json not found at {0}", tsconfigPath);
         return false;
       }
 
@@ -96,7 +96,7 @@ namespace UnityJS.Editor
       using var proc = Process.Start(psi);
       if (proc == null)
       {
-        Debug.LogError("[TscCompiler] Failed to start tsc process");
+        Log.Error("[TscCompiler] Failed to start tsc process");
         return false;
       }
 
@@ -108,14 +108,14 @@ namespace UnityJS.Editor
       {
         var output = (stdout + "\n" + stderr).Trim();
         var errorCount = output.Split('\n').Count(l => l.Contains("error TS"));
-        Debug.LogError($"[TscCompiler] tsc failed with {errorCount} error(s):\n{output}");
+        Log.Error("[TscCompiler] tsc failed with {0} error(s):\n{1}", errorCount, output);
         return false;
       }
 
       var jsCount = Directory.Exists(OutDir)
         ? Directory.GetFiles(OutDir, "*.js", SearchOption.AllDirectories).Length
         : 0;
-      Debug.Log($"[TscCompiler] Compiled {jsCount} file(s) to Library/TscBuild/");
+      Log.Debug("[TscCompiler] Compiled {0} file(s) to Library/TscBuild/", jsCount);
       return true;
     }
   }
