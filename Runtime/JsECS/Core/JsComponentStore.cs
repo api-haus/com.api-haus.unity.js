@@ -110,9 +110,16 @@ namespace UnityJS.Entities.Core
       return s_nameToSlot.ContainsKey(name);
     }
 
+    public static int GetSlotForName(string name)
+    {
+      return s_nameToSlot.TryGetValue(name, out var slot) ? slot : -1;
+    }
+
     /// <summary>
     /// Scrubs JS-side data for an entity during cleanup.
     /// </summary>
+    static readonly byte[] s_cleanupFuncKey = QJS.U8("__cleanupComponentEntity");
+
     public static unsafe void ScrubJsData(
       JSContext ctx,
       int entityId,
@@ -120,6 +127,22 @@ namespace UnityJS.Entities.Core
     )
     {
       var global = QJS.JS_GetGlobalObject(ctx);
+
+      // Call __cleanupComponentEntity(eid) for onDestroy + tick unregistration
+      fixed (byte* pCleanup = s_cleanupFuncKey)
+      {
+        var cleanupFunc = QJS.JS_GetPropertyStr(ctx, global, pCleanup);
+        if (QJS.JS_IsFunction(ctx, cleanupFunc) != 0)
+        {
+          var argv = stackalloc JSValue[1];
+          argv[0] = QJS.NewInt32(ctx, entityId);
+          var result = QJS.JS_Call(ctx, cleanupFunc, global, 1, argv);
+          QJS.JS_FreeValue(ctx, result);
+        }
+
+        QJS.JS_FreeValue(ctx, cleanupFunc);
+      }
+
       var pJsCompBytes = s_jsCompKey;
       fixed (byte* pJsComp = pJsCompBytes)
       {
@@ -175,7 +198,8 @@ namespace UnityJS.Entities.Core
 
       if (s_nameToSlot.ContainsKey(name))
       {
-        Log.Error("[JsComponentStore] ecs.define: '{0}' already defined", name);
+        // Tolerate re-definition for hot reload
+        Log.Verbose("[JsComponentStore] ecs.define: '{0}' already defined (re-define tolerated)", name);
         SetUndefined(outU, outTag);
         return;
       }
@@ -246,9 +270,41 @@ namespace UnityJS.Entities.Core
 
       if (!s_nameToSlot.TryGetValue(name, out var slot))
       {
-        Log.Error("[JsComponentStore] ecs.add: '{0}' not defined (call ecs.define first)", name);
-        SetUndefined(outU, outTag);
-        return;
+        // Auto-define on first use (supports Component classes that skip explicit define)
+        if (JsComponentRegistry.TryGetComponentType(name, out _))
+        {
+          Log.Error("[JsComponentStore] ecs.add: '{0}' conflicts with C# component", name);
+          SetUndefined(outU, outTag);
+          return;
+        }
+
+        if (s_nextSlot >= MaxSlots)
+        {
+          Log.Error("[JsComponentStore] ecs.add: tag pool exhausted (max {0})", MaxSlots);
+          SetUndefined(outU, outTag);
+          return;
+        }
+
+        slot = s_nextSlot++;
+        s_nameToSlot[name] = slot;
+        s_slotToName[slot] = name;
+
+        var tagType = GetTagType(slot);
+        JsComponentRegistry.Register(name, tagType);
+
+        // Create JS-side storage
+        var g = QJS.JS_GetGlobalObject(ctx);
+        var pJcBytes = s_jsCompKey;
+        var pNmBytes = QJS.U8(name);
+        fixed (byte* pJc = pJcBytes, pNm = pNmBytes)
+        {
+          var jc = QJS.JS_GetPropertyStr(ctx, g, pJc);
+          QJS.JS_SetPropertyStr(ctx, jc, pNm, QJS.JS_NewObject(ctx));
+          QJS.JS_FreeValue(ctx, jc);
+        }
+        QJS.JS_FreeValue(ctx, g);
+
+        Log.Info("[JsComponentStore] Auto-defined '{0}' → slot {1}", name, slot);
       }
 
       // Store data in __js_comp[name][eid]

@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -10,55 +11,53 @@ namespace UnityJS.Editor
   {
     public int callbackOrder => 0;
 
-    static string StreamingAssetsSystemsPath =>
-      Path.Combine(Application.dataPath, "StreamingAssets", "unity.js", "systems");
+    static string TscBuildRoot => TscCompiler.OutDir;
 
-    static string TscBuildSystemsPath =>
-      Path.Combine(Application.dataPath, "..", "Library", "TscBuild", "systems");
+    static string StreamingAssetsRoot =>
+      Path.Combine(Application.dataPath, "StreamingAssets", "unity.js");
+
+    static readonly List<string> s_CopiedFiles = new();
 
     public void OnPreprocessBuild(BuildReport report)
     {
       if (!TscCompiler.RunTsc())
         throw new BuildFailedException("[TscBuildPreprocessor] TypeScript compilation failed");
 
-      var src = TscBuildSystemsPath;
-      var dst = StreamingAssetsSystemsPath;
-
+      var src = TscBuildRoot;
       if (!Directory.Exists(src))
         throw new BuildFailedException($"[TscBuildPreprocessor] No compiled JS at {src}");
 
-      if (!Directory.Exists(dst))
-        Directory.CreateDirectory(dst);
+      s_CopiedFiles.Clear();
 
       foreach (var jsFile in Directory.GetFiles(src, "*.js", SearchOption.AllDirectories))
       {
         var relative = jsFile
           .Substring(src.Length)
           .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var target = Path.Combine(dst, relative);
+        var target = Path.Combine(StreamingAssetsRoot, relative);
         var targetDir = Path.GetDirectoryName(target);
         if (targetDir != null && !Directory.Exists(targetDir))
           Directory.CreateDirectory(targetDir);
         File.Copy(jsFile, target, true);
+        s_CopiedFiles.Add(target);
       }
 
       UnityEditor.AssetDatabase.Refresh();
-      Debug.Log("[TscBuildPreprocessor] Copied compiled JS to StreamingAssets for build");
+      Debug.Log($"[TscBuildPreprocessor] Copied {s_CopiedFiles.Count} compiled JS file(s) to StreamingAssets for build");
     }
 
     public void OnPostprocessBuild(BuildReport report)
     {
-      var dst = StreamingAssetsSystemsPath;
-      if (!Directory.Exists(dst))
-        return;
-
-      foreach (var jsFile in Directory.GetFiles(dst, "*.js"))
+      foreach (var file in s_CopiedFiles)
       {
-        File.Delete(jsFile);
-        var meta = jsFile + ".meta";
+        if (File.Exists(file))
+          File.Delete(file);
+        var meta = file + ".meta";
         if (File.Exists(meta))
           File.Delete(meta);
       }
+
+      s_CopiedFiles.Clear();
 
       UnityEditor.AssetDatabase.Refresh();
       Debug.Log("[TscBuildPreprocessor] Cleaned up temporary JS from StreamingAssets");

@@ -35,7 +35,7 @@ namespace UnityJS.Entities.Authoring
         {
           DependsOn(script);
 
-          if (!hasValidScript && script != null && script.script.IsValid)
+          if (!hasValidScript && script != null && script.HasValidScript)
             hasValidScript = true;
         }
 
@@ -50,10 +50,17 @@ namespace UnityJS.Entities.Authoring
 
         foreach (var scriptAuthor in m_Scripts)
         {
-          if (scriptAuthor == null || !scriptAuthor.script.IsValid)
+          if (scriptAuthor == null)
             continue;
 
-          var scriptId = JsScriptPathUtility.NormalizeScriptId(scriptAuthor.script.ToString());
+          string scriptId = null;
+
+          // Prefer scriptPath if set, fall back to legacy JsScriptAssetReference
+          if (!string.IsNullOrEmpty(scriptAuthor.scriptPath))
+            scriptId = JsScriptPathUtility.NormalizeScriptId(scriptAuthor.scriptPath);
+          else if (scriptAuthor.script.IsValid)
+            scriptId = JsScriptPathUtility.NormalizeScriptId(scriptAuthor.script.ToString());
+
           if (string.IsNullOrEmpty(scriptId))
             continue;
 

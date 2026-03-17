@@ -25,9 +25,6 @@ namespace UnityJS.Editor
 
     static TscWatchService()
     {
-      // One-shot compile on domain reload to ensure JS is up-to-date immediately
-      TscCompiler.OnDomainReload();
-      // Then start the watcher for live recompilation
       EditorApplication.delayCall += EnsureWatching;
       EditorApplication.quitting += StopWatch;
     }
@@ -67,6 +64,7 @@ namespace UnityJS.Editor
       if (!File.Exists(tsconfigPath))
       {
         Debug.LogWarning("[TscWatchService] tsconfig.json not found — falling back to one-shot compile");
+        TscCompiler.OnDomainReload();
         return;
       }
 
@@ -76,6 +74,7 @@ namespace UnityJS.Editor
       if (s_NodePath == null)
       {
         Debug.LogWarning("[TscWatchService] node not found — falling back to one-shot compile");
+        TscCompiler.OnDomainReload();
         return;
       }
 
@@ -84,8 +83,11 @@ namespace UnityJS.Editor
       if (!File.Exists(tscPath))
       {
         Debug.LogWarning("[TscWatchService] node_modules/.bin/tsc not found — falling back to one-shot compile");
+        TscCompiler.OnDomainReload();
         return;
       }
+
+      TscCompiler.CleanOutDir();
 
       var psi = new ProcessStartInfo
       {

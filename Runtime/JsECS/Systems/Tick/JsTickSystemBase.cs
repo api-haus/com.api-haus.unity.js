@@ -80,6 +80,12 @@ namespace UnityJS.Entities.Systems.Tick
 
         m_Vm.CallTick(scriptName, stateRef, deltaTime, elapsedTime);
       }
+
+      // Tick Component instances for matching tick groups
+      if (tickGroup == JsTickGroup.Fixed)
+        m_Vm.TickComponents("fixedUpdate", deltaTime);
+      else if (tickGroup == JsTickGroup.AfterTransform)
+        m_Vm.TickComponents("lateUpdate", deltaTime);
     }
   }
 }

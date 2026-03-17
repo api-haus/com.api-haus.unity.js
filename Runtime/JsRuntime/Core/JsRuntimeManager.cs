@@ -127,6 +127,17 @@ namespace UnityJS.Runtime
         if (m_ScriptRefs.TryGetValue(scriptId, out var old))
           QJS.JS_FreeValue(m_Context, old);
         m_ScriptRefs[scriptId] = ns;
+
+        // Set globalThis.__lastLoadedModule for Component class detection
+        // Only for user scripts, not internal glue modules (prefixed with __)
+        if (!scriptId.StartsWith("__"))
+        {
+          var global = QJS.JS_GetGlobalObject(m_Context);
+          fixed (byte* pLast = s_lastLoadedModule)
+            QJS.JS_SetPropertyStr(m_Context, global, pLast, QJS.JS_DupValue(m_Context, ns));
+          QJS.JS_FreeValue(m_Context, global);
+        }
+
         return true;
       }
     }
@@ -143,6 +154,9 @@ namespace UnityJS.Runtime
     static readonly byte[] s_onTick = QJS.U8("onTick");
     static readonly byte[] s_onEvent = QJS.U8("onEvent");
     static readonly byte[] s_onCommand = QJS.U8("onCommand");
+    static readonly byte[] s_tickComponents = QJS.U8("__tickComponents");
+    static readonly byte[] s_componentInit = QJS.U8("__componentInit");
+    static readonly byte[] s_lastLoadedModule = QJS.U8("__lastLoadedModule");
 
     public unsafe int CreateEntityState(string scriptName, int entityId)
     {
@@ -360,6 +374,78 @@ namespace UnityJS.Runtime
         QJS.JS_FreeValue(m_Context, extras[0]);
         return ok;
       }
+    }
+
+    /// <summary>
+    /// Calls globalThis.__tickComponents(group, dt) — one call per tick group per frame.
+    /// </summary>
+    public unsafe void TickComponents(string group, float dt)
+    {
+      var global = QJS.JS_GetGlobalObject(m_Context);
+      fixed (byte* pName = s_tickComponents)
+      {
+        var func = QJS.JS_GetPropertyStr(m_Context, global, pName);
+        if (QJS.JS_IsFunction(m_Context, func) != 0)
+        {
+          var groupBytes = Encoding.UTF8.GetBytes(group + '\0');
+          fixed (byte* pGroup = groupBytes)
+          {
+            var argv = stackalloc JSValue[2];
+            argv[0] = QJS.JS_NewString(m_Context, pGroup);
+            argv[1] = QJS.NewFloat64(m_Context, dt);
+
+            var result = QJS.JS_Call(m_Context, func, global, 2, argv);
+            if (QJS.IsException(result))
+              LogException($"TickComponents({group})");
+
+            QJS.JS_FreeValue(m_Context, result);
+            QJS.JS_FreeValue(m_Context, argv[0]);
+          }
+        }
+
+        QJS.JS_FreeValue(m_Context, func);
+      }
+
+      QJS.JS_FreeValue(m_Context, global);
+    }
+
+    /// <summary>
+    /// Calls globalThis.__componentInit(scriptName, entityId).
+    /// Returns true if the module's default export was a Component class (handled).
+    /// </summary>
+    public unsafe bool TryComponentInit(string scriptName, int entityId)
+    {
+      var global = QJS.JS_GetGlobalObject(m_Context);
+      var handled = false;
+
+      fixed (byte* pName = s_componentInit)
+      {
+        var func = QJS.JS_GetPropertyStr(m_Context, global, pName);
+        if (QJS.JS_IsFunction(m_Context, func) != 0)
+        {
+          var scriptBytes = Encoding.UTF8.GetBytes(scriptName + '\0');
+          fixed (byte* pScript = scriptBytes)
+          {
+            var argv = stackalloc JSValue[2];
+            argv[0] = QJS.JS_NewString(m_Context, pScript);
+            argv[1] = QJS.NewInt32(m_Context, entityId);
+
+            var result = QJS.JS_Call(m_Context, func, global, 2, argv);
+            if (QJS.IsException(result))
+              LogException($"TryComponentInit({scriptName})");
+            else
+              handled = QJS.JS_ToBool(m_Context, result) != 0;
+
+            QJS.JS_FreeValue(m_Context, result);
+            QJS.JS_FreeValue(m_Context, argv[0]);
+          }
+        }
+
+        QJS.JS_FreeValue(m_Context, func);
+      }
+
+      QJS.JS_FreeValue(m_Context, global);
+      return handled;
     }
 
     /// <summary>

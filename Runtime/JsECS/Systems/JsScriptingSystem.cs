@@ -119,6 +119,7 @@ namespace UnityJS.Entities.Systems
         m_ScriptBufferLookup
       );
       UpdateScriptedEntities(deltaTime);
+      // TickComponents moved to JsSystemRunner (which owns the generated bridge lookups).
       DispatchEvents();
 
       m_ECBValid = false;

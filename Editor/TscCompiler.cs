@@ -18,6 +18,12 @@ namespace UnityJS.Editor
     internal static string OutDir =>
       Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "TscBuild"));
 
+    internal static void CleanOutDir()
+    {
+      if (Directory.Exists(OutDir))
+        Directory.Delete(OutDir, true);
+    }
+
     internal static void OnDomainReload()
     {
       if (ShouldCompile())
@@ -32,27 +38,32 @@ namespace UnityJS.Editor
 
     static bool ShouldCompile()
     {
-      var systemsOut = Path.Combine(OutDir, "systems");
-      if (!Directory.Exists(systemsOut))
+      if (!Directory.Exists(OutDir))
         return true;
 
-      var tsDir = Path.GetFullPath(
-        Path.Combine(Application.dataPath, "StreamingAssets", "unity.js", "systems")
+      var tsRoot = Path.GetFullPath(
+        Path.Combine(Application.dataPath, "StreamingAssets", "unity.js")
       );
-      if (!Directory.Exists(tsDir))
-        return false;
 
-      var tsFiles = Directory.GetFiles(tsDir, "*.ts", SearchOption.AllDirectories);
-      foreach (var ts in tsFiles)
+      foreach (var subdir in new[] { "systems", "components" })
       {
-        var relative = ts.Substring(tsDir.Length)
-          .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var jsName = Path.ChangeExtension(relative, ".js");
-        var jsPath = Path.Combine(systemsOut, jsName);
-        if (!File.Exists(jsPath))
-          return true;
-        if (File.GetLastWriteTimeUtc(ts) > File.GetLastWriteTimeUtc(jsPath))
-          return true;
+        var tsDir = Path.Combine(tsRoot, subdir);
+        if (!Directory.Exists(tsDir))
+          continue;
+
+        var outSubdir = Path.Combine(OutDir, subdir);
+        var tsFiles = Directory.GetFiles(tsDir, "*.ts", SearchOption.AllDirectories);
+        foreach (var ts in tsFiles)
+        {
+          var relative = ts.Substring(tsDir.Length)
+            .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+          var jsName = Path.ChangeExtension(relative, ".js");
+          var jsPath = Path.Combine(outSubdir, jsName);
+          if (!File.Exists(jsPath))
+            return true;
+          if (File.GetLastWriteTimeUtc(ts) > File.GetLastWriteTimeUtc(jsPath))
+            return true;
+        }
       }
 
       return false;
@@ -60,6 +71,7 @@ namespace UnityJS.Editor
 
     internal static bool RunTsc()
     {
+      CleanOutDir();
       var tsconfigPath = TsconfigPath;
       if (!File.Exists(tsconfigPath))
       {
@@ -100,11 +112,10 @@ namespace UnityJS.Editor
         return false;
       }
 
-      var systemsOut = Path.Combine(OutDir, "systems");
-      var jsCount = Directory.Exists(systemsOut)
-        ? Directory.GetFiles(systemsOut, "*.js", SearchOption.AllDirectories).Length
+      var jsCount = Directory.Exists(OutDir)
+        ? Directory.GetFiles(OutDir, "*.js", SearchOption.AllDirectories).Length
         : 0;
-      Debug.Log($"[TscCompiler] Compiled {jsCount} system(s) to Library/TscBuild/");
+      Debug.Log($"[TscCompiler] Compiled {jsCount} file(s) to Library/TscBuild/");
       return true;
     }
   }

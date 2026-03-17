@@ -62,6 +62,7 @@ export const add = e.add.bind(e);
 export const remove = e.remove.bind(e);
 export const has = e.has.bind(e);
 export const get = e.get.bind(e);
+export const Component = e.Component;
 ";
 
         case "unity.js/math":

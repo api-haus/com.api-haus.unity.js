@@ -1,3 +1,7 @@
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("UnityJS.Entities.PlayModeTests")]
+
 namespace UnityJS.Entities.Systems
 {
   using System.Collections.Generic;
@@ -19,6 +23,9 @@ namespace UnityJS.Entities.Systems
   [UpdateAfter(typeof(JsScriptingSystem))]
   public partial class JsSystemRunner : SystemBase
   {
+    internal const string QueryBuilderSourceForTests = QueryBuilderSource;
+    internal const string ComponentGlueSourceForTests = ComponentGlueSource;
+
     const string QueryBuilderSource =
       @"
 const _nativeQuery = globalThis.ecs.query;
@@ -33,11 +40,19 @@ function QueryBuilder(all, none) {
 }
 
 QueryBuilder.prototype.withAll = function(...accessors) {
-  return new QueryBuilder([...this._all, ...accessors], this._none);
+  var mapped = accessors.map(function(a) {
+    if (typeof a === 'function' && a.__jsComp) return a;
+    return a;
+  });
+  return new QueryBuilder([...this._all, ...mapped], this._none);
 };
 
 QueryBuilder.prototype.withNone = function(...accessors) {
-  return new QueryBuilder(this._all, [...this._none, ...accessors]);
+  var mapped = accessors.map(function(a) {
+    if (typeof a === 'function' && a.__jsComp) return a;
+    return a;
+  });
+  return new QueryBuilder(this._all, [...this._none, ...mapped]);
 };
 
 QueryBuilder.prototype.build = function() {
@@ -71,6 +86,7 @@ BuiltQuery.prototype[Symbol.iterator] = function() {
     function flush() {
       if (prevTuple === null) return;
       for (let j = 0; j < accessors.length; j++) {
+        if (accessors[j].__jsComp) continue;
         if (accessors[j].set) accessors[j].set(prevEid, prevTuple[j + 1]);
       }
       prevTuple = null;
@@ -169,6 +185,111 @@ BuiltQuery.prototype[Symbol.iterator] = function() {
 };
 ";
 
+    const string ComponentGlueSource =
+      @"
+// Component base class
+function Component() {}
+Object.defineProperty(Component, '__jsComp', { get: function() { return true; } });
+Object.defineProperty(Component, '__stride', { get: function() { return 0; } });
+Object.defineProperty(Component, '__fieldLayout', { get: function() { return []; } });
+Object.defineProperty(Component, '__name', {
+  get: function() { return this.name; },
+  configurable: true
+});
+Component.get = function(eid) {
+  var s = __js_comp[this.name]; return s ? s[eid] : undefined;
+};
+Component.set = function() {};
+Component.prototype.start = null;
+Component.prototype.update = null;
+Component.prototype.fixedUpdate = null;
+Component.prototype.lateUpdate = null;
+Component.prototype.onDestroy = null;
+globalThis.ecs.Component = Component;
+
+// Auto-tick registry
+var __comp_ticks = { update: [], fixedUpdate: [], lateUpdate: [] };
+
+function __registerComponentTick(eid, instance) {
+  if (instance.update) __comp_ticks.update.push({eid: eid, inst: instance});
+  if (instance.fixedUpdate) __comp_ticks.fixedUpdate.push({eid: eid, inst: instance});
+  if (instance.lateUpdate) __comp_ticks.lateUpdate.push({eid: eid, inst: instance});
+}
+
+function __unregisterComponentTick(eid) {
+  for (var key in __comp_ticks) {
+    var arr = __comp_ticks[key];
+    for (var i = arr.length - 1; i >= 0; i--) {
+      if (arr[i].eid === eid) arr.splice(i, 1);
+    }
+  }
+}
+
+globalThis.__tickComponents = function(group, dt) {
+  var arr = __comp_ticks[group];
+  if (!arr) return;
+  for (var i = 0; i < arr.length; i++) {
+    var entry = arr[i];
+    if (entry.inst.__destroyed) { arr.splice(i--, 1); continue; }
+    try {
+      if (entry.inst.__needs_start) {
+        entry.inst.__needs_start = false;
+        if (entry.inst.start) entry.inst.start();
+      }
+      entry.inst[group](dt);
+    } catch (e) {
+      log.error('Component ' + (entry.inst.constructor ? entry.inst.constructor.name : '?') + '.' + group + ' error: ' + e);
+      arr.splice(i--, 1);
+    }
+  }
+};
+
+globalThis.__unregisterComponentTick = __unregisterComponentTick;
+
+globalThis.__cleanupComponentEntity = function(eid) {
+  __unregisterComponentTick(eid);
+  for (var name in __js_comp) {
+    var store = __js_comp[name];
+    if (!store) continue;
+    var inst = store[eid];
+    if (inst && typeof inst === 'object') {
+      inst.__destroyed = true;
+      if (typeof inst.onDestroy === 'function') inst.onDestroy();
+    }
+  }
+};
+
+// Unified ecs.add — handles both string names and Component classes
+var _nativeAdd = globalThis.ecs.add;
+globalThis.ecs.add = function(eid, comp, data) {
+  if (typeof comp === 'string') return _nativeAdd(eid, comp, data);
+  var name = comp.__name || comp.name;
+  if (comp.__jsComp) {
+    var inst = data !== undefined ? Object.assign(new comp(), data) : new comp();
+    inst.entity = eid;
+    _nativeAdd(eid, name, inst);
+    __registerComponentTick(eid, inst);
+    if (inst.start) inst.start();
+    return inst;
+  }
+  return _nativeAdd(eid, name, data);
+};
+
+// Component init for fulfillment pipeline
+globalThis.__componentInit = function(scriptName, entityId) {
+  var mod = globalThis.__lastLoadedModule;
+  if (!mod || !mod.default) return false;
+  var cls = mod.default;
+  if (!cls.__jsComp) return false;
+  var inst = new cls();
+  inst.entity = entityId;
+  _nativeAdd(entityId, cls.name, inst);
+  __registerComponentTick(entityId, inst);
+  inst.__needs_start = true;
+  return true;
+};
+";
+
     JsRuntimeManager m_Vm;
     readonly List<string> m_SystemNames = new();
     readonly Dictionary<string, int> m_SystemStateRefs = new();
@@ -210,13 +331,21 @@ BuiltQuery.prototype[Symbol.iterator] = function() {
       m_BridgesRegistered = false;
       m_Vm = vm;
 
-      m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
+      // If fulfillment already loaded bridges + glue, skip re-registration.
+      // QueryBridge.Register and ComponentStore.Register overwrite ecs.query / ecs.add
+      // which the glue scripts have already wrapped — re-registering undoes the wrapping.
+      if (!m_Vm.HasScript("__ecs_component_glue"))
+      {
+        m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
+        m_Vm.RegisterBridgeNow(JsQueryBridge.Register);
+        m_Vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
+        m_Vm.RegisterBridgeNow(JsComponentStore.Register);
+        m_Vm.LoadScriptFromString("__ecs_query_builder", QueryBuilderSource);
+        m_Vm.LoadScriptFromString("__ecs_component_glue", ComponentGlueSource);
+      }
+
       m_Vm.RegisterBridgeNow(JsSystemBridge.Register);
-      m_Vm.RegisterBridgeNow(JsQueryBridge.Register);
-      m_Vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
-      m_Vm.RegisterBridgeNow(JsComponentStore.Register);
       m_BridgesRegistered = true;
-      m_Vm.LoadScriptFromString("__ecs_query_builder", QueryBuilderSource);
 
       var scriptingSystem = World.GetOrCreateSystemManaged<JsScriptingSystem>();
       JsECSBridge.Initialize(World);
@@ -361,6 +490,10 @@ BuiltQuery.prototype[Symbol.iterator] = function() {
         var scriptId = "system:" + systemName;
         m_Vm.CallFunction(scriptId, "onUpdate", stateRef);
       }
+
+      // Tick Component-class instances (update lifecycle) — must happen here because
+      // generated bridge lookups are refreshed by UpdateAllLookups above.
+      m_Vm.TickComponents("update", deltaTime);
     }
 
     void PrewarmComponentQueries()

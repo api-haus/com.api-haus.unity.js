@@ -37,6 +37,7 @@ namespace UnityJS.Entities.Core
     }
 
     public const string JS_EXTENSION = ".js";
+    public const string TS_EXTENSION = ".ts";
 
     static readonly string s_scriptsFolderRelativeWithSlash = SCRIPTS_FOLDER_RELATIVE + "/";
 
@@ -104,6 +105,8 @@ namespace UnityJS.Entities.Core
 
       if (trimmed.EndsWith(JS_EXTENSION, StringComparison.OrdinalIgnoreCase))
         trimmed = trimmed[..^JS_EXTENSION.Length];
+      else if (trimmed.EndsWith(TS_EXTENSION, StringComparison.OrdinalIgnoreCase))
+        trimmed = trimmed[..^TS_EXTENSION.Length];
 
       if (trimmed.Contains("..", StringComparison.Ordinal))
       {

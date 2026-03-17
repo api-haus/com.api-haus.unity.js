@@ -6,17 +6,22 @@ namespace UnityJS.Entities.Systems.Support
   using Unity.Collections;
   using Unity.Entities;
   using Unity.Logging;
+  using Unity.Transforms;
 
   [UpdateInGroup(typeof(InitializationSystemGroup))]
   public partial class JsScriptFulfillmentSystem : SystemBase
   {
     JsRuntimeManager m_Vm;
     EntityQuery m_RequestQuery;
+    ComponentLookup<LocalTransform> m_TransformLookup;
+    BufferLookup<JsScript> m_ScriptBufferLookup;
 
     protected override void OnCreate()
     {
       JsEntityRegistry.Initialize();
       m_RequestQuery = GetEntityQuery(ComponentType.ReadWrite<JsScriptRequest>());
+      m_TransformLookup = GetComponentLookup<LocalTransform>();
+      m_ScriptBufferLookup = GetBufferLookup<JsScript>(true);
     }
 
     protected override void OnDestroy()
@@ -29,7 +34,15 @@ namespace UnityJS.Entities.Systems.Support
       m_Vm = JsRuntimeManager.Instance ?? JsRuntimeManager.GetOrCreate();
       JsScriptSearchPaths.Initialize();
 
+      // Register ALL bridges before any script evaluation — module imports
+      // (unity.js/ecs, unity.js/components) bind globals at eval time.
       m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
+      m_Vm.RegisterBridgeNow(JsQueryBridge.Register);
+      m_Vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
+      m_Vm.RegisterBridgeNow(JsComponentStore.Register);
+
+      m_Vm.LoadScriptFromString("__ecs_query_builder", JsSystemRunner.QueryBuilderSourceForTests);
+      m_Vm.LoadScriptFromString("__ecs_component_glue", JsSystemRunner.ComponentGlueSourceForTests);
     }
 
     protected override void OnUpdate()
@@ -159,7 +172,17 @@ namespace UnityJS.Entities.Systems.Support
             stateRef
           );
 
-          m_Vm.CallInit(scriptName, stateRef);
+          // Prime BurstContext so _nativeAdd in __componentInit can use the ECB.
+          // start() is deferred to the first TickComponents call in JsSystemRunner
+          // where generated bridge lookups are guaranteed fresh.
+          m_TransformLookup.Update(this);
+          m_ScriptBufferLookup.Update(this);
+          JsECSBridge.UpdateBurstContext(ecb, 0f, m_TransformLookup, m_ScriptBufferLookup);
+
+          if (!m_Vm.TryComponentInit(scriptName, entityId))
+            m_Vm.CallInit(scriptName, stateRef);
+
+          JsECSBridge.ClearBurstContext();
 
           requests = EntityManager.GetBuffer<JsScriptRequest>(entity);
           request.fulfilled = true;
@@ -169,6 +192,7 @@ namespace UnityJS.Entities.Systems.Support
 
       entities.Dispose();
       ecb.Playback(EntityManager);
+      JsEntityRegistry.CommitPendingCreations(EntityManager);
     }
 
     static bool HasScriptWithHash(DynamicBuffer<JsScript> scripts, Hash128 hash)
