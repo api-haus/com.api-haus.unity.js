@@ -155,6 +155,7 @@ namespace UnityJS.Runtime
     static readonly byte[] s_onEvent = QJS.U8("onEvent");
     static readonly byte[] s_onCommand = QJS.U8("onCommand");
     static readonly byte[] s_tickComponents = QJS.U8("__tickComponents");
+    static readonly byte[] s_flushRefRw = QJS.U8("__flushRefRw");
     static readonly byte[] s_componentInit = QJS.U8("__componentInit");
     static readonly byte[] s_lastLoadedModule = QJS.U8("__lastLoadedModule");
 
@@ -401,6 +402,29 @@ namespace UnityJS.Runtime
             QJS.JS_FreeValue(m_Context, result);
             QJS.JS_FreeValue(m_Context, argv[0]);
           }
+        }
+
+        QJS.JS_FreeValue(m_Context, func);
+      }
+
+      QJS.JS_FreeValue(m_Context, global);
+    }
+
+    /// <summary>
+    /// Calls globalThis.__flushRefRw() — writes back any pending RefRW component data.
+    /// </summary>
+    public unsafe void FlushRefRw()
+    {
+      var global = QJS.JS_GetGlobalObject(m_Context);
+      fixed (byte* pName = s_flushRefRw)
+      {
+        var func = QJS.JS_GetPropertyStr(m_Context, global, pName);
+        if (QJS.JS_IsFunction(m_Context, func) != 0)
+        {
+          var result = QJS.JS_Call(m_Context, func, global, 0, null);
+          if (QJS.IsException(result))
+            LogException("FlushRefRw");
+          QJS.JS_FreeValue(m_Context, result);
         }
 
         QJS.JS_FreeValue(m_Context, func);

@@ -242,6 +242,7 @@ globalThis.__tickComponents = function(group, dt) {
       arr.splice(i--, 1);
     }
   }
+  globalThis.__flushRefRw();
 };
 
 globalThis.__unregisterComponentTick = __unregisterComponentTick;
@@ -287,6 +288,31 @@ globalThis.__componentInit = function(scriptName, entityId) {
   __registerComponentTick(entityId, inst);
   inst.__needs_start = true;
   return true;
+};
+
+// ── RefRW auto-flush ──
+var __refRwPending = [];
+
+globalThis.__flushRefRw = function() {
+  var arr = __refRwPending;
+  for (var i = 0; i < arr.length; i++) {
+    var e = arr[i];
+    e.a.set(e.id, e.d);
+  }
+  arr.length = 0;
+};
+
+// ecs.get(Accessor, entity) — returns auto-flushed ref
+globalThis.ecs.get = function(accessor, eid) {
+  if (accessor.__jsComp) {
+    var s = __js_comp[accessor.__name || accessor.name];
+    return s ? s[eid] : undefined;
+  }
+  var data = accessor.get(eid);
+  if (data != null && accessor.set) {
+    __refRwPending.push({ a: accessor, id: eid, d: data });
+  }
+  return data;
 };
 ";
 
@@ -489,6 +515,7 @@ globalThis.__componentInit = function(scriptName, entityId) {
 
         var scriptId = "system:" + systemName;
         m_Vm.CallFunction(scriptId, "onUpdate", stateRef);
+        m_Vm.FlushRefRw();
       }
 
       // Tick Component-class instances (update lifecycle) — must happen here because
