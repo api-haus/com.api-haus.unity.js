@@ -16,20 +16,10 @@ namespace UnityJS.Entities.Core
   /// </summary>
   public static class JsComponentStore
   {
-    const int MaxSlots = 64;
+    const int MaxSlots = JsBridgeState.MaxSlots;
     static readonly byte[] s_jsCompKey = QJS.U8("__js_comp");
 
-    static readonly Dictionary<string, int> s_nameToSlot = new();
-    static readonly string[] s_slotToName = new string[MaxSlots];
-    static readonly Dictionary<string, Dictionary<string, string>> s_schemas = new();
-
-    // Tracks which JS components each entity has (for cleanup)
-    static readonly Dictionary<int, HashSet<string>> s_entityComponents = new();
-
-    // Tracks which entities already have JsDataCleanup (avoid duplicate AddComponent)
-    static readonly HashSet<int> s_entitiesWithCleanup = new();
-
-    static int s_nextSlot;
+    static JsBridgeState B => JsRuntimeManager.Instance?.BridgeState as JsBridgeState;
 
     public static unsafe void Register(JSContext ctx)
     {
@@ -79,40 +69,42 @@ namespace UnityJS.Entities.Core
 
     public static void Shutdown()
     {
-      s_nameToSlot.Clear();
-      s_schemas.Clear();
-      s_entityComponents.Clear();
-      s_entitiesWithCleanup.Clear();
-      s_nextSlot = 0;
-
-      for (var i = 0; i < MaxSlots; i++)
-        s_slotToName[i] = null;
+      // No-op — state is cleared by JsBridgeState.Dispose()
     }
 
     public static HashSet<string> GetEntityComponents(int entityId)
     {
-      return s_entityComponents.TryGetValue(entityId, out var set) ? set : null;
+      var b = B;
+      if (b == null) return null;
+      return b.EntityComponents.TryGetValue(entityId, out var set) ? set : null;
     }
 
     public static void CleanupEntity(int entityId)
     {
-      s_entityComponents.Remove(entityId);
-      s_entitiesWithCleanup.Remove(entityId);
+      var b = B;
+      if (b == null) return;
+      b.EntityComponents.Remove(entityId);
+      b.EntitiesWithCleanup.Remove(entityId);
     }
 
     public static string GetSlotName(int slot)
     {
-      return slot >= 0 && slot < MaxSlots ? s_slotToName[slot] : null;
+      var b = B;
+      if (b == null) return null;
+      return slot >= 0 && slot < MaxSlots ? b.SlotToName[slot] : null;
     }
 
     public static bool IsDefined(string name)
     {
-      return s_nameToSlot.ContainsKey(name);
+      var b = B;
+      return b != null && b.NameToSlot.ContainsKey(name);
     }
 
     public static int GetSlotForName(string name)
     {
-      return s_nameToSlot.TryGetValue(name, out var slot) ? slot : -1;
+      var b = B;
+      if (b == null) return -1;
+      return b.NameToSlot.TryGetValue(name, out var slot) ? slot : -1;
     }
 
     /// <summary>
@@ -180,6 +172,9 @@ namespace UnityJS.Entities.Core
       long* outTag
     )
     {
+      var b = B;
+      if (b == null) { SetUndefined(outU, outTag); return; }
+
       var name = ArgString(ctx, argv, 0);
 
       if (string.IsNullOrEmpty(name))
@@ -196,7 +191,7 @@ namespace UnityJS.Entities.Core
         return;
       }
 
-      if (s_nameToSlot.ContainsKey(name))
+      if (b.NameToSlot.ContainsKey(name))
       {
         // Tolerate re-definition for hot reload
         Log.Verbose("[JsComponentStore] ecs.define: '{0}' already defined (re-define tolerated)", name);
@@ -204,7 +199,7 @@ namespace UnityJS.Entities.Core
         return;
       }
 
-      if (s_nextSlot >= MaxSlots)
+      if (b.NextSlot >= MaxSlots)
       {
         Log.Error("[JsComponentStore] ecs.define: tag pool exhausted (max {0})", MaxSlots);
         SetUndefined(outU, outTag);
@@ -212,9 +207,9 @@ namespace UnityJS.Entities.Core
       }
 
       // Assign tag slot
-      var slot = s_nextSlot++;
-      s_nameToSlot[name] = slot;
-      s_slotToName[slot] = name;
+      var slot = b.NextSlot++;
+      b.NameToSlot[name] = slot;
+      b.SlotToName[slot] = name;
 
       // Register in JsComponentRegistry so ecs.query() resolves this name
       var tagType = GetTagType(slot);
@@ -251,6 +246,9 @@ namespace UnityJS.Entities.Core
       long* outTag
     )
     {
+      var b = B;
+      if (b == null) { SetUndefined(outU, outTag); return; }
+
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
       if (entityId <= 0)
@@ -268,7 +266,7 @@ namespace UnityJS.Entities.Core
         return;
       }
 
-      if (!s_nameToSlot.TryGetValue(name, out var slot))
+      if (!b.NameToSlot.TryGetValue(name, out var slot))
       {
         // Auto-define on first use (supports Component classes that skip explicit define)
         if (JsComponentRegistry.TryGetComponentType(name, out _))
@@ -278,16 +276,16 @@ namespace UnityJS.Entities.Core
           return;
         }
 
-        if (s_nextSlot >= MaxSlots)
+        if (b.NextSlot >= MaxSlots)
         {
           Log.Error("[JsComponentStore] ecs.add: tag pool exhausted (max {0})", MaxSlots);
           SetUndefined(outU, outTag);
           return;
         }
 
-        slot = s_nextSlot++;
-        s_nameToSlot[name] = slot;
-        s_slotToName[slot] = name;
+        slot = b.NextSlot++;
+        b.NameToSlot[name] = slot;
+        b.SlotToName[slot] = name;
 
         var tagType = GetTagType(slot);
         JsComponentRegistry.Register(name, tagType);
@@ -333,10 +331,10 @@ namespace UnityJS.Entities.Core
       QJS.JS_FreeValue(ctx, global);
 
       // Track entity → component mapping
-      if (!s_entityComponents.TryGetValue(entityId, out var components))
+      if (!b.EntityComponents.TryGetValue(entityId, out var components))
       {
         components = new HashSet<string>();
-        s_entityComponents[entityId] = components;
+        b.EntityComponents[entityId] = components;
       }
 
       components.Add(name);
@@ -360,7 +358,7 @@ namespace UnityJS.Entities.Core
       ecb.AddComponent(entity, GetTagType(slot));
 
       // Add JsDataCleanup if not already present
-      if (s_entitiesWithCleanup.Add(entityId))
+      if (b.EntitiesWithCleanup.Add(entityId))
         ecb.AddComponent(entity, new JsDataCleanup { entityId = entityId });
 
       // Return the data or true
@@ -385,6 +383,9 @@ namespace UnityJS.Entities.Core
       long* outTag
     )
     {
+      var b = B;
+      if (b == null) { SetUndefined(outU, outTag); return; }
+
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
       if (entityId <= 0)
@@ -402,7 +403,7 @@ namespace UnityJS.Entities.Core
         return;
       }
 
-      if (!s_nameToSlot.TryGetValue(name, out var slot))
+      if (!b.NameToSlot.TryGetValue(name, out var slot))
       {
         Log.Error("[JsComponentStore] ecs.remove: '{0}' not defined", name);
         SetUndefined(outU, outTag);
@@ -428,7 +429,7 @@ namespace UnityJS.Entities.Core
       QJS.JS_FreeValue(ctx, global);
 
       // Update tracking
-      if (s_entityComponents.TryGetValue(entityId, out var components))
+      if (b.EntityComponents.TryGetValue(entityId, out var components))
         components.Remove(name);
 
       // Remove ECS tag via ECB
@@ -462,6 +463,9 @@ namespace UnityJS.Entities.Core
       long* outTag
     )
     {
+      var b = B;
+      if (b == null) { SetBool(outU, outTag, ctx, false); return; }
+
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
       if (entityId <= 0)
@@ -478,10 +482,10 @@ namespace UnityJS.Entities.Core
       }
 
       // Check JS-defined components via data store
-      if (s_nameToSlot.ContainsKey(name))
+      if (b.NameToSlot.ContainsKey(name))
       {
         var has =
-          s_entityComponents.TryGetValue(entityId, out var components) && components.Contains(name);
+          b.EntityComponents.TryGetValue(entityId, out var components) && components.Contains(name);
         SetBool(outU, outTag, ctx, has);
         return;
       }

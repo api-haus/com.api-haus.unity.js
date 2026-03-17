@@ -357,6 +357,9 @@ globalThis.ecs.get = function(accessor, eid) {
       m_BridgesRegistered = false;
       m_Vm = vm;
 
+      // Ensure bridge state exists on new VM
+      m_Vm.BridgeState ??= new JsBridgeState();
+
       // If fulfillment already loaded bridges + glue, skip re-registration.
       // QueryBridge.Register and ComponentStore.Register overwrite ecs.query / ecs.add
       // which the glue scripts have already wrapped — re-registering undoes the wrapping.
@@ -390,9 +393,9 @@ globalThis.ecs.get = function(accessor, eid) {
 
     protected override void OnDestroy()
     {
+      // SharedStatic Persistent allocations — must be disposed exactly once
       JsECSBridge.Shutdown();
-      JsQueryBridge.Shutdown();
-      JsComponentStore.Shutdown();
+      // QueryBridge + ComponentStore state is cleared by JsBridgeState.Dispose()
     }
 
     void DiscoverAndLoadSystems()
@@ -426,14 +429,13 @@ globalThis.ecs.get = function(accessor, eid) {
     {
       var scriptId = "system:" + systemName;
 
-      // If the VM already has this module (e.g. world was recreated but VM persists),
-      // skip re-evaluation — QuickJS caches modules and re-eval returns stale namespace.
-      if (!m_Vm.HasScript(scriptId))
-        if (!m_Vm.LoadScriptAsModule(scriptId, source, resolvedId))
-        {
-          Log.Error("[JsSystemRunner] Failed to load system '{0}'", systemName);
-          return;
-        }
+      // Always force fresh evaluation — ReloadScript frees any stale namespace
+      // and appends ?v=N to bypass QuickJS module cache.
+      if (!m_Vm.ReloadScript(scriptId, source, resolvedId))
+      {
+        Log.Error("[JsSystemRunner] Failed to load system '{0}'", systemName);
+        return;
+      }
 
       // System scripts have no entity (entityId = -1)
       var stateRef = m_Vm.CreateEntityState(scriptId, -1);

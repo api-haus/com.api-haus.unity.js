@@ -15,8 +15,6 @@ namespace UnityJS.Entities.Core
   /// </summary>
   static partial class JsECSBridge
   {
-    static Color s_currentDrawColor = Color.white;
-    static float s_currentDuration;
 
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
     static unsafe void Draw_SetColor(
@@ -39,7 +37,7 @@ namespace UnityJS.Entities.Core
       da = 1.0;
       if (argc >= 4)
         QJS.JS_ToFloat64(ctx, &da, argv[3]);
-      s_currentDrawColor = new Color((float)dr, (float)dg, (float)db, (float)da);
+      B.DrawColor = new Color((float)dr, (float)dg, (float)db, (float)da);
       SetUndefined(outU, outTag);
     }
 
@@ -56,7 +54,7 @@ namespace UnityJS.Entities.Core
     {
       double d;
       QJS.JS_ToFloat64(ctx, &d, argv[0]);
-      s_currentDuration = (float)d;
+      B.DrawDuration = (float)d;
       SetUndefined(outU, outTag);
     }
 
@@ -79,13 +77,13 @@ namespace UnityJS.Entities.Core
 
       var from = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       var to = JsStateExtensions.JsObjectToFloat3(ctx, argv[1]);
-      if (s_currentDuration > 0)
-        using (Draw.ingame.WithDuration(s_currentDuration))
+      if (B.DrawDuration > 0)
+        using (Draw.ingame.WithDuration(B.DrawDuration))
         {
-          Draw.ingame.Line(from, to, s_currentDrawColor);
+          Draw.ingame.Line(from, to, B.DrawColor);
         }
       else
-        Draw.ingame.Line(from, to, s_currentDrawColor);
+        Draw.ingame.Line(from, to, B.DrawColor);
 
       SetUndefined(outU, outTag);
     }
@@ -109,13 +107,13 @@ namespace UnityJS.Entities.Core
 
       var origin = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       var direction = JsStateExtensions.JsObjectToFloat3(ctx, argv[1]);
-      if (s_currentDuration > 0)
-        using (Draw.ingame.WithDuration(s_currentDuration))
+      if (B.DrawDuration > 0)
+        using (Draw.ingame.WithDuration(B.DrawDuration))
         {
-          Draw.ingame.Ray(origin, direction, s_currentDrawColor);
+          Draw.ingame.Ray(origin, direction, B.DrawColor);
         }
       else
-        Draw.ingame.Ray(origin, direction, s_currentDrawColor);
+        Draw.ingame.Ray(origin, direction, B.DrawColor);
 
       SetUndefined(outU, outTag);
     }
@@ -139,13 +137,13 @@ namespace UnityJS.Entities.Core
 
       var from = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       var to = JsStateExtensions.JsObjectToFloat3(ctx, argv[1]);
-      if (s_currentDuration > 0)
-        using (Draw.ingame.WithDuration(s_currentDuration))
+      if (B.DrawDuration > 0)
+        using (Draw.ingame.WithDuration(B.DrawDuration))
         {
-          Draw.ingame.Arrow(from, to, s_currentDrawColor);
+          Draw.ingame.Arrow(from, to, B.DrawColor);
         }
       else
-        Draw.ingame.Arrow(from, to, s_currentDrawColor);
+        Draw.ingame.Arrow(from, to, B.DrawColor);
 
       SetUndefined(outU, outTag);
     }
@@ -170,13 +168,13 @@ namespace UnityJS.Entities.Core
       var center = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       double radius;
       QJS.JS_ToFloat64(ctx, &radius, argv[1]);
-      if (s_currentDuration > 0)
-        using (Draw.ingame.WithDuration(s_currentDuration))
+      if (B.DrawDuration > 0)
+        using (Draw.ingame.WithDuration(B.DrawDuration))
         {
-          Draw.ingame.WireSphere(center, (float)radius, s_currentDrawColor);
+          Draw.ingame.WireSphere(center, (float)radius, B.DrawColor);
         }
       else
-        Draw.ingame.WireSphere(center, (float)radius, s_currentDrawColor);
+        Draw.ingame.WireSphere(center, (float)radius, B.DrawColor);
 
       SetUndefined(outU, outTag);
     }
@@ -200,13 +198,13 @@ namespace UnityJS.Entities.Core
 
       var center = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       var size = JsStateExtensions.JsObjectToFloat3(ctx, argv[1]);
-      if (s_currentDuration > 0)
-        using (Draw.ingame.WithDuration(s_currentDuration))
+      if (B.DrawDuration > 0)
+        using (Draw.ingame.WithDuration(B.DrawDuration))
         {
-          Draw.ingame.WireBox(center, size, s_currentDrawColor);
+          Draw.ingame.WireBox(center, size, B.DrawColor);
         }
       else
-        Draw.ingame.WireBox(center, size, s_currentDrawColor);
+        Draw.ingame.WireBox(center, size, B.DrawColor);
 
       SetUndefined(outU, outTag);
     }
@@ -232,13 +230,13 @@ namespace UnityJS.Entities.Core
       var end = JsStateExtensions.JsObjectToFloat3(ctx, argv[1]);
       double radius;
       QJS.JS_ToFloat64(ctx, &radius, argv[2]);
-      if (s_currentDuration > 0)
-        using (Draw.ingame.WithDuration(s_currentDuration))
+      if (B.DrawDuration > 0)
+        using (Draw.ingame.WithDuration(B.DrawDuration))
         {
-          Draw.ingame.WireCapsule(start, end, (float)radius, s_currentDrawColor);
+          Draw.ingame.WireCapsule(start, end, (float)radius, B.DrawColor);
         }
       else
-        Draw.ingame.WireCapsule(start, end, (float)radius, s_currentDrawColor);
+        Draw.ingame.WireCapsule(start, end, (float)radius, B.DrawColor);
 
       SetUndefined(outU, outTag);
     }
@@ -263,13 +261,13 @@ namespace UnityJS.Entities.Core
       var center = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       double radius;
       QJS.JS_ToFloat64(ctx, &radius, argv[1]);
-      if (s_currentDuration > 0)
-        using (Draw.ingame.WithDuration(s_currentDuration))
+      if (B.DrawDuration > 0)
+        using (Draw.ingame.WithDuration(B.DrawDuration))
         {
-          Draw.ingame.xz.Circle(center, (float)radius, s_currentDrawColor);
+          Draw.ingame.xz.Circle(center, (float)radius, B.DrawColor);
         }
       else
-        Draw.ingame.xz.Circle(center, (float)radius, s_currentDrawColor);
+        Draw.ingame.xz.Circle(center, (float)radius, B.DrawColor);
 
       SetUndefined(outU, outTag);
     }
@@ -293,13 +291,13 @@ namespace UnityJS.Entities.Core
 
       var center = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       var size = JsStateExtensions.JsObjectToFloat3(ctx, argv[1]);
-      if (s_currentDuration > 0)
-        using (Draw.ingame.WithDuration(s_currentDuration))
+      if (B.DrawDuration > 0)
+        using (Draw.ingame.WithDuration(B.DrawDuration))
         {
-          Draw.ingame.SolidBox(center, size, s_currentDrawColor);
+          Draw.ingame.SolidBox(center, size, B.DrawColor);
         }
       else
-        Draw.ingame.SolidBox(center, size, s_currentDrawColor);
+        Draw.ingame.SolidBox(center, size, B.DrawColor);
 
       SetUndefined(outU, outTag);
     }
@@ -325,13 +323,13 @@ namespace UnityJS.Entities.Core
       var normal = JsStateExtensions.JsObjectToFloat3(ctx, argv[1]);
       double radius;
       QJS.JS_ToFloat64(ctx, &radius, argv[2]);
-      if (s_currentDuration > 0)
-        using (Draw.ingame.WithDuration(s_currentDuration))
+      if (B.DrawDuration > 0)
+        using (Draw.ingame.WithDuration(B.DrawDuration))
         {
-          Draw.ingame.SolidCircle(center, normal, (float)radius, s_currentDrawColor);
+          Draw.ingame.SolidCircle(center, normal, (float)radius, B.DrawColor);
         }
       else
-        Draw.ingame.SolidCircle(center, normal, (float)radius, s_currentDrawColor);
+        Draw.ingame.SolidCircle(center, normal, (float)radius, B.DrawColor);
 
       SetUndefined(outU, outTag);
     }
@@ -357,13 +355,13 @@ namespace UnityJS.Entities.Core
       var text = QJS.ToManagedString(ctx, argv[1]);
       if (text != null)
       {
-        if (s_currentDuration > 0)
-          using (Draw.ingame.WithDuration(s_currentDuration))
+        if (B.DrawDuration > 0)
+          using (Draw.ingame.WithDuration(B.DrawDuration))
           {
-            Draw.ingame.Label2D(position, text, s_currentDrawColor);
+            Draw.ingame.Label2D(position, text, B.DrawColor);
           }
         else
-          Draw.ingame.Label2D(position, text, s_currentDrawColor);
+          Draw.ingame.Label2D(position, text, B.DrawColor);
       }
 
       SetUndefined(outU, outTag);

@@ -21,6 +21,7 @@ namespace UnityJS.Entities.PlayModeTests
     {
       QJSShim.qjs_shim_reset();
       m_Manager = new JsRuntimeManager();
+      m_Manager.BridgeState ??= new JsBridgeState();
 
       // Register all ECS bridge functions
       JsECSBridge.RegisterFunctions(Ctx);

@@ -84,6 +84,8 @@ namespace UnityJS.Entities.Core
   /// </summary>
   public static partial class JsECSBridge
   {
+    static JsBridgeState B => Runtime.JsRuntimeManager.Instance?.BridgeState as JsBridgeState;
+
     struct BurstContextMarker { }
 
     struct NextEntityIdMarker { }

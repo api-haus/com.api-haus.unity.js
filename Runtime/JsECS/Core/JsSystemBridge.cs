@@ -18,7 +18,7 @@ namespace UnityJS.Entities.Core
     static readonly SharedStatic<double> s_elapsedTime =
       SharedStatic<double>.GetOrCreate<ElapsedTimeMarker>();
 
-    static Random s_random;
+    static JsBridgeState B => Runtime.JsRuntimeManager.Instance?.BridgeState as JsBridgeState;
 
     public static void UpdateContext(float deltaTime, double elapsedTime)
     {
@@ -28,7 +28,8 @@ namespace UnityJS.Entities.Core
 
     public static unsafe void Register(JSContext ctx)
     {
-      s_random = new Random((uint)System.Environment.TickCount | 1u);
+      var b = B;
+      if (b != null) b.SystemRandom = new Random((uint)System.Environment.TickCount | 1u);
 
       var ns = QJS.JS_NewObject(ctx);
 
@@ -92,7 +93,9 @@ namespace UnityJS.Entities.Core
         max = (float)d;
       }
 
-      var value = s_random.NextFloat(min, max);
+      var b = B;
+      if (b == null) { SetFloat(outU, outTag, ctx, 0); return; }
+      var value = b.SystemRandom.NextFloat(min, max);
       SetFloat(outU, outTag, ctx, value);
     }
 
@@ -118,7 +121,9 @@ namespace UnityJS.Entities.Core
         max = i;
       }
 
-      var value = s_random.NextInt(min, max + 1);
+      var b = B;
+      if (b == null) { SetInt(outU, outTag, ctx, 0); return; }
+      var value = b.SystemRandom.NextInt(min, max + 1);
       SetInt(outU, outTag, ctx, value);
     }
   }

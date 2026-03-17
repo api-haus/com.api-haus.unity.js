@@ -34,6 +34,13 @@ namespace UnityJS.Runtime
     public bool IsValid => !m_Context.IsNull;
 
     /// <summary>
+    /// Instance-scoped bridge state. Set by the Entities layer on first bridge registration.
+    /// Disposed atomically with the VM. Typed as object to avoid circular assembly reference.
+    /// </summary>
+    public IDisposable BridgeState { get; set; }
+
+
+    /// <summary>
     /// Returns true if a script module with this ID is already loaded.
     /// </summary>
     public bool HasScript(string scriptId)
@@ -506,6 +513,8 @@ namespace UnityJS.Runtime
 
     public void Dispose()
     {
+      BridgeState?.Dispose();
+
       foreach (var kv in m_StateRefs)
         QJS.JS_FreeValue(m_Context, kv.Value);
       m_StateRefs.Clear();

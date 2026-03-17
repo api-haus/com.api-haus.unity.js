@@ -23,6 +23,14 @@ namespace UnityJS.Runtime
     // Track which search paths we've registered as FileSystemScriptSources
     static readonly Dictionary<string, string> s_pathToSourceId = new();
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetSession()
+    {
+      s_initialized = false;
+      s_defaultScriptsPath = null;
+      s_pathToSourceId.Clear();
+    }
+
     public static string DefaultScriptsPath
     {
       get

@@ -32,6 +32,10 @@ namespace UnityJS.Entities.Systems.Support
     protected override void OnStartRunning()
     {
       m_Vm = JsRuntimeManager.Instance ?? JsRuntimeManager.GetOrCreate();
+
+      // Create bridge state if not yet set (first system to touch the VM)
+      m_Vm.BridgeState ??= new JsBridgeState();
+
       JsScriptSearchPaths.Initialize();
 
       // Register ALL bridges before any script evaluation — module imports

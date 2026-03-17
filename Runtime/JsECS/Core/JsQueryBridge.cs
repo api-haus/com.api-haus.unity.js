@@ -4,6 +4,7 @@ namespace UnityJS.Entities.Core
   using AOT;
   using Components;
   using QJS;
+  using Runtime;
   using Unity.Collections;
   using Unity.Collections.LowLevel.Unsafe;
   using Unity.Entities;
@@ -11,17 +12,14 @@ namespace UnityJS.Entities.Core
 
   public static class JsQueryBridge
   {
-    static readonly Dictionary<int, EntityQuery> s_queryCache = new();
-    static readonly Dictionary<int, (ComponentType[] all, ComponentType[] none)> s_pendingQueries =
-      new();
-    static readonly Dictionary<int, int[]> s_precomputedIds = new();
-    static EntityManager s_entityManager;
-    static bool s_initialized;
+    static JsBridgeState B => JsRuntimeManager.Instance?.BridgeState as JsBridgeState;
 
     public static void Initialize(EntityManager entityManager)
     {
-      s_entityManager = entityManager;
-      s_initialized = true;
+      var b = B;
+      if (b == null) return;
+      b.QueryEntityManager = entityManager;
+      b.QueryInitialized = true;
     }
 
     /// <summary>
@@ -31,17 +29,18 @@ namespace UnityJS.Entities.Core
     /// </summary>
     public static void FlushPendingQueries(EntityManager entityManager)
     {
-      if (s_pendingQueries.Count == 0)
+      var b = B;
+      if (b == null || b.PendingQueries.Count == 0)
         return;
 
-      foreach (var kvp in s_pendingQueries)
+      foreach (var kvp in b.PendingQueries)
       {
         var (all, none) = kvp.Value;
         var desc = new EntityQueryDesc { All = all, None = none };
-        s_queryCache[kvp.Key] = entityManager.CreateEntityQuery(desc);
+        b.QueryCache[kvp.Key] = entityManager.CreateEntityQuery(desc);
       }
 
-      s_pendingQueries.Clear();
+      b.PendingQueries.Clear();
     }
 
     /// <summary>
@@ -51,7 +50,10 @@ namespace UnityJS.Entities.Core
     /// </summary>
     public static void PrecomputeQueryResults(EntityManager entityManager)
     {
-      foreach (var kvp in s_queryCache)
+      var b = B;
+      if (b == null) return;
+
+      foreach (var kvp in b.QueryCache)
       {
         var query = kvp.Value;
         if (query == default)
@@ -77,19 +79,22 @@ namespace UnityJS.Entities.Core
         if (count < ids.Length)
           System.Array.Resize(ref ids, count);
 
-        s_precomputedIds[kvp.Key] = ids;
+        b.PrecomputedIds[kvp.Key] = ids;
       }
     }
 
     public static void Shutdown()
     {
-      foreach (var kvp in s_queryCache)
+      var b = B;
+      if (b == null) return;
+
+      foreach (var kvp in b.QueryCache)
         if (kvp.Value != default)
           kvp.Value.Dispose();
-      s_queryCache.Clear();
-      s_pendingQueries.Clear();
-      s_precomputedIds.Clear();
-      s_initialized = false;
+      b.QueryCache.Clear();
+      b.PendingQueries.Clear();
+      b.PrecomputedIds.Clear();
+      b.QueryInitialized = false;
     }
 
     public static unsafe void Register(JSContext ctx)
@@ -130,7 +135,8 @@ namespace UnityJS.Entities.Core
       long* outTag
     )
     {
-      if (!s_initialized)
+      var b = B;
+      if (b == null || !b.QueryInitialized)
       {
         SetResult(outU, outTag, QJS.JS_NewArray(ctx));
         return;
@@ -182,7 +188,7 @@ namespace UnityJS.Entities.Core
       var hash = ComputeQueryHash(allComponents, noneComponents);
 
       // Return precomputed results if available
-      if (s_precomputedIds.TryGetValue(hash, out var ids) && ids.Length > 0)
+      if (b.PrecomputedIds.TryGetValue(hash, out var ids) && ids.Length > 0)
       {
         // Use a plain JS array — Int32Array via qjs_shim_new_int32array references
         // the source buffer, which is invalid after the callback returns.
@@ -194,12 +200,12 @@ namespace UnityJS.Entities.Core
       }
 
       // No precomputed results — register for creation from system context next frame
-      if (!s_queryCache.ContainsKey(hash))
+      if (!b.QueryCache.ContainsKey(hash))
       {
         var allArray = allComponents.ToArray();
         var noneArray =
           noneComponents.Count > 0 ? noneComponents.ToArray() : System.Array.Empty<ComponentType>();
-        s_pendingQueries[hash] = (allArray, noneArray);
+        b.PendingQueries[hash] = (allArray, noneArray);
       }
 
       // Return empty for this frame

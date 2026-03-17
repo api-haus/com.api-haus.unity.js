@@ -15,40 +15,41 @@ namespace UnityJS.Entities.Core
   /// </summary>
   static partial class JsECSBridge
   {
-    static Dictionary<string, InputAction> s_inputActions;
-    static bool s_inputInitialized;
-
     public static void InitializeInputSystem(InputActionAsset inputActionAsset)
     {
-      if (s_inputActions == null)
-        s_inputActions = new Dictionary<string, InputAction>();
+      var b = B;
+      if (b == null) return;
 
-      s_inputActions.Clear();
+      if (b.InputActions == null)
+        b.InputActions = new Dictionary<string, InputAction>();
+
+      b.InputActions.Clear();
 
       if (inputActionAsset == null)
       {
-        s_inputInitialized = false;
+        b.InputInitialized = false;
         return;
       }
 
       foreach (var action in inputActionAsset)
       {
-        s_inputActions[action.name] = action;
+        b.InputActions[action.name] = action;
         action.Enable();
       }
 
-      s_inputInitialized = true;
+      b.InputInitialized = true;
     }
 
     static unsafe InputAction GetInputAction(JSContext ctx, JSValue* argv, int index)
     {
-      if (!s_inputInitialized || s_inputActions == null)
+      var b = B;
+      if (b == null || !b.InputInitialized || b.InputActions == null)
         return null;
 
       var actionName = ArgString(ctx, argv, index);
       if (string.IsNullOrEmpty(actionName))
         return null;
-      s_inputActions.TryGetValue(actionName, out var action);
+      b.InputActions.TryGetValue(actionName, out var action);
       return action;
     }
 

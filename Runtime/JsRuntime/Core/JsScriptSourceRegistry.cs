@@ -12,6 +12,15 @@ namespace UnityJS.Runtime
     static readonly List<IJsScriptSource> s_sources = new();
     static readonly object s_lock = new();
 
+    [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetSession()
+    {
+      lock (s_lock)
+      {
+        s_sources.Clear();
+      }
+    }
+
     public static void Register(IJsScriptSource source)
     {
       if (source == null)
