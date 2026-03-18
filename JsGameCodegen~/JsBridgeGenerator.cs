@@ -952,6 +952,11 @@ namespace JsGameCodegen
       sb.AppendLine("\t\t\tvar entity = JsECSBridge.GetEntityFromIdBurst(entityId);");
       sb.AppendLine("\t\t\tif (entity == Entity.Null || !s_lookup.Data.HasComponent(entity))");
       sb.AppendLine("\t\t\t{");
+      sb.AppendLine(
+        "\t\t\t\tUnityEngine.Debug.LogError(\"[JsBridge] "
+          + fullTypeName
+          + ".set: entity \" + entityId + \" not found or missing component\");"
+      );
       sb.AppendLine("\t\t\t\tvar undef = QJS.JS_UNDEFINED;");
       sb.AppendLine("\t\t\t\t*outU = undef.u;");
       sb.AppendLine("\t\t\t\t*outTag = undef.tag;");

@@ -1,25 +1,22 @@
 namespace UnityJS.Entities.Authoring
 {
-  using Components;
+  using System.Collections.Generic;
+  using Unity.Entities;
   using UnityEngine;
-#if ODIN_INSPECTOR
-  using Sirenix.OdinInspector;
-#endif
 
+  [AddComponentMenu("JS/Js Script Authoring")]
   [RequireComponent(typeof(JsScriptBufferAuthoring))]
   public class JsScriptAuthoring : MonoBehaviour
   {
-    [Tooltip("File name without .js extension, relative to Assets/StreamingAssets/unity.js")]
-    public JsScriptAssetReference script;
-
-#if ODIN_INSPECTOR
-    [FilePath(Extensions = "ts", ParentFolder = "Assets/StreamingAssets/unity.js")]
-#endif
     [Tooltip("Path relative to Assets/StreamingAssets/unity.js (e.g. components/slime_wander.ts)")]
     public string scriptPath;
 
-    public bool HasValidScript =>
-      script.IsValid || !string.IsNullOrEmpty(scriptPath);
+    [Tooltip("How this entity uses transforms. Set to Dynamic if the script modifies LocalTransform.")]
+    public TransformUsageFlags transformUsageType = TransformUsageFlags.Dynamic;
+
+    public List<JsSerializedProperty> propertyOverrides = new();
+
+    public bool HasValidScript => !string.IsNullOrEmpty(scriptPath);
 
     void Reset()
     {

@@ -12,7 +12,9 @@ namespace UnityJS.Entities.Systems.Support
   public partial class JsScriptFulfillmentSystem : SystemBase
   {
     JsRuntimeManager m_Vm;
+    JsRuntimeManager m_LastVm;
     EntityQuery m_RequestQuery;
+    EntityQuery m_ScriptQuery;
     ComponentLookup<LocalTransform> m_TransformLookup;
     BufferLookup<JsScript> m_ScriptBufferLookup;
 
@@ -20,6 +22,7 @@ namespace UnityJS.Entities.Systems.Support
     {
       JsEntityRegistry.Initialize();
       m_RequestQuery = GetEntityQuery(ComponentType.ReadWrite<JsScriptRequest>());
+      m_ScriptQuery = GetEntityQuery(ComponentType.ReadWrite<JsScript>());
       m_TransformLookup = GetComponentLookup<LocalTransform>();
       m_ScriptBufferLookup = GetBufferLookup<JsScript>(true);
     }
@@ -38,6 +41,11 @@ namespace UnityJS.Entities.Systems.Support
 
       JsScriptSearchPaths.Initialize();
 
+      // Ensure ECS bridge is initialized before we prime ECB context.
+      // Without this, UpdateBurstContext silently fails because s_initialized
+      // is false until JsSystemRunner (SimulationSystemGroup) calls it — too late.
+      JsECSBridge.Initialize(World);
+
       // Register ALL bridges before any script evaluation — module imports
       // (unity.js/ecs, unity.js/components) bind globals at eval time.
       m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
@@ -47,6 +55,8 @@ namespace UnityJS.Entities.Systems.Support
 
       m_Vm.LoadScriptFromString("__ecs_query_builder", JsSystemRunner.QueryBuilderSourceForTests);
       m_Vm.LoadScriptFromString("__ecs_component_glue", JsSystemRunner.ComponentGlueSourceForTests);
+
+      m_LastVm = m_Vm;
     }
 
     protected override void OnUpdate()
@@ -59,6 +69,26 @@ namespace UnityJS.Entities.Systems.Support
           m_Vm = JsRuntimeManager.Instance;
         else
           return;
+      }
+
+      // VM changed (domain reload destroyed the old one).
+      // Re-register bridges + glue on the new VM — OnStartRunning only ran
+      // on the old one. Scripts must import the glue-wrapped ecs.get (with
+      // auto-flush) not the raw bridge function.
+      if (m_Vm != m_LastVm)
+      {
+        m_LastVm = m_Vm;
+
+        m_Vm.BridgeState ??= new JsBridgeState();
+        JsECSBridge.Initialize(World);
+        m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
+        m_Vm.RegisterBridgeNow(JsQueryBridge.Register);
+        m_Vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
+        m_Vm.RegisterBridgeNow(JsComponentStore.Register);
+        m_Vm.LoadScriptFromString("__ecs_query_builder", JsSystemRunner.QueryBuilderSourceForTests);
+        m_Vm.LoadScriptFromString("__ecs_component_glue", JsSystemRunner.ComponentGlueSourceForTests);
+
+        InvalidateStaleScripts();
       }
 
       if (m_RequestQuery.IsEmptyIgnoreFilter)
@@ -183,7 +213,10 @@ namespace UnityJS.Entities.Systems.Support
           m_ScriptBufferLookup.Update(this);
           JsECSBridge.UpdateBurstContext(ecb, 0f, m_TransformLookup, m_ScriptBufferLookup);
 
-          if (!m_Vm.TryComponentInit(scriptName, entityId))
+          var propsJson = request.propertiesJson.IsEmpty
+            ? null
+            : request.propertiesJson.ToString();
+          if (!m_Vm.TryComponentInit(scriptName, entityId, propsJson))
             m_Vm.CallInit(scriptName, stateRef);
 
           JsECSBridge.ClearBurstContext();
@@ -197,6 +230,35 @@ namespace UnityJS.Entities.Systems.Support
       entities.Dispose();
       ecb.Playback(EntityManager);
       JsEntityRegistry.CommitPendingCreations(EntityManager);
+    }
+
+    void InvalidateStaleScripts()
+    {
+      var entities = m_ScriptQuery.ToEntityArray(Allocator.Temp);
+      foreach (var entity in entities)
+      {
+        if (!EntityManager.Exists(entity))
+          continue;
+
+        // Clear stale JsScript entries (stateRefs point to dead VM)
+        var scripts = EntityManager.GetBuffer<JsScript>(entity);
+        scripts.Clear();
+
+        // Unfulfill all requests so they get re-processed
+        if (EntityManager.HasBuffer<JsScriptRequest>(entity))
+        {
+          var requests = EntityManager.GetBuffer<JsScriptRequest>(entity);
+          for (var i = 0; i < requests.Length; i++)
+          {
+            var r = requests[i];
+            r.fulfilled = false;
+            requests[i] = r;
+          }
+        }
+      }
+
+      entities.Dispose();
+      Log.Debug("[JsFulfillment] VM changed — invalidated stale scripts for re-fulfillment");
     }
 
     static bool HasScriptWithHash(DynamicBuffer<JsScript> scripts, Hash128 hash)

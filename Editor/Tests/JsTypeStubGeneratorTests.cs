@@ -97,25 +97,6 @@ namespace UnityJS.Editor.Tests
       );
     }
 
-    [Test]
-    public void EnumClasses_HaveDescriptionsField_WhenDocsExist()
-    {
-      var enumType = FindType("UnityJS.Entities.Generated.JsWanderPlaneEnum");
-      if (enumType == null)
-      {
-        Assert.Inconclusive("JsWanderPlaneEnum not found — project enums may not be compiled");
-        return;
-      }
-
-      var field = enumType.GetField("Descriptions", BindingFlags.Public | BindingFlags.Static);
-      Assert.IsNotNull(field, "Descriptions field should exist on enum with docs");
-
-      var dict = field.GetValue(null) as Dictionary<string, string>;
-      Assert.IsNotNull(dict, "Descriptions should be a Dictionary<string, string>");
-      Assert.IsTrue(dict.ContainsKey(""), "Should have enum-level description");
-      Assert.IsTrue(dict.ContainsKey("XY"), "Should have member-level description for XY");
-    }
-
     // ── Doc Propagation to Stubs ─────────────────────────────────
 
     [Test]
@@ -157,38 +138,6 @@ namespace UnityJS.Editor.Tests
       }
     }
 
-    [Test]
-    public void GenerateContent_EnumDocsAppearInStub()
-    {
-      var enumType = FindType("UnityJS.Entities.Generated.JsWanderPlaneEnum");
-      if (enumType == null)
-      {
-        Assert.Inconclusive("JsWanderPlaneEnum not found");
-        return;
-      }
-
-      var field = enumType.GetField("Descriptions", BindingFlags.Public | BindingFlags.Static);
-      if (field == null)
-      {
-        Assert.Fail("Descriptions field missing on enum — source generator did not emit docs");
-        return;
-      }
-
-      var dict = field.GetValue(null) as Dictionary<string, string>;
-
-      // Enum-level doc
-      if (dict != null && dict.TryGetValue("", out var enumDesc))
-      {
-        var enumIdx = m_Content.IndexOf("export const WANDER_PLANE:", StringComparison.Ordinal);
-        Assert.Greater(enumIdx, 0, "export const WANDER_PLANE should exist in module");
-
-        var docLine = $"/** {enumDesc} */";
-        var docIdx = m_Content.IndexOf(docLine, StringComparison.Ordinal);
-        Assert.Greater(docIdx, 0, $"Enum doc should appear in stub: {docLine}");
-        Assert.Less(docIdx, enumIdx, "Enum doc should appear BEFORE export const");
-      }
-    }
-
     // ── ReadOnly component (NeedSetters = false) ─────────────────
 
     [Test]
@@ -205,35 +154,6 @@ namespace UnityJS.Editor.Tests
         "export const ECSCharacterState: ReadonlyComponentAccessor<ECSCharacterState>;",
         m_Content
       );
-    }
-
-    // ── Enum field types ─────────────────────────────────────────
-
-    [Test]
-    public void GenerateContent_EnumFieldUsesEnumTypeName()
-    {
-      // SlimeWanderConfig.wanderPlane should map to WanderPlane type
-      if (!m_Content.Contains("interface SlimeWanderConfig"))
-      {
-        Assert.Inconclusive("SlimeWanderConfig not in stub");
-        return;
-      }
-
-      StringAssert.Contains("wanderPlane: WanderPlane;", m_Content);
-    }
-
-    // ── Enum type alias ─────────────────────────────────────────
-
-    [Test]
-    public void GenerateContent_EnumHasTypeAlias()
-    {
-      if (!m_Content.Contains("export const WANDER_PLANE:"))
-      {
-        Assert.Inconclusive("WANDER_PLANE not in stub");
-        return;
-      }
-
-      StringAssert.Contains("type WanderPlane = ", m_Content);
     }
 
     // ── tsc --noEmit validation ─────────────────────────────────

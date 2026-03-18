@@ -247,29 +247,6 @@ namespace UnityJS.Entities.PlayModeTests
       // If we got here without LogError assertions, all scripts are executing cleanly
     }
 
-    // ── Slime wander system script runs with entities ───────────
-
-    [UnityTest]
-    public IEnumerator SlimeWander_ExecutesWithEntity()
-    {
-      // Create a slime-like entity with the components slime_wander.js queries:
-      // slime_wander_config, slime_wander_state, local_transform
-      // We can't easily create these bridged components from test code without
-      // the codegen registration, so instead we verify the system script loaded
-      // and runs without crashing (query returns empty = safe no-op).
-
-      yield return null;
-      yield return null;
-
-      // slime_wander.js should be loaded and running (zero slimes = no work, no crash)
-      for (var i = 0; i < 10; i++)
-        yield return null;
-
-      // If we get here, slime_wander.js loaded and its onUpdate ran without error
-      // even with zero matching entities (ecs.query returns empty array)
-      Assert.Pass("slime_wander.js loaded and executed without errors");
-    }
-
     // ── Character input system script runs with entities ────────
 
     [UnityTest]

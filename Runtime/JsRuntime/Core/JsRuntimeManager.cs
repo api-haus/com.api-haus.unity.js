@@ -441,10 +441,10 @@ namespace UnityJS.Runtime
     }
 
     /// <summary>
-    /// Calls globalThis.__componentInit(scriptName, entityId).
+    /// Calls globalThis.__componentInit(scriptName, entityId, propsJson).
     /// Returns true if the module's default export was a Component class (handled).
     /// </summary>
-    public unsafe bool TryComponentInit(string scriptName, int entityId)
+    public unsafe bool TryComponentInit(string scriptName, int entityId, string propertiesJson = null)
     {
       var global = QJS.JS_GetGlobalObject(m_Context);
       var handled = false;
@@ -457,11 +457,23 @@ namespace UnityJS.Runtime
           var scriptBytes = Encoding.UTF8.GetBytes(scriptName + '\0');
           fixed (byte* pScript = scriptBytes)
           {
-            var argv = stackalloc JSValue[2];
+            var argc = propertiesJson != null ? 3 : 2;
+            var argv = stackalloc JSValue[3];
             argv[0] = QJS.JS_NewString(m_Context, pScript);
             argv[1] = QJS.NewInt32(m_Context, entityId);
 
-            var result = QJS.JS_Call(m_Context, func, global, 2, argv);
+            if (propertiesJson != null)
+            {
+              var propsBytes = Encoding.UTF8.GetBytes(propertiesJson + '\0');
+              fixed (byte* pProps = propsBytes)
+                argv[2] = QJS.JS_NewString(m_Context, pProps);
+            }
+            else
+            {
+              argv[2] = QJS.JS_UNDEFINED;
+            }
+
+            var result = QJS.JS_Call(m_Context, func, global, argc, argv);
             if (QJS.IsException(result))
               LogException($"TryComponentInit({scriptName})");
             else
@@ -469,6 +481,8 @@ namespace UnityJS.Runtime
 
             QJS.JS_FreeValue(m_Context, result);
             QJS.JS_FreeValue(m_Context, argv[0]);
+            if (propertiesJson != null)
+              QJS.JS_FreeValue(m_Context, argv[2]);
           }
         }
 
@@ -498,6 +512,21 @@ namespace UnityJS.Runtime
       var versionedFilename = filename + "?v=" + version;
 
       return LoadScriptAsModule(scriptName, source, versionedFilename);
+    }
+
+    /// <summary>
+    /// Simulates a hot reload for a script, following the same path as
+    /// JsHotReloadSystem: re-read source from disk, call ReloadScript().
+    /// </summary>
+    public bool SimulateHotReload(string scriptName)
+    {
+      if (!JsScriptSourceRegistry.TryReadScript(scriptName, out var source, out var resolvedId))
+      {
+        Log.Error("[JsRuntime] SimulateHotReload: script not found: {0}", scriptName);
+        return false;
+      }
+
+      return ReloadScript(scriptName, source, resolvedId);
     }
 
     public void RegisterBridgeNow(Action<JSContext> registration)

@@ -281,5 +281,103 @@ export function getQuery() { return q !== undefined; }
       Assert.IsTrue(m_Manager.LoadScriptAsModule("test_toplevel_query", source, "<test>"),
         "Module with top-level query() should load without error");
     }
+
+    [Test]
+    public void AutoFlush_DuplicateGet_ReturnsSameObject()
+    {
+      // Regression: multiple ecs.get() calls for the same (accessor, eid) in one
+      // flush window must return the same JS object so modifications accumulate.
+      // Before the fix, each get() created a new native-read object and pushed a
+      // separate pending entry — the last (stale) entry overwrote valid writes.
+      EvalGlobalVoid(@"
+        // Mock accessor with get/set
+        var _mockData = { value: 10 };
+        var _mockWritten = null;
+        var _mockAccessor = {
+          __name: 'Mock',
+          get: function(eid) { return { value: _mockData.value }; },
+          set: function(eid, d) { _mockWritten = d; }
+        };
+      ");
+
+      // Two get() calls for the same (accessor, eid) — must return same object
+      var same = EvalGlobalBool(@"
+        var a = ecs.get(_mockAccessor, 1);
+        var b = ecs.get(_mockAccessor, 1);
+        a === b;
+      ");
+      Assert.IsTrue(same, "Duplicate ecs.get() must return the same object reference");
+    }
+
+    [Test]
+    public void AutoFlush_DuplicateGet_FlushesOnce()
+    {
+      // Verify that duplicate get() calls produce exactly one set() call on flush.
+      EvalGlobalVoid(@"
+        var _flushCount = 0;
+        var _flushAccessor = {
+          __name: 'FlushTest',
+          get: function(eid) { return { x: 0 }; },
+          set: function(eid, d) { _flushCount++; }
+        };
+      ");
+
+      EvalGlobalVoid(@"
+        ecs.get(_flushAccessor, 1);
+        ecs.get(_flushAccessor, 1);
+        ecs.get(_flushAccessor, 1);
+        __flushRefRw();
+      ");
+
+      var count = EvalGlobalInt("_flushCount");
+      Assert.AreEqual(1, count, "Three get() calls for same (accessor, eid) should produce exactly one set()");
+    }
+
+    [Test]
+    public void AutoFlush_DuplicateGet_LastModificationWins()
+    {
+      // The core regression scenario: start() reads but doesn't modify,
+      // update() reads and modifies. The modification must survive the flush.
+      EvalGlobalVoid(@"
+        var _lastWritten = null;
+        var _modAccessor = {
+          __name: 'ModTest',
+          get: function(eid) { return { pos: 0 }; },
+          set: function(eid, d) { _lastWritten = d; }
+        };
+      ");
+
+      EvalGlobalVoid(@"
+        // Simulate start() — reads but doesn't modify
+        var lt1 = ecs.get(_modAccessor, 1);
+        // Simulate update() — reads and modifies
+        var lt2 = ecs.get(_modAccessor, 1);
+        lt2.pos = 42;
+        __flushRefRw();
+      ");
+
+      var pos = EvalGlobalInt("_lastWritten.pos");
+      Assert.AreEqual(42, pos, "Modification from second get() must survive flush");
+    }
+
+    [Test]
+    public void AutoFlush_DifferentEntities_IndependentEntries()
+    {
+      // get() for different entity IDs must NOT share objects.
+      EvalGlobalVoid(@"
+        var _indepAccessor = {
+          __name: 'Indep',
+          get: function(eid) { return { id: eid }; },
+          set: function(eid, d) {}
+        };
+      ");
+
+      var independent = EvalGlobalBool(@"
+        var e1 = ecs.get(_indepAccessor, 1);
+        var e2 = ecs.get(_indepAccessor, 2);
+        e1 !== e2 && e1.id === 1 && e2.id === 2;
+      ");
+      Assert.IsTrue(independent, "Different entity IDs must produce independent objects");
+    }
   }
 }

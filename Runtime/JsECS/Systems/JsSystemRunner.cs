@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("UnityJS.Entities.PlayModeTests")]
+[assembly: InternalsVisibleTo("Project.Tests.PlayMode")]
 
 namespace UnityJS.Entities.Systems
 {
@@ -277,12 +278,16 @@ globalThis.ecs.add = function(eid, comp, data) {
 };
 
 // Component init for fulfillment pipeline
-globalThis.__componentInit = function(scriptName, entityId) {
+globalThis.__componentInit = function(scriptName, entityId, propsJson) {
   var mod = globalThis.__lastLoadedModule;
   if (!mod || !mod.default) return false;
   var cls = mod.default;
   if (!cls.__jsComp) return false;
   var inst = new cls();
+  if (propsJson) {
+    var overrides = JSON.parse(propsJson);
+    for (var k in overrides) inst[k] = overrides[k];
+  }
   inst.entity = entityId;
   _nativeAdd(entityId, cls.name, inst);
   __registerComponentTick(entityId, inst);
@@ -303,14 +308,24 @@ globalThis.__flushRefRw = function() {
 };
 
 // ecs.get(Accessor, entity) — returns auto-flushed ref
+// If the same (accessor, eid) was already get()'d this flush window,
+// returns the SAME JS object so all in-place modifications accumulate
+// on one object and a single set() call flushes the final state.
 globalThis.ecs.get = function(accessor, eid) {
   if (accessor.__jsComp) {
     var s = __js_comp[accessor.__name || accessor.name];
     return s ? s[eid] : undefined;
   }
+  // Return existing pending object for duplicate get() calls
+  for (var i = 0; i < __refRwPending.length; i++) {
+    var p = __refRwPending[i];
+    if (p.a === accessor && p.id === eid) return p.d;
+  }
   var data = accessor.get(eid);
   if (data != null && accessor.set) {
     __refRwPending.push({ a: accessor, id: eid, d: data });
+  } else if (data != null && !accessor.set) {
+    log.error('[ecs.get] accessor ' + (accessor.__name || '?') + ' has NO .set — auto-flush disabled!');
   }
   return data;
 };
