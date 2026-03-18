@@ -53,16 +53,14 @@ namespace UnityJS.Entities.PlayModeTests
 
       m_Vm = JsRuntimeManager.GetOrCreate();
 
-      if (!JsEntityRegistry.IsCreated)
-        JsEntityRegistry.Initialize(128_000);
-      else
-        JsEntityRegistry.Clear();
+      JsEntityRegistry.Dispose();
+      JsEntityRegistry.Initialize(128_000);
     }
 
     [UnityTearDown]
     public IEnumerator TearDown()
     {
-      JsEntityRegistry.Clear();
+      JsEntityRegistry.Dispose();
       var query = m_EntityManager.CreateEntityQuery(typeof(JsEntityId));
       m_EntityManager.DestroyEntity(query);
 

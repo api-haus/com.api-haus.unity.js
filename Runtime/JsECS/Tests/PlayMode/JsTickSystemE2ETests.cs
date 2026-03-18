@@ -45,10 +45,8 @@ namespace UnityJS.Entities.PlayModeTests
 
       JsScriptSearchPaths.AddSearchPath(s_testsPath, 0);
 
-      if (!JsEntityRegistry.IsCreated)
-        JsEntityRegistry.Initialize(64);
-      else
-        JsEntityRegistry.Clear();
+      JsEntityRegistry.Dispose();
+      JsEntityRegistry.Initialize(64);
 
       // Clear all test globals
       EvalGlobal("for (var k in globalThis) { if (k.startsWith('_e2e')) delete globalThis[k]; }");

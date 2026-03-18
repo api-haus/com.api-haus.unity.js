@@ -37,10 +37,8 @@ namespace UnityJS.Entities.PlayModeTests
 
       JsScriptSearchPaths.AddSearchPath(s_testsPath, 0);
 
-      if (!JsEntityRegistry.IsCreated)
-        JsEntityRegistry.Initialize(16);
-      else
-        JsEntityRegistry.Clear();
+      JsEntityRegistry.Dispose();
+      JsEntityRegistry.Initialize(16);
 
       // Clear globals
       ClearGlobal("_testInitCalled");
@@ -53,7 +51,7 @@ namespace UnityJS.Entities.PlayModeTests
     [UnityTearDown]
     public IEnumerator TearDown()
     {
-      JsEntityRegistry.Clear();
+      JsEntityRegistry.Dispose();
       JsScriptSearchPaths.RemoveSearchPath(s_testsPath);
       var query = m_EntityManager.CreateEntityQuery(typeof(JsEntityId));
       m_EntityManager.DestroyEntity(query);

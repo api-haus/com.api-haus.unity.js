@@ -4,7 +4,6 @@ namespace UnityJS.Entities.PlayModeTests
   using Components;
   using Core;
   using NUnit.Framework;
-  using Unity.Collections;
   using Unity.Entities;
   using Unity.Mathematics;
   using Unity.Transforms;
@@ -23,10 +22,8 @@ namespace UnityJS.Entities.PlayModeTests
       m_EntityManager = m_World.EntityManager;
       m_ECBSystem = m_World.GetExistingSystemManaged<EndSimulationEntityCommandBufferSystem>();
 
-      if (!JsEntityRegistry.IsCreated)
-        JsEntityRegistry.Initialize(16);
-      else
-        JsEntityRegistry.Clear();
+      JsEntityRegistry.Dispose();
+      JsEntityRegistry.Initialize(16);
 
       yield return null;
     }
@@ -39,7 +36,7 @@ namespace UnityJS.Entities.PlayModeTests
     [UnityTearDown]
     public IEnumerator TearDown()
     {
-      JsEntityRegistry.Clear();
+      JsEntityRegistry.Dispose();
       var query = m_EntityManager.CreateEntityQuery(typeof(JsEntityId));
       m_EntityManager.DestroyEntity(query);
       yield return null;
@@ -129,7 +126,6 @@ namespace UnityJS.Entities.PlayModeTests
       ecb = CreateECB();
       var destroyed = JsEntityRegistry.Destroy(id, ecb);
       Assert.IsTrue(destroyed);
-      Assert.IsTrue(JsEntityRegistry.IsMarkedForDestruction(id));
       Assert.IsTrue(JsEntityRegistry.Contains(id));
       yield return null;
       JsEntityRegistry.CommitPendingDestructions();
@@ -284,44 +280,6 @@ namespace UnityJS.Entities.PlayModeTests
 
     #endregion
 
-    #region Entity Version Safety
-
-    [UnityTest]
-    public IEnumerator SyncWithWorld_DetectsDestroyedEntity_AutoCleanup()
-    {
-      var ecb = CreateECB();
-      var id = JsEntityRegistry.Create(float3.zero, ecb);
-      yield return null;
-      JsEntityRegistry.CommitPendingCreations(m_EntityManager);
-      var entity = JsEntityRegistry.GetEntityFromId(id);
-      Assert.AreNotEqual(Entity.Null, entity);
-      m_EntityManager.DestroyEntity(entity);
-      JsEntityRegistry.SyncWithWorld(m_EntityManager);
-      Assert.AreEqual(Entity.Null, JsEntityRegistry.GetEntityFromId(id));
-      Assert.IsFalse(JsEntityRegistry.Contains(id));
-    }
-
-    [UnityTest]
-    public IEnumerator SyncWithWorld_RemovesExternallyDestroyedEntities()
-    {
-      var ecb = CreateECB();
-      var id1 = JsEntityRegistry.Create(float3.zero, ecb);
-      var id2 = JsEntityRegistry.Create(float3.zero, ecb);
-      var id3 = JsEntityRegistry.Create(float3.zero, ecb);
-      yield return null;
-      JsEntityRegistry.CommitPendingCreations(m_EntityManager);
-      Assert.AreEqual(3, JsEntityRegistry.Count);
-      var entity2 = JsEntityRegistry.GetEntityFromId(id2);
-      m_EntityManager.DestroyEntity(entity2);
-      JsEntityRegistry.SyncWithWorld(m_EntityManager);
-      Assert.AreEqual(2, JsEntityRegistry.Count);
-      Assert.IsTrue(JsEntityRegistry.Contains(id1));
-      Assert.IsFalse(JsEntityRegistry.Contains(id2));
-      Assert.IsTrue(JsEntityRegistry.Contains(id3));
-    }
-
-    #endregion
-
     #region Commit Order and Edge Cases
 
     [UnityTest]
@@ -370,42 +328,6 @@ namespace UnityJS.Entities.PlayModeTests
 
     #endregion
 
-    #region GetAll / Enumeration
-
-    [UnityTest]
-    public IEnumerator GetAllIds_ReturnsOnlyCommitted()
-    {
-      var ecb = CreateECB();
-      JsEntityRegistry.Create(float3.zero, ecb);
-      JsEntityRegistry.Create(float3.zero, ecb);
-      var idsBefore = JsEntityRegistry.GetAllIds(Allocator.Persistent);
-      Assert.AreEqual(0, idsBefore.Length);
-      idsBefore.Dispose();
-      yield return null;
-      JsEntityRegistry.CommitPendingCreations(m_EntityManager);
-      var idsAfter = JsEntityRegistry.GetAllIds(Allocator.Persistent);
-      Assert.AreEqual(2, idsAfter.Length);
-      idsAfter.Dispose();
-    }
-
-    [UnityTest]
-    public IEnumerator GetAllEntities_ReturnsOnlyCommitted()
-    {
-      var ecb = CreateECB();
-      JsEntityRegistry.Create(float3.zero, ecb);
-      JsEntityRegistry.Create(float3.zero, ecb);
-      var entitiesBefore = JsEntityRegistry.GetAllEntities(Allocator.Persistent);
-      Assert.AreEqual(0, entitiesBefore.Length);
-      entitiesBefore.Dispose();
-      yield return null;
-      JsEntityRegistry.CommitPendingCreations(m_EntityManager);
-      var entitiesAfter = JsEntityRegistry.GetAllEntities(Allocator.Persistent);
-      Assert.AreEqual(2, entitiesAfter.Length);
-      entitiesAfter.Dispose();
-    }
-
-    #endregion
-
     #region Capacity / Stress
 
     [UnityTest]
@@ -417,28 +339,6 @@ namespace UnityJS.Entities.PlayModeTests
       yield return null;
       JsEntityRegistry.CommitPendingCreations(m_EntityManager);
       Assert.AreEqual(50, JsEntityRegistry.Count);
-    }
-
-    #endregion
-
-    #region Clear / Lifecycle
-
-    [UnityTest]
-    public IEnumerator Clear_ResetsState()
-    {
-      var ecb = CreateECB();
-      JsEntityRegistry.Create(float3.zero, ecb);
-      JsEntityRegistry.Create(float3.zero, ecb);
-      yield return null;
-      JsEntityRegistry.CommitPendingCreations(m_EntityManager);
-      Assert.AreEqual(2, JsEntityRegistry.Count);
-      JsEntityRegistry.Clear();
-      Assert.AreEqual(0, JsEntityRegistry.Count);
-      Assert.IsTrue(JsEntityRegistry.IsCreated);
-      ecb = CreateECB();
-      var newId = JsEntityRegistry.Create(float3.zero, ecb);
-      Assert.AreEqual(1, newId);
-      yield return null;
     }
 
     #endregion

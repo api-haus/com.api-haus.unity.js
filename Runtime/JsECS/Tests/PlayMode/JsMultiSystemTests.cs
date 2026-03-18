@@ -32,10 +32,8 @@ namespace UnityJS.Entities.PlayModeTests
       m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
       JsECSBridge.Initialize(m_World);
 
-      if (!JsEntityRegistry.IsCreated)
-        JsEntityRegistry.Initialize(64);
-      else
-        JsEntityRegistry.Clear();
+      JsEntityRegistry.Dispose();
+      JsEntityRegistry.Initialize(64);
 
       m_LoadedScripts = new List<(string, int)>();
       m_UniqueCounter = 0;
@@ -54,7 +52,7 @@ namespace UnityJS.Entities.PlayModeTests
           m_Vm.ReleaseEntityState(stateRef);
       m_LoadedScripts.Clear();
 
-      JsEntityRegistry.Clear();
+      JsEntityRegistry.Dispose();
       var query = m_EntityManager.CreateEntityQuery(typeof(JsEntityId));
       m_EntityManager.DestroyEntity(query);
       var cleanupQuery = m_EntityManager.CreateEntityQuery(typeof(JsScript));

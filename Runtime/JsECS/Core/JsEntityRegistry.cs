@@ -87,34 +87,6 @@ namespace UnityJS.Entities.Core
     }
 
     /// <summary>
-    /// Clears all registry data without disposing the collections.
-    /// Use for test isolation - resets state between tests while keeping allocations.
-    /// </summary>
-    public static void Clear()
-    {
-      ref var data = ref s_registry.Data;
-      if (!data.isCreated)
-        return;
-
-      if (data.idToEntity.IsCreated)
-        data.idToEntity.Clear();
-
-      if (data.entityToId.IsCreated)
-        data.entityToId.Clear();
-
-      if (data.pendingCreations.IsCreated)
-        data.pendingCreations.Clear();
-
-      if (data.pendingDestructions.IsCreated)
-        data.pendingDestructions.Clear();
-
-      if (data.pendingEntityIds.IsCreated)
-        data.pendingEntityIds.Clear();
-
-      data.nextId = 1;
-    }
-
-    /// <summary>
     /// O(1) lookup: ID → Entity (Burst-compatible).
     /// Returns Entity.Null if not found.
     /// </summary>
@@ -146,7 +118,7 @@ namespace UnityJS.Entities.Core
     /// <summary>
     /// O(1) check if ID exists.
     /// </summary>
-    public static bool Contains(int entityId)
+    internal static bool Contains(int entityId)
     {
       ref var data = ref s_registry.Data;
       if (!data.isCreated)
@@ -158,7 +130,7 @@ namespace UnityJS.Entities.Core
     /// <summary>
     /// O(1) check if Entity exists.
     /// </summary>
-    public static bool Contains(Entity entity)
+    internal static bool Contains(Entity entity)
     {
       ref var data = ref s_registry.Data;
       if (!data.isCreated)
@@ -177,15 +149,6 @@ namespace UnityJS.Entities.Core
     }
 
     /// <summary>
-    /// Returns true if the entity is marked for destruction.
-    /// </summary>
-    public static bool IsMarkedForDestruction(int entityId)
-    {
-      ref var data = ref s_registry.Data;
-      return data.isCreated && data.pendingDestructions.Contains(entityId);
-    }
-
-    /// <summary>
     /// Allocates a new entity ID atomically.
     /// </summary>
     public static int AllocateId()
@@ -195,19 +158,6 @@ namespace UnityJS.Entities.Core
         return -1;
 
       return data.nextId++;
-    }
-
-    /// <summary>
-    /// Ensures NextId is at least the given value.
-    /// </summary>
-    public static void EnsureNextId(int minNextId)
-    {
-      ref var data = ref s_registry.Data;
-      if (!data.isCreated)
-        return;
-
-      if (minNextId > data.nextId)
-        data.nextId = minNextId;
     }
 
     /// <summary>
@@ -227,7 +177,7 @@ namespace UnityJS.Entities.Core
     /// <summary>
     /// Creates an entity with a pre-assigned ID.
     /// </summary>
-    public static void CreateWithId(int id, float3 position, EntityCommandBuffer ecb)
+    static void CreateWithId(int id, float3 position, EntityCommandBuffer ecb)
     {
       ref var data = ref s_registry.Data;
       if (!data.isCreated)
@@ -392,72 +342,6 @@ namespace UnityJS.Entities.Core
         }
 
       data.pendingDestructions.Clear();
-    }
-
-    /// <summary>
-    /// Syncs with world state, removing invalid entities.
-    /// </summary>
-    public static void SyncWithWorld(EntityManager entityManager)
-    {
-      ref var data = ref s_registry.Data;
-      if (!data.isCreated)
-        return;
-
-      var toRemove = new NativeList<int>(Allocator.Temp);
-
-      foreach (var kvp in data.idToEntity)
-        if (!IsEntityValid(entityManager, kvp.Value, kvp.Key))
-          toRemove.Add(kvp.Key);
-
-      foreach (var id in toRemove)
-        if (data.idToEntity.TryGetValue(id, out var entity))
-        {
-          data.entityToId.Remove(entity);
-          data.idToEntity.Remove(id);
-        }
-
-      toRemove.Dispose();
-    }
-
-    /// <summary>
-    /// Gets all committed entity IDs.
-    /// </summary>
-    public static NativeArray<int> GetAllIds(Allocator allocator)
-    {
-      ref var data = ref s_registry.Data;
-      return data.isCreated
-        ? data.idToEntity.GetKeyArray(allocator)
-        : new NativeArray<int>(0, allocator);
-    }
-
-    /// <summary>
-    /// Gets all committed entities.
-    /// </summary>
-    public static NativeArray<Entity> GetAllEntities(Allocator allocator)
-    {
-      ref var data = ref s_registry.Data;
-      return data.isCreated
-        ? data.idToEntity.GetValueArray(allocator)
-        : new NativeArray<Entity>(0, allocator);
-    }
-
-    static bool IsEntityValid(EntityManager entityManager, Entity entity, int expectedId)
-    {
-      if (entity == Entity.Null)
-        return false;
-
-      if (!entityManager.Exists(entity))
-        return false;
-
-      if (!entityManager.HasComponent<JsEntityId>(entity))
-        return false;
-
-      var actualId = entityManager.GetComponentData<JsEntityId>(entity).value;
-
-      if (actualId == 0)
-        return false;
-
-      return actualId == expectedId;
     }
 
     /// <summary>
