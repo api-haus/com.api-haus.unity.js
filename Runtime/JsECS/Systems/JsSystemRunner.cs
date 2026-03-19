@@ -212,9 +212,11 @@ globalThis.ecs.Component = Component;
 var __comp_ticks = { update: [], fixedUpdate: [], lateUpdate: [] };
 
 function __registerComponentTick(eid, instance) {
-  if (instance.update) __comp_ticks.update.push({eid: eid, inst: instance});
-  if (instance.fixedUpdate) __comp_ticks.fixedUpdate.push({eid: eid, inst: instance});
-  if (instance.lateUpdate) __comp_ticks.lateUpdate.push({eid: eid, inst: instance});
+  var hasTick = false;
+  if (instance.update) { __comp_ticks.update.push({eid: eid, inst: instance}); hasTick = true; }
+  if (instance.fixedUpdate) { __comp_ticks.fixedUpdate.push({eid: eid, inst: instance}); hasTick = true; }
+  if (instance.lateUpdate) { __comp_ticks.lateUpdate.push({eid: eid, inst: instance}); hasTick = true; }
+  if (!hasTick && instance.__needs_start) __comp_ticks.update.push({eid: eid, inst: instance});
 }
 
 function __unregisterComponentTick(eid) {
@@ -237,7 +239,8 @@ globalThis.__tickComponents = function(group, dt) {
         entry.inst.__needs_start = false;
         if (entry.inst.start) entry.inst.start();
       }
-      entry.inst[group](dt);
+      if (entry.inst[group]) entry.inst[group](dt);
+      else { arr.splice(i--, 1); continue; }
     } catch (e) {
       log.error('Component ' + (entry.inst.constructor ? entry.inst.constructor.name : '?') + '.' + group + ' error: ' + e);
       arr.splice(i--, 1);
@@ -290,8 +293,8 @@ globalThis.__componentInit = function(scriptName, entityId, propsJson) {
   }
   inst.entity = entityId;
   _nativeAdd(entityId, cls.name, inst);
-  __registerComponentTick(entityId, inst);
   inst.__needs_start = true;
+  __registerComponentTick(entityId, inst);
   return true;
 };
 
