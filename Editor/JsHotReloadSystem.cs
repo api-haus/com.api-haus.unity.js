@@ -106,6 +106,9 @@ namespace UnityJS.Editor
           if (directory != null && directory.Contains("data"))
             fileName = $"data.{fileName}";
 
+          if (!vm.HasScript(fileName))
+            continue;
+
           var source = File.ReadAllText(filePath);
           if (vm.ReloadScript(fileName, source, filePath))
             Log.Debug($"[JsHotReload] Reloaded: {fileName}");
@@ -124,6 +127,8 @@ namespace UnityJS.Editor
             try
             {
               var systemName = Path.GetFileNameWithoutExtension(filePath);
+              if (!vm.HasScript("system:" + systemName))
+                continue;
               runner.ReloadSystem(systemName);
             }
             catch (Exception ex)
@@ -138,9 +143,16 @@ namespace UnityJS.Editor
         {
           var fileName = Path.GetFileNameWithoutExtension(filePath);
           var scriptName = $"components/{fileName}";
+
+          if (!vm.HasScript(scriptName))
+            continue;
+
           var source = File.ReadAllText(filePath);
           if (vm.ReloadScript(scriptName, source, filePath))
+          {
+            vm.ComponentReload(scriptName);
             Log.Debug($"[JsHotReload] Reloaded component: {scriptName}");
+          }
         }
         catch (Exception ex)
         {

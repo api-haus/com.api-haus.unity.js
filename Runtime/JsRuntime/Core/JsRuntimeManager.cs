@@ -63,6 +63,37 @@ namespace UnityJS.Runtime
       return true;
     }
 
+    /// <summary>
+    /// Swaps prototypes on existing Component instances after a hot-reload.
+    /// Calls globalThis.__componentReload(scriptName) which sets Object.setPrototypeOf
+    /// on every live instance to the newly loaded class's prototype.
+    /// </summary>
+    public unsafe void ComponentReload(string scriptName)
+    {
+      SetLastLoadedModule(scriptName);
+      var global = QJS.JS_GetGlobalObject(m_Context);
+      fixed (byte* p = s_componentReload)
+      {
+        var func = QJS.JS_GetPropertyStr(m_Context, global, p);
+        if (QJS.JS_IsFunction(m_Context, func) != 0)
+        {
+          var nameBytes = Encoding.UTF8.GetBytes(scriptName + '\0');
+          fixed (byte* pName = nameBytes)
+          {
+            var argv = stackalloc JSValue[1];
+            argv[0] = QJS.JS_NewString(m_Context, pName);
+            var result = QJS.JS_Call(m_Context, func, global, 1, argv);
+            if (QJS.IsException(result))
+              LogException($"ComponentReload({scriptName})");
+            QJS.JS_FreeValue(m_Context, result);
+            QJS.JS_FreeValue(m_Context, argv[0]);
+          }
+        }
+        QJS.JS_FreeValue(m_Context, func);
+      }
+      QJS.JS_FreeValue(m_Context, global);
+    }
+
     public JsRuntimeManager(string basePath = null)
     {
       if (s_shimDirty)
@@ -180,6 +211,7 @@ namespace UnityJS.Runtime
     static readonly byte[] s_flushRefRw = QJS.U8("__flushRefRw");
     static readonly byte[] s_componentInit = QJS.U8("__componentInit");
     static readonly byte[] s_lastLoadedModule = QJS.U8("__lastLoadedModule");
+    static readonly byte[] s_componentReload = QJS.U8("__componentReload");
     static readonly byte[] s_verifyModuleExports = QJS.U8("__verifyModuleExports");
 
     public unsafe int CreateEntityState(string scriptName, int entityId)

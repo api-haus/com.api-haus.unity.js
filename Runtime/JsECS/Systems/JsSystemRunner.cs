@@ -340,6 +340,19 @@ globalThis.__verifyModuleExports = function(mod) {
         return null;
     } catch (e) { return e.message; }
 };
+
+globalThis.__componentReload = function(scriptName) {
+  var mod = globalThis.__lastLoadedModule;
+  if (!mod || !mod.default || !mod.default.__jsComp) return;
+  var newCls = mod.default;
+  var store = __js_comp[newCls.name];
+  if (!store) return;
+  for (var eid in store) {
+    var inst = store[eid];
+    if (inst && typeof inst === 'object')
+      Object.setPrototypeOf(inst, newCls.prototype);
+  }
+};
 ";
 
     JsRuntimeManager m_Vm;
