@@ -162,7 +162,11 @@ namespace UnityJS.Entities.Systems.Support
             continue;
           }
 
-          if (!m_Vm.LoadScriptAsModule(scriptName, source, resolvedId))
+          if (m_Vm.HasScript(scriptName))
+          {
+            m_Vm.SetLastLoadedModule(scriptName);
+          }
+          else if (!m_Vm.LoadScriptAsModule(scriptName, source, resolvedId))
           {
             Log.Error("[JsFulfillment] Failed to load script: {0}", scriptName);
             request.fulfilled = true;

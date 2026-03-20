@@ -29,6 +29,10 @@ namespace UnityJS.Runtime
     int m_NextStateId = 1;
     readonly Dictionary<int, JSValue> m_StateRefs = new();
 
+    readonly List<string> m_CapturedExceptions = new();
+    public IReadOnlyList<string> CapturedExceptions => m_CapturedExceptions;
+    public void ClearCapturedExceptions() => m_CapturedExceptions.Clear();
+
     public JSRuntime Runtime => m_Runtime;
     public JSContext Context => m_Context;
     public bool IsValid => !m_Context.IsNull;
@@ -46,6 +50,17 @@ namespace UnityJS.Runtime
     public bool HasScript(string scriptId)
     {
       return m_ScriptRefs.ContainsKey(scriptId);
+    }
+
+    public unsafe bool SetLastLoadedModule(string scriptId)
+    {
+      if (!m_ScriptRefs.TryGetValue(scriptId, out var ns))
+        return false;
+      var global = QJS.JS_GetGlobalObject(m_Context);
+      fixed (byte* pLast = s_lastLoadedModule)
+        QJS.JS_SetPropertyStr(m_Context, global, pLast, QJS.JS_DupValue(m_Context, ns));
+      QJS.JS_FreeValue(m_Context, global);
+      return true;
     }
 
     public JsRuntimeManager(string basePath = null)
@@ -165,6 +180,7 @@ namespace UnityJS.Runtime
     static readonly byte[] s_flushRefRw = QJS.U8("__flushRefRw");
     static readonly byte[] s_componentInit = QJS.U8("__componentInit");
     static readonly byte[] s_lastLoadedModule = QJS.U8("__lastLoadedModule");
+    static readonly byte[] s_verifyModuleExports = QJS.U8("__verifyModuleExports");
 
     public unsafe int CreateEntityState(string scriptName, int entityId)
     {
@@ -493,6 +509,53 @@ namespace UnityJS.Runtime
       return handled;
     }
 
+    public unsafe string VerifyModuleHealth()
+    {
+      var global = QJS.JS_GetGlobalObject(m_Context);
+      JSValue checkFn;
+      fixed (byte* p = s_verifyModuleExports)
+        checkFn = QJS.JS_GetPropertyStr(m_Context, global, p);
+
+      if (QJS.JS_IsFunction(m_Context, checkFn) == 0)
+      {
+        QJS.JS_FreeValue(m_Context, checkFn);
+        QJS.JS_FreeValue(m_Context, global);
+        return null;
+      }
+
+      foreach (var (scriptId, ns) in m_ScriptRefs)
+      {
+        if (scriptId.StartsWith("__")) continue;
+        var argv = stackalloc JSValue[1];
+        argv[0] = QJS.JS_DupValue(m_Context, ns);
+        var result = QJS.JS_Call(m_Context, checkFn, global, 1, argv);
+        QJS.JS_FreeValue(m_Context, argv[0]);
+
+        if (QJS.IsException(result))
+        {
+          LogException($"VerifyModuleHealth({scriptId})");
+          QJS.JS_FreeValue(m_Context, result);
+          QJS.JS_FreeValue(m_Context, checkFn);
+          QJS.JS_FreeValue(m_Context, global);
+          return $"Exception verifying '{scriptId}'";
+        }
+
+        if (result != QJS.JS_NULL && result != QJS.JS_UNDEFINED)
+        {
+          var err = QJS.ToManagedString(m_Context, result);
+          QJS.JS_FreeValue(m_Context, result);
+          QJS.JS_FreeValue(m_Context, checkFn);
+          QJS.JS_FreeValue(m_Context, global);
+          return $"TDZ in '{scriptId}': {err}";
+        }
+        QJS.JS_FreeValue(m_Context, result);
+      }
+
+      QJS.JS_FreeValue(m_Context, checkFn);
+      QJS.JS_FreeValue(m_Context, global);
+      return null;
+    }
+
     /// <summary>
     /// Reloads a script by freeing the old ref and re-evaluating with a versioned
     /// filename. QuickJS caches modules by filename — appending ?v=N ensures the
@@ -585,6 +648,8 @@ namespace UnityJS.Runtime
         stack = QJS.GetStringProperty(m_Context, exc, pStack);
 
       QJS.JS_FreeValue(m_Context, exc);
+
+      m_CapturedExceptions.Add($"{context}: {msg}");
 
       if (!string.IsNullOrEmpty(stack))
         Log.Error("[JsRuntime] Exception in {0}: {1}\n{2}", context, msg, stack);

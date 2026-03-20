@@ -378,6 +378,59 @@ namespace UnityJS.Entities.PlayModeTests
       }
     }
 
+    [Test]
+    public void TscWatch_SyntaxError_EmitsErrorLinesOnStdout()
+    {
+      // Drain accumulated output from initial compilation
+      while (m_TscOutputLines.TryDequeue(out _)) {}
+
+      // Inject a syntax error — "export const VALUE = ;" (parse error)
+      var errorMutation = new Mutation { Module = "core", Type = MutationType.InjectSyntaxError };
+      ApplyMutation(errorMutation);
+      m_Ledger["core"].HasSyntaxError = true;
+
+      WaitForTscError();
+
+      // Collect all output since the error injection
+      var lines = new List<string>();
+      while (m_TscOutputLines.TryDequeue(out var line))
+        lines.Add(line);
+
+      var errorLines = lines.FindAll(l => l.Contains("error TS"));
+      Assert.IsNotEmpty(errorLines,
+        "tsc --watch must emit 'error TS' diagnostic lines to stdout when compilation fails.\n"
+        + $"All captured output ({lines.Count} lines):\n" + string.Join("\n", lines));
+
+      // Verify the summary line shows non-zero error count
+      var summaryLine = lines.Find(l => l.Contains("Found") && l.Contains("error") && l.Contains("Watching"));
+      Assert.IsNotNull(summaryLine,
+        "tsc --watch should emit 'Found N error(s). Watching for file changes.' summary");
+      Assert.IsFalse(summaryLine.Contains("Found 0 errors"),
+        $"Summary should NOT say 'Found 0 errors': {summaryLine}");
+
+      // Fix the error and verify clean compilation
+      while (m_TscOutputLines.TryDequeue(out _)) {}
+
+      var fixMutation = new Mutation { Module = "core", Type = MutationType.FixSyntaxError };
+      ApplyMutation(fixMutation);
+      m_Ledger["core"].HasSyntaxError = false;
+
+      WaitForTscRecompile();
+
+      var postFixLines = new List<string>();
+      while (m_TscOutputLines.TryDequeue(out var line2))
+        postFixLines.Add(line2);
+
+      var postFixErrors = postFixLines.FindAll(l => l.Contains("error TS"));
+      Assert.IsEmpty(postFixErrors,
+        "After fixing the error, tsc --watch should emit no 'error TS' lines.\n"
+        + $"Post-fix output ({postFixLines.Count} lines):\n" + string.Join("\n", postFixLines));
+
+      // Verify VM still works after recovery
+      ReloadModule("core");
+      CallOnUpdateAndAssertLedger(-1);
+    }
+
     // ── Mutation application ──
 
     void ApplyMutation(Mutation mutation)

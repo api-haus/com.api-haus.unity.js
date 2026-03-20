@@ -132,18 +132,27 @@ namespace UnityJS.Editor
       if (string.IsNullOrEmpty(e.Data))
         return;
 
-      if (e.Data.Contains("Watching for file changes"))
+      // tsc --watch emits error diagnostics to stdout, not stderr
+      if (e.Data.Contains("error TS"))
       {
-        s_ConsecutiveFails = 0;
-        Log.Debug("[TscWatchService] tsc --watch ready");
+        Log.Error("[TscWatchService] {0}", e.Data);
+        return;
       }
-      else if (e.Data.Contains("File change detected"))
+
+      if (e.Data.Contains("File change detected"))
       {
         Log.Debug("[TscWatchService] Recompiling...");
       }
-      else if (e.Data.Contains("Found 0 errors"))
+      else if (e.Data.Contains("Watching for file changes"))
       {
-        Log.Debug("[TscWatchService] Compilation successful");
+        s_ConsecutiveFails = 0;
+        // "Found 0 errors. Watching..." → success
+        // "Found N error(s). Watching..." → errors already logged individually above
+        // Initial "Watching for file changes" → startup
+        if (e.Data.Contains("Found 0 errors"))
+          Log.Debug("[TscWatchService] Compilation successful");
+        else
+          Log.Debug("[TscWatchService] tsc --watch ready");
       }
     }
 

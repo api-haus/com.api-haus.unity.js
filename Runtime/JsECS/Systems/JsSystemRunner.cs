@@ -332,6 +332,14 @@ globalThis.ecs.get = function(accessor, eid) {
   }
   return data;
 };
+
+globalThis.__verifyModuleExports = function(mod) {
+    try {
+        var names = Object.getOwnPropertyNames(mod);
+        for (var i = 0; i < names.length; i++) void mod[names[i]];
+        return null;
+    } catch (e) { return e.message; }
+};
 ";
 
     JsRuntimeManager m_Vm;
