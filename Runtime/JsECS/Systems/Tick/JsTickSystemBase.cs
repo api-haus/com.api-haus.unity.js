@@ -2,13 +2,17 @@ namespace UnityJS.Entities.Systems.Tick
 {
   using System.Collections.Generic;
   using Components;
+  using Core;
   using Runtime;
   using Unity.Entities;
   using Unity.Logging;
+  using Unity.Transforms;
 
   public abstract partial class JsTickSystemBase : SystemBase
   {
     protected JsRuntimeManager m_Vm;
+    ComponentLookup<LocalTransform> m_TransformLookup;
+    BufferLookup<JsScript> m_ScriptBufferLookup;
 
     readonly List<(
       Entity entity,
@@ -18,6 +22,13 @@ namespace UnityJS.Entities.Systems.Tick
     )> m_PendingTicks = new(64);
 
     protected abstract JsTickGroup GetTickGroup();
+
+    protected override void OnCreate()
+    {
+      base.OnCreate();
+      m_TransformLookup = GetComponentLookup<LocalTransform>(false);
+      m_ScriptBufferLookup = GetBufferLookup<JsScript>(true);
+    }
 
     protected override void OnStartRunning()
     {
@@ -34,6 +45,14 @@ namespace UnityJS.Entities.Systems.Tick
           return;
       }
 
+      EntityManager.CompleteDependencyBeforeRW<LocalTransform>();
+      m_TransformLookup.Update(this);
+      m_ScriptBufferLookup.Update(this);
+
+      ref var sysState = ref CheckedStateRef;
+      JsComponentRegistry.UpdateAllLookups(ref sysState);
+      CompleteDependency();
+
       var tickGroup = GetTickGroup();
 
       var deltaTime = SystemAPI.Time.DeltaTime;
@@ -41,6 +60,10 @@ namespace UnityJS.Entities.Systems.Tick
         deltaTime = UnityEngine.Time.deltaTime;
 
       var elapsedTime = SystemAPI.Time.ElapsedTime;
+
+      var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
+      var ecb = ecbSingleton.CreateCommandBuffer(World.Unmanaged);
+      JsECSBridge.UpdateBurstContext(ecb, deltaTime, m_TransformLookup, m_ScriptBufferLookup);
 
       m_PendingTicks.Clear();
 
