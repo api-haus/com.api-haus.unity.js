@@ -2,6 +2,18 @@
 
 TypeScript/JavaScript scripting for Unity DOTS via [QuickJS-ng](https://github.com/nicbarker/quickjs-ng). Write ECS systems and components in TypeScript with hot reload, auto-generated type stubs, and Burst-compiled math bridges.
 
+## What this is
+
+unity.js lets you write **gameplay systems and component logic** in TypeScript that runs inside Unity's ECS (DOTS) pipeline. Scripts execute in an embedded QuickJS VM with direct access to ECS components, queries, and math — no serialization overhead.
+
+**Good for:** gameplay prototyping, AI behaviors, input handling, game rules, modding support, any logic that benefits from hot reload without domain reloads.
+
+## What this is not
+
+- **Not a UI framework.** unity.js does not render UI or interact with Unity UI Toolkit / UGUI.
+- **Not a WebGL runtime.** Scripts run in QuickJS (a C-based JS engine), not in a browser. The WebGL build target is not currently supported.
+- **Not a replacement for C#.** Performance-critical systems (physics, rendering, spatial partitioning) should stay in Burst-compiled C#. unity.js is for the gameplay layer on top.
+
 ## Installation
 
 Add to your project via git URL in Unity Package Manager:
