@@ -1,6 +1,6 @@
 {
   "name": "im.pala.unity.js",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "displayName": "[Pala] unity.js",
   "description": "JavaScript/TypeScript scripting framework for Unity via QuickJS-ng. Includes QuickJS P/Invoke bindings, ECS bridge, and Roslyn codegen.",
   "unity": "2022.3",
