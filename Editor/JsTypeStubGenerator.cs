@@ -108,9 +108,7 @@ namespace UnityJS.Editor
           var attr = t.GetCustomAttribute<JsBridgeAttribute>();
           if (attr == null)
             continue;
-          var jsName = !string.IsNullOrEmpty(attr.JsName)
-            ? attr.JsName
-            : t.Name;
+          var jsName = !string.IsNullOrEmpty(attr.JsName) ? attr.JsName : t.Name;
           enums.Add((jsName, t));
           s_enumNames[t] = t.Name;
         }
@@ -294,6 +292,5 @@ namespace UnityJS.Editor
         return type.Name;
       return null;
     }
-
   }
 }
