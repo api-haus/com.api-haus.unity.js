@@ -1,0 +1,34 @@
+{
+  "name": "UnityJS.Integration.Physics.EditModeTests",
+  "rootNamespace": "UnityJS.Integration.Physics.EditModeTests",
+  "references": [
+    "UnityJS.QJS",
+    "UnityJS.Runtime",
+    "UnityJS.Entities",
+    "UnityJS.Integration.Physics",
+    "Unity.Entities",
+    "Unity.Mathematics",
+    "Unity.Collections",
+    "Unity.Transforms",
+    "Unity.Burst",
+    "Unity.Physics",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "UnityJS.Integrations.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

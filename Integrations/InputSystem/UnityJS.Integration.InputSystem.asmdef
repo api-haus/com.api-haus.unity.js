@@ -1,16 +1,14 @@
 {
-  "name": "UnityJS.Entities",
-  "rootNamespace": "UnityJS.Entities",
+  "name": "UnityJS.Integration.InputSystem",
+  "rootNamespace": "UnityJS.Integration.InputSystem",
   "references": [
+    "UnityJS.Entities",
     "UnityJS.QJS",
     "UnityJS.Runtime",
     "Unity.Entities",
-    "Unity.Entities.Hybrid",
     "Unity.Mathematics",
     "Unity.Collections",
-    "Unity.Burst",
-    "Unity.Transforms",
-    "Unity.Logging"
+    "Unity.InputSystem"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
@@ -18,7 +16,9 @@
   "overrideReferences": false,
   "precompiledReferences": [],
   "autoReferenced": false,
-  "defineConstraints": [],
+  "defineConstraints": [
+    "UNITY_JS_INPUT_SYSTEM"
+  ],
   "versionDefines": [],
   "noEngineReferences": false
 }

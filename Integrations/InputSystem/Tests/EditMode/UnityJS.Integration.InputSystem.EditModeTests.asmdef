@@ -1,0 +1,32 @@
+{
+  "name": "UnityJS.Integration.InputSystem.EditModeTests",
+  "rootNamespace": "UnityJS.Integration.InputSystem.EditModeTests",
+  "references": [
+    "UnityJS.QJS",
+    "UnityJS.Runtime",
+    "UnityJS.Entities",
+    "UnityJS.Integration.InputSystem",
+    "Unity.Entities",
+    "Unity.Mathematics",
+    "Unity.Collections",
+    "Unity.InputSystem",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "UnityJS.Integrations.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

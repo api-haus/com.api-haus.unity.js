@@ -5,7 +5,6 @@ namespace UnityJS.Entities.Core
   using Unity.Entities;
   using Unity.Mathematics;
   using UnityEngine;
-  using UnityEngine.InputSystem;
 
   /// <summary>
   /// Instance-scoped container for all mutable bridge state.
@@ -30,14 +29,6 @@ namespace UnityJS.Entities.Core
     public readonly HashSet<int> EntitiesWithCleanup = new();
     public int NextSlot;
 
-    // ── Draw (from JsDrawBridge / JsECSBridge partial) ──
-    public Color DrawColor = Color.white;
-    public float DrawDuration;
-
-    // ── Input (from JsInputBridge / JsECSBridge partial) ──
-    public Dictionary<string, InputAction> InputActions;
-    public bool InputInitialized;
-
     // ── System bridge (from JsSystemBridge) ──
     public Unity.Mathematics.Random SystemRandom;
 
@@ -57,14 +48,6 @@ namespace UnityJS.Entities.Core
       EntitiesWithCleanup.Clear();
       NextSlot = 0;
       Array.Clear(SlotToName, 0, SlotToName.Length);
-
-      // Draw
-      DrawColor = Color.white;
-      DrawDuration = 0;
-
-      // Input
-      InputActions = null;
-      InputInitialized = false;
 
       // System bridge
       SystemRandom = default;

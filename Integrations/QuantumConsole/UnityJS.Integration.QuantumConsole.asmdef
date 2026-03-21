@@ -1,0 +1,21 @@
+{
+  "name": "UnityJS.Integration.QuantumConsole",
+  "rootNamespace": "UnityJS.Integration.QuantumConsole",
+  "references": [
+    "UnityJS.Entities",
+    "UnityJS.QJS",
+    "UnityJS.Runtime",
+    "QFSW.QC"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_JS_QUANTUM_CONSOLE"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

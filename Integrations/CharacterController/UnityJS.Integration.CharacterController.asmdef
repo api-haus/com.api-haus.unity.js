@@ -1,16 +1,17 @@
 {
-  "name": "UnityJS.Entities",
-  "rootNamespace": "UnityJS.Entities",
+  "name": "UnityJS.Integration.CharacterController",
+  "rootNamespace": "UnityJS.Integration.CharacterController",
   "references": [
+    "UnityJS.Entities",
     "UnityJS.QJS",
     "UnityJS.Runtime",
     "Unity.Entities",
-    "Unity.Entities.Hybrid",
+    "Unity.Physics",
     "Unity.Mathematics",
     "Unity.Collections",
     "Unity.Burst",
     "Unity.Transforms",
-    "Unity.Logging"
+    "Unity.CharacterController"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
@@ -18,7 +19,9 @@
   "overrideReferences": false,
   "precompiledReferences": [],
   "autoReferenced": false,
-  "defineConstraints": [],
+  "defineConstraints": [
+    "UNITY_JS_CHARACTER_CONTROLLER"
+  ],
   "versionDefines": [],
   "noEngineReferences": false
 }

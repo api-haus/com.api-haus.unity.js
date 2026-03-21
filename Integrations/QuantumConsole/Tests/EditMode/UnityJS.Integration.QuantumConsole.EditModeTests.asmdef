@@ -1,0 +1,29 @@
+{
+  "name": "UnityJS.Integration.QuantumConsole.EditModeTests",
+  "rootNamespace": "UnityJS.Integration.QuantumConsole.EditModeTests",
+  "references": [
+    "UnityJS.QJS",
+    "UnityJS.Runtime",
+    "UnityJS.Entities",
+    "UnityJS.Integration.QuantumConsole",
+    "QFSW.QC",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "UnityJS.Integrations.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -271,8 +271,6 @@ namespace UnityJS.Entities.Core
     {
       RegisterEntitiesFunctions(ctx);
       RegisterLogFunctions(ctx);
-      RegisterInputFunctions(ctx);
-      RegisterDrawFunctions(ctx);
       RegisterMathBootstrap(ctx);
 
       JsFunctionRegistry.RegisterAll(ctx);

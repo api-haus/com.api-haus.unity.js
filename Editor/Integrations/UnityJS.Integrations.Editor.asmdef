@@ -1,23 +1,25 @@
 {
-  "name": "UnityJS.Entities",
-  "rootNamespace": "UnityJS.Entities",
+  "name": "UnityJS.Integrations.Editor",
+  "rootNamespace": "UnityJS.Integrations.Editor",
   "references": [
     "UnityJS.QJS",
     "UnityJS.Runtime",
+    "UnityJS.Entities",
+    "UnityJS.Editor",
     "Unity.Entities",
     "Unity.Entities.Hybrid",
     "Unity.Mathematics",
     "Unity.Collections",
-    "Unity.Burst",
-    "Unity.Transforms",
-    "Unity.Logging"
+    "Unity.Transforms"
   ],
-  "includePlatforms": [],
+  "includePlatforms": [
+    "Editor"
+  ],
   "excludePlatforms": [],
   "allowUnsafeCode": true,
   "overrideReferences": false,
   "precompiledReferences": [],
-  "autoReferenced": false,
+  "autoReferenced": true,
   "defineConstraints": [],
   "versionDefines": [],
   "noEngineReferences": false

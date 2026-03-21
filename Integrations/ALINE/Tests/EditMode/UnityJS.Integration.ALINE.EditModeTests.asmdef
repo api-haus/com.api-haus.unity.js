@@ -1,0 +1,31 @@
+{
+  "name": "UnityJS.Integration.ALINE.EditModeTests",
+  "rootNamespace": "UnityJS.Integration.ALINE.EditModeTests",
+  "references": [
+    "UnityJS.QJS",
+    "UnityJS.Runtime",
+    "UnityJS.Entities",
+    "UnityJS.Integration.ALINE",
+    "Unity.Mathematics",
+    "Unity.Collections",
+    "ALINE",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "UnityJS.Integrations.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

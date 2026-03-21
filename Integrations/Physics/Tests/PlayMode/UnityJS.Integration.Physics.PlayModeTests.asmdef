@@ -1,0 +1,31 @@
+{
+  "name": "UnityJS.Integration.Physics.PlayModeTests",
+  "rootNamespace": "UnityJS.Integration.Physics.PlayModeTests",
+  "references": [
+    "UnityJS.QJS",
+    "UnityJS.Runtime",
+    "UnityJS.Entities",
+    "UnityJS.Integration.Physics",
+    "UnityJS.Entities.PlayModeTests",
+    "Unity.Entities",
+    "Unity.Mathematics",
+    "Unity.Collections",
+    "Unity.Transforms",
+    "Unity.Burst",
+    "Unity.Physics",
+    "UnityEngine.TestRunner"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

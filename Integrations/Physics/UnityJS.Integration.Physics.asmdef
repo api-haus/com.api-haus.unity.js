@@ -1,16 +1,15 @@
 {
-  "name": "UnityJS.Entities",
-  "rootNamespace": "UnityJS.Entities",
+  "name": "UnityJS.Integration.Physics",
+  "rootNamespace": "UnityJS.Integration.Physics",
   "references": [
+    "UnityJS.Entities",
     "UnityJS.QJS",
     "UnityJS.Runtime",
     "Unity.Entities",
-    "Unity.Entities.Hybrid",
+    "Unity.Physics",
     "Unity.Mathematics",
     "Unity.Collections",
-    "Unity.Burst",
-    "Unity.Transforms",
-    "Unity.Logging"
+    "Unity.Burst"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
@@ -18,7 +17,9 @@
   "overrideReferences": false,
   "precompiledReferences": [],
   "autoReferenced": false,
-  "defineConstraints": [],
+  "defineConstraints": [
+    "UNITY_JS_PHYSICS"
+  ],
   "versionDefines": [],
   "noEngineReferences": false
 }
