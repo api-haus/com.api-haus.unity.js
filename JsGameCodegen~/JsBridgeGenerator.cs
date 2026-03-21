@@ -267,7 +267,7 @@ namespace JsGameCodegen
           jsName = attrData.ConstructorArguments[0].Value as string;
 
         if (string.IsNullOrEmpty(jsName))
-          jsName = SnakeCaseHelper.ToScreamingSnakeCase(symbol.Name);
+          jsName = symbol.Name;
 
         var enumDesc = DocExtractor.GetSummary(symbol, ct);
 

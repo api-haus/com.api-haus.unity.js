@@ -110,7 +110,7 @@ namespace UnityJS.Editor
             continue;
           var jsName = !string.IsNullOrEmpty(attr.JsName)
             ? attr.JsName
-            : ToScreamingSnakeCase(t.Name);
+            : t.Name;
           enums.Add((jsName, t));
           s_enumNames[t] = t.Name;
         }
@@ -295,39 +295,5 @@ namespace UnityJS.Editor
       return null;
     }
 
-    internal static string ToSnakeCase(string input)
-    {
-      if (string.IsNullOrEmpty(input))
-        return input;
-      var sb = new StringBuilder();
-      for (var i = 0; i < input.Length; i++)
-      {
-        var c = input[i];
-        if (char.IsUpper(c))
-        {
-          if (i > 0 && !char.IsUpper(input[i - 1]))
-            sb.Append('_');
-          else if (
-            i > 0
-            && i < input.Length - 1
-            && char.IsUpper(input[i - 1])
-            && char.IsLower(input[i + 1])
-          )
-            sb.Append('_');
-          sb.Append(char.ToLowerInvariant(c));
-        }
-        else
-        {
-          sb.Append(c);
-        }
-      }
-
-      return sb.ToString();
-    }
-
-    static string ToScreamingSnakeCase(string input)
-    {
-      return ToSnakeCase(input).ToUpperInvariant();
-    }
   }
 }

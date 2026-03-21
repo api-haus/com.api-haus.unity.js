@@ -174,12 +174,12 @@ public struct MyState : IComponentData { public bool active; }
 
 ### On enums
 
-Generates a `SCREAMING_SNAKE` global:
+Generates a global object matching the C# name:
 
 ```csharp
 [JsBridge]
 public enum WanderPlane { XY, XZ }
-// JS: WANDER_PLANE.XY
+// JS: WanderPlane.XY
 ```
 
 ### On assembly
