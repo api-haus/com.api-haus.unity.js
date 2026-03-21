@@ -40,15 +40,12 @@ namespace UnityJS.Integrations.Editor
       foreach (var (guid, define, rspRelPath) in s_integrations)
       {
         var rspPath = Path.Combine(packageRoot, rspRelPath);
-        if (!File.Exists(rspPath))
-          continue;
-
         var depPresent = !string.IsNullOrEmpty(AssetDatabase.GUIDToAssetPath(guid));
-        var content = File.ReadAllText(rspPath).Trim();
         var activeLine = $"-define:{define}";
         var commentedLine = $"#{activeLine}";
-
         var desired = depPresent ? activeLine : commentedLine;
+
+        var content = File.Exists(rspPath) ? File.ReadAllText(rspPath).Trim() : "";
         if (content != desired)
         {
           File.WriteAllText(rspPath, desired + "\n");
