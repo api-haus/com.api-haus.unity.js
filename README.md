@@ -33,18 +33,19 @@ Place TypeScript files in `Assets/StreamingAssets/unity.js/`. Systems go in `sys
 // @tick: variable
 
 import * as ecs from 'unity.js/ecs'
-import { MyComponent } from 'unity.js/components'
+import { Health } from 'unity.js/components'
 
-let query: any;
+let query = ecs.query().withAll(Health).build();
 
 export function onUpdate(state: UpdateState): void {
-  query ??= ecs.query().withAll(MyComponent).build();
-
-  for (const [eid, comp] of query) {
-    comp.health -= state.deltaTime;
+  for (const [eid, hp] of query) {
+    hp.current -= state.deltaTime;
+    // hp is fully typed — autocomplete works for .current, .max, etc.
   }
 }
 ```
+
+Queries are fully typed via mapped tuple inference — `withAll(Health)` yields `[entity, Health]` tuples, so destructured variables get correct types with no casts needed.
 
 ### Component script
 
@@ -79,12 +80,16 @@ public struct Health : IComponentData
 }
 ```
 
-JS usage — components are auto-flushed when iterating queries:
+JS usage — components are auto-flushed when iterating queries, and all fields are fully typed:
 
 ```typescript
+import * as ecs from 'unity.js/ecs'
+import { Health } from 'unity.js/components'
+
 const q = ecs.query().withAll(Health).build();
 for (const [eid, hp] of q) {
   hp.current -= 10;  // no .set() needed, flushed automatically
+  // hp.current and hp.max are typed as number
 }
 ```
 
