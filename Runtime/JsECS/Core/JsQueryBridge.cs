@@ -17,7 +17,8 @@ namespace UnityJS.Entities.Core
     public static void Initialize(EntityManager entityManager)
     {
       var b = B;
-      if (b == null) return;
+      if (b == null)
+        return;
       b.QueryEntityManager = entityManager;
       b.QueryInitialized = true;
     }
@@ -51,7 +52,8 @@ namespace UnityJS.Entities.Core
     public static void PrecomputeQueryResults(EntityManager entityManager)
     {
       var b = B;
-      if (b == null) return;
+      if (b == null)
+        return;
 
       foreach (var kvp in b.QueryCache)
       {
@@ -86,7 +88,8 @@ namespace UnityJS.Entities.Core
     public static void Shutdown()
     {
       var b = B;
-      if (b == null) return;
+      if (b == null)
+        return;
 
       foreach (var kvp in b.QueryCache)
         if (kvp.Value != default)

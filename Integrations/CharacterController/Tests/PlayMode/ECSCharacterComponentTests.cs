@@ -70,7 +70,11 @@ namespace UnityJS.Integration.CharacterController.PlayModeTests
     {
       var control = new ECSCharacterControl();
 
-      Assert.AreEqual(Unity.Mathematics.float3.zero, control.moveVector, "Default moveVector should be zero");
+      Assert.AreEqual(
+        Unity.Mathematics.float3.zero,
+        control.moveVector,
+        "Default moveVector should be zero"
+      );
       Assert.IsFalse(control.jump, "Default jump should be false");
       Assert.IsFalse(control.sprint, "Default sprint should be false");
     }
@@ -81,7 +85,11 @@ namespace UnityJS.Integration.CharacterController.PlayModeTests
       var state = new ECSCharacterState();
 
       Assert.IsFalse(state.isGrounded, "Default isGrounded should be false");
-      Assert.AreEqual(Unity.Mathematics.float3.zero, state.velocity, "Default velocity should be zero");
+      Assert.AreEqual(
+        Unity.Mathematics.float3.zero,
+        state.velocity,
+        "Default velocity should be zero"
+      );
       Assert.IsFalse(state.wasGroundedLastFrame, "Default wasGroundedLastFrame should be false");
     }
   }

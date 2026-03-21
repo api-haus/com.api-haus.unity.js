@@ -38,7 +38,8 @@ namespace UnityJS.Editor
         EditorApplication.delayCall += () =>
         {
           var vt = FindStatusBarVisualTree();
-          if (vt != null) Inject(vt);
+          if (vt != null)
+            Inject(vt);
         };
         return;
       }
@@ -50,18 +51,25 @@ namespace UnityJS.Editor
     {
       var asm = typeof(UnityEditor.Editor).Assembly;
       var statusBarType = asm.GetType("UnityEditor.AppStatusBar");
-      if (statusBarType == null) return null;
+      if (statusBarType == null)
+        return null;
 
       var instances = Resources.FindObjectsOfTypeAll(statusBarType);
-      if (instances.Length == 0) return null;
+      if (instances.Length == 0)
+        return null;
 
       var guiViewType = asm.GetType("UnityEditor.GUIView");
-      if (guiViewType == null) return null;
+      if (guiViewType == null)
+        return null;
 
-      var prop = guiViewType.GetProperty("visualTree",
-        BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
-      prop ??= guiViewType.GetProperty("rootVisualElement",
-        BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+      var prop = guiViewType.GetProperty(
+        "visualTree",
+        BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public
+      );
+      prop ??= guiViewType.GetProperty(
+        "rootVisualElement",
+        BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public
+      );
 
       return prop?.GetValue(instances[0]) as VisualElement;
     }
@@ -88,15 +96,7 @@ namespace UnityJS.Editor
         },
       };
 
-      s_Icon = new Image
-      {
-        name = "tsc-status-icon",
-        style =
-        {
-          width = 16,
-          height = 16,
-        },
-      };
+      s_Icon = new Image { name = "tsc-status-icon", style = { width = 16, height = 16 } };
 
       s_Container.Add(s_Icon);
       s_Container.AddManipulator(new Clickable(OnClick));
@@ -145,7 +145,8 @@ namespace UnityJS.Editor
 
     static void UpdateIcon()
     {
-      if (s_Icon == null) return;
+      if (s_Icon == null)
+        return;
       var compiler = TscCompiler.Instance;
       var state = compiler?.State ?? TscState.Dead;
       s_Icon.image = IconForState(state);
@@ -162,7 +163,8 @@ namespace UnityJS.Editor
         TscState.Error => "console.erroricon.sml",
         _ => null,
       };
-      if (name == null) return null;
+      if (name == null)
+        return null;
       var content = EditorGUIUtility.IconContent(name);
       return content?.image;
     }
@@ -199,7 +201,8 @@ namespace UnityJS.Editor
     static void OnClick()
     {
       var compiler = TscCompiler.Instance;
-      if (compiler == null) return;
+      if (compiler == null)
+        return;
 
       switch (compiler.State)
       {

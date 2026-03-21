@@ -29,7 +29,8 @@ namespace UnityJS.Entities.Core
     public static unsafe void Register(JSContext ctx)
     {
       var b = B;
-      if (b != null) b.SystemRandom = new Random((uint)System.Environment.TickCount | 1u);
+      if (b != null)
+        b.SystemRandom = new Random((uint)System.Environment.TickCount | 1u);
 
       var ns = QJS.JS_NewObject(ctx);
 
@@ -94,7 +95,11 @@ namespace UnityJS.Entities.Core
       }
 
       var b = B;
-      if (b == null) { SetFloat(outU, outTag, ctx, 0); return; }
+      if (b == null)
+      {
+        SetFloat(outU, outTag, ctx, 0);
+        return;
+      }
       var value = b.SystemRandom.NextFloat(min, max);
       SetFloat(outU, outTag, ctx, value);
     }
@@ -122,7 +127,11 @@ namespace UnityJS.Entities.Core
       }
 
       var b = B;
-      if (b == null) { SetInt(outU, outTag, ctx, 0); return; }
+      if (b == null)
+      {
+        SetInt(outU, outTag, ctx, 0);
+        return;
+      }
       var value = b.SystemRandom.NextInt(min, max + 1);
       SetInt(outU, outTag, ctx, value);
     }

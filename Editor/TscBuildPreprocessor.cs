@@ -12,7 +12,8 @@ namespace UnityJS.Editor
   {
     public int callbackOrder => 0;
 
-    static string TscBuildRoot => TscCompiler.Instance?.OutDir
+    static string TscBuildRoot =>
+      TscCompiler.Instance?.OutDir
       ?? Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "TscBuild"));
 
     static string StreamingAssetsRoot =>
@@ -46,7 +47,10 @@ namespace UnityJS.Editor
       }
 
       UnityEditor.AssetDatabase.Refresh();
-      Log.Debug("[TscBuildPreprocessor] Copied {0} compiled JS file(s) to StreamingAssets for build", s_CopiedFiles.Count);
+      Log.Debug(
+        "[TscBuildPreprocessor] Copied {0} compiled JS file(s) to StreamingAssets for build",
+        s_CopiedFiles.Count
+      );
     }
 
     public void OnPostprocessBuild(BuildReport report)

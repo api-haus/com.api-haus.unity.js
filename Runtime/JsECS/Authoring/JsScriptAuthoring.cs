@@ -11,7 +11,9 @@ namespace UnityJS.Entities.Authoring
     [Tooltip("Path relative to Assets/StreamingAssets/unity.js (e.g. components/slime_wander.ts)")]
     public string scriptPath;
 
-    [Tooltip("How this entity uses transforms. Set to Dynamic if the script modifies LocalTransform.")]
+    [Tooltip(
+      "How this entity uses transforms. Set to Dynamic if the script modifies LocalTransform."
+    )]
     public TransformUsageFlags transformUsageType = TransformUsageFlags.Dynamic;
 
     public List<JsSerializedProperty> propertyOverrides = new();

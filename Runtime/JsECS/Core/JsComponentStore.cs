@@ -75,14 +75,16 @@ namespace UnityJS.Entities.Core
     public static HashSet<string> GetEntityComponents(int entityId)
     {
       var b = B;
-      if (b == null) return null;
+      if (b == null)
+        return null;
       return b.EntityComponents.TryGetValue(entityId, out var set) ? set : null;
     }
 
     public static void CleanupEntity(int entityId)
     {
       var b = B;
-      if (b == null) return;
+      if (b == null)
+        return;
       b.EntityComponents.Remove(entityId);
       b.EntitiesWithCleanup.Remove(entityId);
     }
@@ -90,7 +92,8 @@ namespace UnityJS.Entities.Core
     public static string GetSlotName(int slot)
     {
       var b = B;
-      if (b == null) return null;
+      if (b == null)
+        return null;
       return slot >= 0 && slot < MaxSlots ? b.SlotToName[slot] : null;
     }
 
@@ -103,7 +106,8 @@ namespace UnityJS.Entities.Core
     public static int GetSlotForName(string name)
     {
       var b = B;
-      if (b == null) return -1;
+      if (b == null)
+        return -1;
       return b.NameToSlot.TryGetValue(name, out var slot) ? slot : -1;
     }
 
@@ -173,7 +177,11 @@ namespace UnityJS.Entities.Core
     )
     {
       var b = B;
-      if (b == null) { SetUndefined(outU, outTag); return; }
+      if (b == null)
+      {
+        SetUndefined(outU, outTag);
+        return;
+      }
 
       var name = ArgString(ctx, argv, 0);
 
@@ -194,7 +202,10 @@ namespace UnityJS.Entities.Core
       if (b.NameToSlot.ContainsKey(name))
       {
         // Tolerate re-definition for hot reload
-        Log.Verbose("[JsComponentStore] ecs.define: '{0}' already defined (re-define tolerated)", name);
+        Log.Verbose(
+          "[JsComponentStore] ecs.define: '{0}' already defined (re-define tolerated)",
+          name
+        );
         SetUndefined(outU, outTag);
         return;
       }
@@ -247,7 +258,11 @@ namespace UnityJS.Entities.Core
     )
     {
       var b = B;
-      if (b == null) { SetUndefined(outU, outTag); return; }
+      if (b == null)
+      {
+        SetUndefined(outU, outTag);
+        return;
+      }
 
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
@@ -294,7 +309,10 @@ namespace UnityJS.Entities.Core
         var g = QJS.JS_GetGlobalObject(ctx);
         var pJcBytes = s_jsCompKey;
         var pNmBytes = QJS.U8(name);
-        fixed (byte* pJc = pJcBytes, pNm = pNmBytes)
+        fixed (
+          byte* pJc = pJcBytes,
+            pNm = pNmBytes
+        )
         {
           var jc = QJS.JS_GetPropertyStr(ctx, g, pJc);
           QJS.JS_SetPropertyStr(ctx, jc, pNm, QJS.JS_NewObject(ctx));
@@ -384,7 +402,11 @@ namespace UnityJS.Entities.Core
     )
     {
       var b = B;
-      if (b == null) { SetUndefined(outU, outTag); return; }
+      if (b == null)
+      {
+        SetUndefined(outU, outTag);
+        return;
+      }
 
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
@@ -464,7 +486,11 @@ namespace UnityJS.Entities.Core
     )
     {
       var b = B;
-      if (b == null) { SetBool(outU, outTag, ctx, false); return; }
+      if (b == null)
+      {
+        SetBool(outU, outTag, ctx, false);
+        return;
+      }
 
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);

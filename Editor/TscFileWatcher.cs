@@ -32,10 +32,12 @@ namespace UnityJS.Editor
     static void Poll()
     {
       var compiler = TscCompiler.Instance;
-      if (compiler == null || compiler.State == TscState.Dead) return;
+      if (compiler == null || compiler.State == TscState.Dead)
+        return;
 
       var now = EditorApplication.timeSinceStartup;
-      if (now - s_LastPollTime < PollIntervalSec) return;
+      if (now - s_LastPollTime < PollIntervalSec)
+        return;
       s_LastPollTime = now;
 
       if (HasChanges(compiler.SourceRoot))
@@ -83,7 +85,8 @@ namespace UnityJS.Editor
     {
       s_FileTimestamps.Clear();
       var compiler = TscCompiler.Instance;
-      if (compiler == null) return;
+      if (compiler == null)
+        return;
 
       foreach (var subdir in new[] { "systems", "components", "types" })
       {
@@ -99,10 +102,12 @@ namespace UnityJS.Editor
     static void TriggerHotReload()
     {
       var vm = JsRuntimeManager.Instance;
-      if (vm == null || !vm.IsValid) return;
+      if (vm == null || !vm.IsValid)
+        return;
 
       var compiler = TscCompiler.Instance;
-      if (compiler == null || !Directory.Exists(compiler.OutDir)) return;
+      if (compiler == null || !Directory.Exists(compiler.OutDir))
+        return;
 
       ReloadAllCompiledScripts(vm, compiler);
     }
@@ -130,7 +135,9 @@ namespace UnityJS.Editor
       var componentsDir = Path.Combine(outDir, "components");
       if (Directory.Exists(componentsDir))
       {
-        foreach (var jsFile in Directory.GetFiles(componentsDir, "*.js", SearchOption.AllDirectories))
+        foreach (
+          var jsFile in Directory.GetFiles(componentsDir, "*.js", SearchOption.AllDirectories)
+        )
         {
           var fileName = Path.GetFileNameWithoutExtension(jsFile);
           var scriptName = $"components/{fileName}";

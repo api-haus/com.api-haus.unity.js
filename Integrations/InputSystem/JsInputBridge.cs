@@ -2,11 +2,11 @@ namespace UnityJS.Integration.InputSystem
 {
   using System.Collections.Generic;
   using AOT;
-  using UnityJS.QJS;
-  using UnityJS.Runtime;
   using Unity.Mathematics;
   using UnityEngine;
   using UnityEngine.InputSystem;
+  using UnityJS.QJS;
+  using UnityJS.Runtime;
   using static UnityJS.Runtime.QJSHelpers;
 
   /// <summary>
@@ -84,7 +84,11 @@ namespace UnityJS.Integration.InputSystem
       if (action.expectedControlType == "Vector2")
       {
         var value = action.ReadValue<Vector2>();
-        SetResult(outU, outTag, JsStateExtensions.Float3ToJsObject(ctx, new float3(value.x, value.y, 0)));
+        SetResult(
+          outU,
+          outTag,
+          JsStateExtensions.Float3ToJsObject(ctx, new float3(value.x, value.y, 0))
+        );
         return;
       }
 

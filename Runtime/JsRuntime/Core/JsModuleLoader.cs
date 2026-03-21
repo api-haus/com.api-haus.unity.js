@@ -77,7 +77,10 @@ namespace UnityJS.Runtime
             resolved = nameStr;
         }
 
-        if (!resolved.StartsWith("unity.js/") && !resolved.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+        if (
+          !resolved.StartsWith("unity.js/")
+          && !resolved.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
+        )
           resolved += ".js";
 
         var bytes = Encoding.UTF8.GetBytes(resolved);

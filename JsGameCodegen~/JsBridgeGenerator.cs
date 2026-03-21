@@ -711,7 +711,9 @@ namespace JsGameCodegen
       string fullTypeName
     )
     {
-      sb.AppendLine("\t\tpublic static unsafe " + fullTypeName + " ReadFromJsObject(JSContext ctx, JSValue obj)");
+      sb.AppendLine(
+        "\t\tpublic static unsafe " + fullTypeName + " ReadFromJsObject(JSContext ctx, JSValue obj)"
+      );
       sb.AppendLine("\t\t{");
       sb.AppendLine("\t\t\tvar comp = default(" + fullTypeName + ");");
       sb.AppendLine("\t\t\tvar data = obj;");
@@ -1338,7 +1340,9 @@ namespace JsGameCodegen
         "\t\t[UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.AfterAssembliesLoaded)]"
       );
       sb.AppendLine(
-        "\t\tstatic void AutoRegister() => JsComponentRegistry.RegisterEnum(\"" + target.JsName + "\", Register);"
+        "\t\tstatic void AutoRegister() => JsComponentRegistry.RegisterEnum(\""
+          + target.JsName
+          + "\", Register);"
       );
       sb.AppendLine();
 

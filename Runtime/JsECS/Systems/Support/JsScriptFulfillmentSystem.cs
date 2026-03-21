@@ -86,7 +86,10 @@ namespace UnityJS.Entities.Systems.Support
         m_Vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
         m_Vm.RegisterBridgeNow(JsComponentStore.Register);
         m_Vm.LoadScriptFromString("__ecs_query_builder", JsSystemRunner.QueryBuilderSourceForTests);
-        m_Vm.LoadScriptFromString("__ecs_component_glue", JsSystemRunner.ComponentGlueSourceForTests);
+        m_Vm.LoadScriptFromString(
+          "__ecs_component_glue",
+          JsSystemRunner.ComponentGlueSourceForTests
+        );
 
         InvalidateStaleScripts();
       }
@@ -217,9 +220,7 @@ namespace UnityJS.Entities.Systems.Support
           m_ScriptBufferLookup.Update(this);
           JsECSBridge.UpdateBurstContext(ecb, 0f, m_TransformLookup, m_ScriptBufferLookup);
 
-          var propsJson = request.propertiesJson.IsEmpty
-            ? null
-            : request.propertiesJson.ToString();
+          var propsJson = request.propertiesJson.IsEmpty ? null : request.propertiesJson.ToString();
           if (!m_Vm.TryComponentInit(scriptName, entityId, propsJson))
             m_Vm.CallInit(scriptName, stateRef);
 

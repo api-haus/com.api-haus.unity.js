@@ -46,7 +46,10 @@ namespace UnityJS.Entities.PlayModeTests
       var min = timings[0];
       var max = timings[iterations - 1];
 
-      Log.Debug("BENCHMARK: {0}", $"{label} | mean={mean:F4}ms median={median:F4}ms min={min:F4}ms max={max:F4}ms (n={iterations})");
+      Log.Debug(
+        "BENCHMARK: {0}",
+        $"{label} | mean={mean:F4}ms median={median:F4}ms min={min:F4}ms max={max:F4}ms (n={iterations})"
+      );
 
       return new Result
       {

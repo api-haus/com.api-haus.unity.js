@@ -53,8 +53,10 @@ namespace UnityJS.Entities.PlayModeTests
     [Test]
     public void Marshal_ReaderRegistered()
     {
-      Assert.IsTrue(JsBridgeMarshal<TestMarshalStruct>.Reader != null,
-        "Marshal reader should be registered after bridge init");
+      Assert.IsTrue(
+        JsBridgeMarshal<TestMarshalStruct>.Reader != null,
+        "Marshal reader should be registered after bridge init"
+      );
     }
   }
 }

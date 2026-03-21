@@ -10,7 +10,13 @@ using UnityEngine;
 
 namespace UnityJS.Editor
 {
-  public enum TscState { Dead, Compiling, Success, Error }
+  public enum TscState
+  {
+    Dead,
+    Compiling,
+    Success,
+    Error,
+  }
 
   public sealed class TscCompiler
   {
@@ -34,9 +40,10 @@ namespace UnityJS.Editor
     {
       SourceRoot = Path.GetFullPath(sourceRoot);
       TsconfigPath = Path.Combine(SourceRoot, "tsconfig.json");
-      OutDir = outDir != null
-        ? Path.GetFullPath(outDir)
-        : Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "TscBuild"));
+      OutDir =
+        outDir != null
+          ? Path.GetFullPath(outDir)
+          : Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "TscBuild"));
       Epoch = SessionState.GetInt(EpochKey, 0);
       LastCompilationSucceeded = true;
       State = File.Exists(TsconfigPath) ? TscState.Success : TscState.Dead;
@@ -44,7 +51,8 @@ namespace UnityJS.Editor
 
     void SetState(TscState newState)
     {
-      if (State == newState) return;
+      if (State == newState)
+        return;
       State = newState;
       EditorApplication.delayCall += () => StateChanged?.Invoke();
     }
@@ -165,8 +173,11 @@ namespace UnityJS.Editor
       }
       else
       {
-        Log.Error("[TscCompiler] tsc failed with {0} error(s):\n{1}",
-          errors.Count, (stdout + "\n" + stderr).Trim());
+        Log.Error(
+          "[TscCompiler] tsc failed with {0} error(s):\n{1}",
+          errors.Count,
+          (stdout + "\n" + stderr).Trim()
+        );
       }
 
       return (success, errors);

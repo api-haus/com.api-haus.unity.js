@@ -196,7 +196,10 @@ namespace UnityJS.QJS
     {
       var codeBytes = System.Text.Encoding.UTF8.GetBytes(code + '\0');
       var fileBytes = System.Text.Encoding.UTF8.GetBytes(filename + '\0');
-      fixed (byte* pCode = codeBytes, pFile = fileBytes)
+      fixed (
+        byte* pCode = codeBytes,
+          pFile = fileBytes
+      )
       {
         return JS_Eval(ctx, pCode, codeBytes.Length - 1, pFile, JS_EVAL_TYPE_GLOBAL);
       }
@@ -304,7 +307,8 @@ namespace UnityJS.QJS
     public static unsafe string ToManagedString(JSContext ctx, JSValue val)
     {
       var ptr = JS_ToCString(ctx, val);
-      if (ptr == null) return null;
+      if (ptr == null)
+        return null;
       var str = System.Runtime.InteropServices.Marshal.PtrToStringUTF8((nint)ptr);
       JS_FreeCString(ctx, ptr);
       return str;

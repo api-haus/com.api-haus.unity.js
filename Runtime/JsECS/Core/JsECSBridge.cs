@@ -5,12 +5,12 @@ namespace UnityJS.Entities.Core
   using QJS;
   using Runtime;
   using Unity.Burst;
-  using static Runtime.QJSHelpers;
   using Unity.Collections;
   using Unity.Collections.LowLevel.Unsafe;
   using Unity.Entities;
   using Unity.Mathematics;
   using Unity.Transforms;
+  using static Runtime.QJSHelpers;
 
   public struct PendingEntityCreation
   {
@@ -598,6 +598,5 @@ namespace UnityJS.Entities.Core
 
       return ctx.eventBuffer[index];
     }
-
   }
 }

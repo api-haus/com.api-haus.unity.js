@@ -79,7 +79,11 @@ namespace UnityJS.Editor
         return;
 
       var content = File.ReadAllText(fullPath);
-      if (m_ParsedProperties == null || m_LastParsedPath != scriptPath || m_LastParsedContent != content)
+      if (
+        m_ParsedProperties == null
+        || m_LastParsedPath != scriptPath
+        || m_LastParsedContent != content
+      )
       {
         m_ParsedProperties = JsPropertyParser.Parse(content);
         m_LastParsedPath = scriptPath;
@@ -186,7 +190,12 @@ namespace UnityJS.Editor
     {
       Undo.RecordObject(authoring, "Change JS Property");
       var idx = FindOverrideIndex(authoring.propertyOverrides, key);
-      var prop = new JsSerializedProperty { key = key, type = type, floatValue = value };
+      var prop = new JsSerializedProperty
+      {
+        key = key,
+        type = type,
+        floatValue = value,
+      };
       if (idx >= 0)
         authoring.propertyOverrides[idx] = prop;
       else
@@ -198,7 +207,12 @@ namespace UnityJS.Editor
     {
       Undo.RecordObject(authoring, "Change JS Property");
       var idx = FindOverrideIndex(authoring.propertyOverrides, key);
-      var prop = new JsSerializedProperty { key = key, type = JsPropertyType.Bool, boolValue = value };
+      var prop = new JsSerializedProperty
+      {
+        key = key,
+        type = JsPropertyType.Bool,
+        boolValue = value,
+      };
       if (idx >= 0)
         authoring.propertyOverrides[idx] = prop;
       else
@@ -210,7 +224,12 @@ namespace UnityJS.Editor
     {
       Undo.RecordObject(authoring, "Change JS Property");
       var idx = FindOverrideIndex(authoring.propertyOverrides, key);
-      var prop = new JsSerializedProperty { key = key, type = JsPropertyType.String, stringValue = value };
+      var prop = new JsSerializedProperty
+      {
+        key = key,
+        type = JsPropertyType.String,
+        stringValue = value,
+      };
       if (idx >= 0)
         authoring.propertyOverrides[idx] = prop;
       else
@@ -222,7 +241,12 @@ namespace UnityJS.Editor
     {
       Undo.RecordObject(authoring, "Change JS Property");
       var idx = FindOverrideIndex(authoring.propertyOverrides, key);
-      var prop = new JsSerializedProperty { key = key, type = JsPropertyType.Vector2, vector2Value = value };
+      var prop = new JsSerializedProperty
+      {
+        key = key,
+        type = JsPropertyType.Vector2,
+        vector2Value = value,
+      };
       if (idx >= 0)
         authoring.propertyOverrides[idx] = prop;
       else
@@ -234,7 +258,12 @@ namespace UnityJS.Editor
     {
       Undo.RecordObject(authoring, "Change JS Property");
       var idx = FindOverrideIndex(authoring.propertyOverrides, key);
-      var prop = new JsSerializedProperty { key = key, type = JsPropertyType.Vector3, vector3Value = value };
+      var prop = new JsSerializedProperty
+      {
+        key = key,
+        type = JsPropertyType.Vector3,
+        vector3Value = value,
+      };
       if (idx >= 0)
         authoring.propertyOverrides[idx] = prop;
       else

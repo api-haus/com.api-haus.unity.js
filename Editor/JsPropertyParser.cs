@@ -25,25 +25,19 @@ namespace UnityJS.Editor
     // Match: public <name> = <value>
     // Also matches: public <name>: <type> = <value>
     // Only public fields are exposed in JsScriptAuthoring inspector.
-    static readonly Regex s_PropertyRegex = new(
-      @"^\s*public\s+(\w+)(?:\s*:\s*\w+)?\s*=\s*(.+)$"
-    );
+    static readonly Regex s_PropertyRegex = new(@"^\s*public\s+(\w+)(?:\s*:\s*\w+)?\s*=\s*(.+)$");
 
     static readonly Regex s_Float3Call = new(
       @"^float3\(\s*([^,)]+)\s*,\s*([^,)]+)\s*,\s*([^,)]+)\s*\)$"
     );
 
-    static readonly Regex s_Float2Call = new(
-      @"^float2\(\s*([^,)]+)\s*,\s*([^,)]+)\s*\)$"
-    );
+    static readonly Regex s_Float2Call = new(@"^float2\(\s*([^,)]+)\s*,\s*([^,)]+)\s*\)$");
 
     static readonly Regex s_Vector3New = new(
       @"^new\s+Vector3\(\s*([^,)]+)\s*,\s*([^,)]+)\s*,\s*([^,)]+)\s*\)$"
     );
 
-    static readonly Regex s_Vector2New = new(
-      @"^new\s+Vector2\(\s*([^,)]+)\s*,\s*([^,)]+)\s*\)$"
-    );
+    static readonly Regex s_Vector2New = new(@"^new\s+Vector2\(\s*([^,)]+)\s*,\s*([^,)]+)\s*\)$");
 
     static readonly Regex s_EnumRef = new(@"^\w+\.\w+$");
 
@@ -83,7 +77,8 @@ namespace UnityJS.Editor
             before = before.TrimStart('*', ' ');
             if (before.Length > 0)
             {
-              if (jsdoc.Length > 0) jsdoc.Append(' ');
+              if (jsdoc.Length > 0)
+                jsdoc.Append(' ');
               jsdoc.Append(before);
             }
             inJsdoc = false;
@@ -93,7 +88,8 @@ namespace UnityJS.Editor
             var content = trimmed.TrimStart('*', ' ');
             if (content.Length > 0)
             {
-              if (jsdoc.Length > 0) jsdoc.Append(' ');
+              if (jsdoc.Length > 0)
+                jsdoc.Append(' ');
               jsdoc.Append(content);
             }
           }
@@ -137,8 +133,10 @@ namespace UnityJS.Editor
       }
 
       // String
-      if ((value.StartsWith("'") && value.EndsWith("'")) ||
-          (value.StartsWith("\"") && value.EndsWith("\"")))
+      if (
+        (value.StartsWith("'") && value.EndsWith("'"))
+        || (value.StartsWith("\"") && value.EndsWith("\""))
+      )
       {
         prop.type = JsPropertyType.String;
         prop.stringValue = value.Substring(1, value.Length - 2);
@@ -165,9 +163,11 @@ namespace UnityJS.Editor
       var m3 = s_Float3Call.Match(value);
       if (m3.Success)
       {
-        if (TryParseFloat(m3.Groups[1].Value, out var x) &&
-            TryParseFloat(m3.Groups[2].Value, out var y) &&
-            TryParseFloat(m3.Groups[3].Value, out var z))
+        if (
+          TryParseFloat(m3.Groups[1].Value, out var x)
+          && TryParseFloat(m3.Groups[2].Value, out var y)
+          && TryParseFloat(m3.Groups[3].Value, out var z)
+        )
         {
           prop.type = JsPropertyType.Vector3;
           prop.vector3Value = new Vector3(x, y, z);
@@ -179,9 +179,11 @@ namespace UnityJS.Editor
       var mv3 = s_Vector3New.Match(value);
       if (mv3.Success)
       {
-        if (TryParseFloat(mv3.Groups[1].Value, out var x) &&
-            TryParseFloat(mv3.Groups[2].Value, out var y) &&
-            TryParseFloat(mv3.Groups[3].Value, out var z))
+        if (
+          TryParseFloat(mv3.Groups[1].Value, out var x)
+          && TryParseFloat(mv3.Groups[2].Value, out var y)
+          && TryParseFloat(mv3.Groups[3].Value, out var z)
+        )
         {
           prop.type = JsPropertyType.Vector3;
           prop.vector3Value = new Vector3(x, y, z);
@@ -193,8 +195,10 @@ namespace UnityJS.Editor
       var m2 = s_Float2Call.Match(value);
       if (m2.Success)
       {
-        if (TryParseFloat(m2.Groups[1].Value, out var x) &&
-            TryParseFloat(m2.Groups[2].Value, out var y))
+        if (
+          TryParseFloat(m2.Groups[1].Value, out var x)
+          && TryParseFloat(m2.Groups[2].Value, out var y)
+        )
         {
           prop.type = JsPropertyType.Vector2;
           prop.vector2Value = new Vector2(x, y);
@@ -206,8 +210,10 @@ namespace UnityJS.Editor
       var mv2 = s_Vector2New.Match(value);
       if (mv2.Success)
       {
-        if (TryParseFloat(mv2.Groups[1].Value, out var x) &&
-            TryParseFloat(mv2.Groups[2].Value, out var y))
+        if (
+          TryParseFloat(mv2.Groups[1].Value, out var x)
+          && TryParseFloat(mv2.Groups[2].Value, out var y)
+        )
         {
           prop.type = JsPropertyType.Vector2;
           prop.vector2Value = new Vector2(x, y);

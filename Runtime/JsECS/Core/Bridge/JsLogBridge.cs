@@ -103,10 +103,7 @@ namespace UnityJS.Entities.Core
 
       var result = QJS.EvalGlobal(ctx, logBootstrap, "<log_bootstrap>");
       if (QJS.IsException(result))
-        Log.Error(
-          "[JsECS] Failed to initialize JS log helpers: {0}",
-          QJS.GetExceptionMessage(ctx)
-        );
+        Log.Error("[JsECS] Failed to initialize JS log helpers: {0}", QJS.GetExceptionMessage(ctx));
 
       QJS.JS_FreeValue(ctx, result);
 

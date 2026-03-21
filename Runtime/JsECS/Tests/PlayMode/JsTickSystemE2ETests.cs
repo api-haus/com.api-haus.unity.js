@@ -10,9 +10,9 @@ namespace UnityJS.Entities.PlayModeTests
   using Runtime;
   using Unity.Collections;
   using Unity.Entities;
+  using Unity.Logging;
   using Unity.Mathematics;
   using Unity.Transforms;
-  using Unity.Logging;
   using UnityEngine;
   using UnityEngine.TestTools;
 

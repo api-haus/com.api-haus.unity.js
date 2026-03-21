@@ -31,7 +31,8 @@ namespace UnityJS.Integrations.Editor
     public static string GetFixturesPath(string integrationRelativePath)
     {
       var pkgInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(
-        typeof(IntegrationTestHarness).Assembly);
+        typeof(IntegrationTestHarness).Assembly
+      );
       Assert.IsNotNull(pkgInfo, "Could not resolve unity.js package info");
       return Path.Combine(pkgInfo.resolvedPath, integrationRelativePath);
     }
@@ -45,16 +46,22 @@ namespace UnityJS.Integrations.Editor
     /// </summary>
     public static string CompileFixtures(string fixturesPath)
     {
-      Assert.IsTrue(Directory.Exists(fixturesPath),
-        $"Fixtures directory does not exist: {fixturesPath}");
+      Assert.IsTrue(
+        Directory.Exists(fixturesPath),
+        $"Fixtures directory does not exist: {fixturesPath}"
+      );
 
-      var outDir = Path.Combine(Path.GetTempPath(),
-        "unity-js-fixtures-" + fixturesPath.GetHashCode().ToString("x8"));
+      var outDir = Path.Combine(
+        Path.GetTempPath(),
+        "unity-js-fixtures-" + fixturesPath.GetHashCode().ToString("x8")
+      );
 
       var compiler = new TscCompiler(fixturesPath, outDir);
       var success = compiler.Recompile();
-      Assert.IsTrue(success,
-        $"Fixture compilation failed:\n{string.Join("\n", compiler.LastErrors)}");
+      Assert.IsTrue(
+        success,
+        $"Fixture compilation failed:\n{string.Join("\n", compiler.LastErrors)}"
+      );
 
       return outDir;
     }
@@ -66,8 +73,7 @@ namespace UnityJS.Integrations.Editor
     /// Returns a disposable that removes the path when disposed.
     /// Usage: using var scope = IntegrationTestHarness.UseSearchPath(path);
     /// </summary>
-    public static SearchPathScope UseSearchPath(string absolutePath)
-      => new(absolutePath);
+    public static SearchPathScope UseSearchPath(string absolutePath) => new(absolutePath);
 
     public sealed class SearchPathScope : IDisposable
     {
@@ -90,12 +96,16 @@ namespace UnityJS.Integrations.Editor
     /// Follows the same pattern as JsPlayModeCycleTests.CreateSlimeEntities.
     /// </summary>
     public static Entity CreateScriptedEntity(
-      EntityManager em, string scriptName, params ComponentType[] extraTypes)
+      EntityManager em,
+      string scriptName,
+      params ComponentType[] extraTypes
+    )
     {
       var types = new NativeList<ComponentType>(extraTypes.Length + 2, Allocator.Temp);
       types.Add(ComponentType.ReadWrite<JsEntityId>());
       types.Add(ComponentType.ReadWrite<LocalTransform>());
-      foreach (var t in extraTypes) types.Add(t);
+      foreach (var t in extraTypes)
+        types.Add(t);
       var entity = em.CreateEntity(types.AsArray());
       types.Dispose();
 
@@ -104,12 +114,14 @@ namespace UnityJS.Integrations.Editor
       em.SetComponentData(entity, LocalTransform.FromPosition(float3.zero));
 
       var requests = em.AddBuffer<JsScriptRequest>(entity);
-      requests.Add(new JsScriptRequest
-      {
-        scriptName = new FixedString64Bytes(scriptName),
-        requestHash = JsScriptPathUtility.HashScriptName(scriptName),
-        fulfilled = false,
-      });
+      requests.Add(
+        new JsScriptRequest
+        {
+          scriptName = new FixedString64Bytes(scriptName),
+          requestHash = JsScriptPathUtility.HashScriptName(scriptName),
+          fulfilled = false,
+        }
+      );
       return entity;
     }
 
@@ -119,13 +131,19 @@ namespace UnityJS.Integrations.Editor
     /// Sets globalThis._testInput so fixture scripts can read mock input values.
     /// </summary>
     public static unsafe void SetTestInput(
-      float moveX = 0, float moveZ = 0, bool jump = false, bool sprint = false)
+      float moveX = 0,
+      float moveZ = 0,
+      bool jump = false,
+      bool sprint = false
+    )
     {
       var vm = JsRuntimeManager.Instance;
-      if (vm == null || !vm.IsValid) return;
+      if (vm == null || !vm.IsValid)
+        return;
 
-      var code = $"globalThis._testInput = {{ moveX:{moveX}, moveZ:{moveZ}, " +
-                 $"jump:{(jump ? "true" : "false")}, sprint:{(sprint ? "true" : "false")} }};";
+      var code =
+        $"globalThis._testInput = {{ moveX:{moveX}, moveZ:{moveZ}, "
+        + $"jump:{(jump ? "true" : "false")}, sprint:{(sprint ? "true" : "false")} }};";
       EvalVoidInternal(vm.Context, code);
     }
 
@@ -135,7 +153,8 @@ namespace UnityJS.Integrations.Editor
     public static unsafe void ClearTestInput()
     {
       var vm = JsRuntimeManager.Instance;
-      if (vm == null || !vm.IsValid) return;
+      if (vm == null || !vm.IsValid)
+        return;
       EvalVoidInternal(vm.Context, "delete globalThis._testInput;");
     }
 
@@ -154,7 +173,8 @@ namespace UnityJS.Integrations.Editor
 
       Assert.IsEmpty(
         vm.CapturedExceptions,
-        $"JS exceptions ({context}):\n" + string.Join("\n", vm.CapturedExceptions));
+        $"JS exceptions ({context}):\n" + string.Join("\n", vm.CapturedExceptions)
+      );
     }
 
     /// <summary>
@@ -177,10 +197,18 @@ namespace UnityJS.Integrations.Editor
       var sourceBytes = Encoding.UTF8.GetBytes(code + '\0');
       var sourceLen = sourceBytes.Length - 1;
       var fileBytes = Encoding.UTF8.GetBytes("<harness>\0");
-      fixed (byte* pSrc = sourceBytes, pFile = fileBytes)
+      fixed (
+        byte* pSrc = sourceBytes,
+          pFile = fileBytes
+      )
       {
-        var result = UnityJS.QJS.QJS.JS_Eval(ctx, pSrc, sourceLen, pFile,
-          UnityJS.QJS.QJS.JS_EVAL_TYPE_GLOBAL);
+        var result = UnityJS.QJS.QJS.JS_Eval(
+          ctx,
+          pSrc,
+          sourceLen,
+          pFile,
+          UnityJS.QJS.QJS.JS_EVAL_TYPE_GLOBAL
+        );
         if (UnityJS.QJS.QJS.IsException(result))
         {
           var exc = UnityJS.QJS.QJS.JS_GetException(ctx);

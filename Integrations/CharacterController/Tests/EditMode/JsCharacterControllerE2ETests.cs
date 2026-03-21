@@ -19,19 +19,22 @@ namespace UnityJS.Integration.CharacterController.EditModeTests
     public IEnumerator PlayModeCycle_CharacterInputFixture_RunsWithoutErrors()
     {
       var fixturesPath = IntegrationTestHarness.GetFixturesPath(
-        "Integrations/CharacterController/Fixtures~");
+        "Integrations/CharacterController/Fixtures~"
+      );
       var compiledPath = IntegrationTestHarness.CompileFixtures(fixturesPath);
 
       yield return new EnterPlayMode();
 
       using var searchPath = IntegrationTestHarness.UseSearchPath(compiledPath);
       var em = World.DefaultGameObjectInjectionWorld.EntityManager;
-      var entity = IntegrationTestHarness.CreateScriptedEntity(em,
+      var entity = IntegrationTestHarness.CreateScriptedEntity(
+        em,
         "systems/character_input",
         ComponentType.ReadWrite<ECSCharacterControl>(),
         ComponentType.ReadWrite<ECSCharacterStats>(),
         ComponentType.ReadWrite<ECSCharacterState>(),
-        ComponentType.ReadWrite<ECSCharacterFixedInput>());
+        ComponentType.ReadWrite<ECSCharacterFixedInput>()
+      );
       em.SetComponentData(entity, ECSCharacterStats.Default());
 
       yield return new WaitForSeconds(0.3f);
@@ -55,9 +58,21 @@ namespace UnityJS.Integration.CharacterController.EditModeTests
       var variableUpdate = world.GetExistingSystem<ECSCharacterVariableUpdateSystem>();
       var fixedTick = world.GetExistingSystem<FixedTickSystem>();
 
-      Assert.AreNotEqual(default(SystemHandle), inputBridge, "ECSCharacterInputBridgeSystem should exist");
-      Assert.AreNotEqual(default(SystemHandle), physicsUpdate, "ECSCharacterPhysicsUpdateSystem should exist");
-      Assert.AreNotEqual(default(SystemHandle), variableUpdate, "ECSCharacterVariableUpdateSystem should exist");
+      Assert.AreNotEqual(
+        default(SystemHandle),
+        inputBridge,
+        "ECSCharacterInputBridgeSystem should exist"
+      );
+      Assert.AreNotEqual(
+        default(SystemHandle),
+        physicsUpdate,
+        "ECSCharacterPhysicsUpdateSystem should exist"
+      );
+      Assert.AreNotEqual(
+        default(SystemHandle),
+        variableUpdate,
+        "ECSCharacterVariableUpdateSystem should exist"
+      );
       Assert.AreNotEqual(default(SystemHandle), fixedTick, "FixedTickSystem should exist");
 
       yield return null;

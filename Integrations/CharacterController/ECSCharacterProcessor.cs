@@ -11,8 +11,7 @@ public struct ECSCharacterUpdateContext
 }
 
 [BurstCompile]
-public struct ECSCharacterProcessor
-  : IKinematicCharacterProcessor<ECSCharacterUpdateContext>
+public struct ECSCharacterProcessor : IKinematicCharacterProcessor<ECSCharacterUpdateContext>
 {
   public KinematicCharacterDataAccess CharacterDataAccess;
   public RefRW<ECSCharacterControl> control;
@@ -101,10 +100,7 @@ public struct ECSCharacterProcessor
       CharacterDataAccess.DeferredImpulsesBuffer,
       ref characterPosition
     );
-    KinematicCharacterUtilities.Update_MovingPlatformDetection(
-      ref baseContext,
-      ref characterBody
-    );
+    KinematicCharacterUtilities.Update_MovingPlatformDetection(ref baseContext, ref characterBody);
     KinematicCharacterUtilities.Update_ParentMomentum(
       ref baseContext,
       ref characterBody,

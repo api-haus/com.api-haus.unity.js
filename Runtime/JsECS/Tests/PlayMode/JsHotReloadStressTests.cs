@@ -28,7 +28,10 @@ namespace UnityJS.Entities.PlayModeTests
       var code = $"globalThis.{name} || 0";
       var src = Encoding.UTF8.GetBytes(code + '\0');
       var file = Encoding.UTF8.GetBytes("<test>\0");
-      fixed (byte* pSrc = src, pFile = file)
+      fixed (
+        byte* pSrc = src,
+          pFile = file
+      )
       {
         var val = QJS.JS_Eval(vm.Context, pSrc, src.Length - 1, pFile, QJS.JS_EVAL_TYPE_GLOBAL);
         int result;
@@ -204,7 +207,9 @@ namespace UnityJS.Entities.PlayModeTests
     {
       // First VM: load and call successfully
       var vm1 = CreateVm();
-      Assert.IsTrue(vm1.LoadScriptAsModule("system:probe", MakeCounterScript("_stale"), "stale.js"));
+      Assert.IsTrue(
+        vm1.LoadScriptAsModule("system:probe", MakeCounterScript("_stale"), "stale.js")
+      );
       var stateRef = vm1.CreateEntityState("system:probe", 0);
       Assert.IsTrue(vm1.CallFunction("system:probe", "onUpdate", stateRef));
       vm1.Dispose();

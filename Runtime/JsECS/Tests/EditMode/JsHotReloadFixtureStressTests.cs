@@ -18,8 +18,14 @@ namespace UnityJS.Entities.EditModeTests
   {
     static readonly string[] ModuleNames =
     {
-      "core", "math_utils", "transform", "physics",
-      "ai_state", "ai_behavior", "renderer", "main_system",
+      "core",
+      "math_utils",
+      "transform",
+      "physics",
+      "ai_state",
+      "ai_behavior",
+      "renderer",
+      "main_system",
     };
 
     static readonly Dictionary<string, long> DefaultValues = new()
@@ -34,7 +40,13 @@ namespace UnityJS.Entities.EditModeTests
       { "main_system", 10000000 },
     };
 
-    enum MutationType { TouchComment, ChangeConstant, InjectSyntaxError, FixSyntaxError }
+    enum MutationType
+    {
+      TouchComment,
+      ChangeConstant,
+      InjectSyntaxError,
+      FixSyntaxError,
+    }
 
     string m_WorkDir;
     string m_OutDir;
@@ -43,6 +55,7 @@ namespace UnityJS.Entities.EditModeTests
 
     // Track current VALUE per module (after mutations)
     readonly Dictionary<string, long> m_CurrentValues = new();
+
     // Track which modules have injected syntax errors
     readonly Dictionary<string, bool> m_HasSyntaxError = new();
     int m_MutationCount;
@@ -52,7 +65,8 @@ namespace UnityJS.Entities.EditModeTests
       get
       {
         var pkgInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(
-          typeof(JsHotReloadFixtureStressTests).Assembly);
+          typeof(JsHotReloadFixtureStressTests).Assembly
+        );
         Assert.IsNotNull(pkgInfo, "Could not resolve unity.js package root");
         return Path.Combine(pkgInfo.resolvedPath, "tests~", "hot-reload-fixture");
       }
@@ -61,7 +75,10 @@ namespace UnityJS.Entities.EditModeTests
     [SetUp]
     public void SetUp()
     {
-      m_WorkDir = Path.Combine(Path.GetTempPath(), "js-fixture-stress-" + Guid.NewGuid().ToString("N")[..8]);
+      m_WorkDir = Path.Combine(
+        Path.GetTempPath(),
+        "js-fixture-stress-" + Guid.NewGuid().ToString("N")[..8]
+      );
       m_SrcDir = Path.Combine(m_WorkDir, "src");
       m_OutDir = Path.Combine(m_WorkDir, "out");
       Directory.CreateDirectory(m_SrcDir);
@@ -72,10 +89,16 @@ namespace UnityJS.Entities.EditModeTests
         File.Copy(ts, Path.Combine(m_SrcDir, Path.GetFileName(ts)));
 
       // Copy tsconfig.json
-      File.Copy(Path.Combine(FixtureRoot, "tsconfig.json"), Path.Combine(m_WorkDir, "tsconfig.json"));
+      File.Copy(
+        Path.Combine(FixtureRoot, "tsconfig.json"),
+        Path.Combine(m_WorkDir, "tsconfig.json")
+      );
 
       m_Compiler = new TscCompiler(m_WorkDir, m_OutDir);
-      Assert.IsTrue(m_Compiler.Recompile(), "Initial compile failed:\n" + string.Join("\n", m_Compiler.LastErrors));
+      Assert.IsTrue(
+        m_Compiler.Recompile(),
+        "Initial compile failed:\n" + string.Join("\n", m_Compiler.LastErrors)
+      );
 
       m_CurrentValues.Clear();
       m_HasSyntaxError.Clear();
@@ -92,8 +115,13 @@ namespace UnityJS.Entities.EditModeTests
     {
       if (m_WorkDir != null && Directory.Exists(m_WorkDir))
       {
-        try { Directory.Delete(m_WorkDir, true); }
-        catch { /* best-effort cleanup */ }
+        try
+        {
+          Directory.Delete(m_WorkDir, true);
+        }
+        catch
+        { /* best-effort cleanup */
+        }
       }
     }
 
@@ -132,12 +160,15 @@ namespace UnityJS.Entities.EditModeTests
           break;
 
         case MutationType.InjectSyntaxError:
-          if (m_HasSyntaxError[module]) break;
+          if (m_HasSyntaxError[module])
+            break;
           var content = File.ReadAllText(path);
           var importIdx = content.IndexOf("import", StringComparison.Ordinal);
-          if (importIdx < 0) importIdx = 0;
+          if (importIdx < 0)
+            importIdx = 0;
           var eol = content.IndexOf('\n', importIdx);
-          if (eol < 0) break;
+          if (eol < 0)
+            break;
           content = content.Insert(eol + 1, "{{{SYNTAX_ERROR}}}\n");
           File.WriteAllText(path, content);
           m_HasSyntaxError[module] = true;
@@ -165,9 +196,11 @@ namespace UnityJS.Entities.EditModeTests
         var module = ModuleNames[rng.Next(ModuleNames.Length)];
         ApplyMutation(module, MutationType.TouchComment, rng);
 
-        Assert.IsTrue(m_Compiler.Recompile(),
+        Assert.IsTrue(
+          m_Compiler.Recompile(),
           $"Cycle {cycle}: comment-only mutation to {module} must compile:\n"
-          + string.Join("\n", m_Compiler.LastErrors));
+            + string.Join("\n", m_Compiler.LastErrors)
+        );
       }
     }
 
@@ -181,17 +214,20 @@ namespace UnityJS.Entities.EditModeTests
         var module = ModuleNames[cycle % ModuleNames.Length];
         ApplyMutation(module, MutationType.ChangeConstant, rng);
 
-        Assert.IsTrue(m_Compiler.Recompile(),
+        Assert.IsTrue(
+          m_Compiler.Recompile(),
           $"Cycle {cycle}: constant change in {module} must compile:\n"
-          + string.Join("\n", m_Compiler.LastErrors));
+            + string.Join("\n", m_Compiler.LastErrors)
+        );
 
         // Verify the compiled JS contains the new value
         var jsPath = Path.Combine(m_OutDir, module + ".js");
         var jsContent = File.ReadAllText(jsPath);
         Assert.IsTrue(
-          jsContent.Contains($"VALUE = {m_CurrentValues[module]}") ||
-          jsContent.Contains($"VALUE={m_CurrentValues[module]}"),
-          $"Cycle {cycle}: compiled JS for {module} missing VALUE={m_CurrentValues[module]}");
+          jsContent.Contains($"VALUE = {m_CurrentValues[module]}")
+            || jsContent.Contains($"VALUE={m_CurrentValues[module]}"),
+          $"Cycle {cycle}: compiled JS for {module} missing VALUE={m_CurrentValues[module]}"
+        );
       }
     }
 
@@ -204,15 +240,17 @@ namespace UnityJS.Entities.EditModeTests
       for (var cycle = 0; cycle < 5; cycle++)
       {
         ApplyMutation(target, MutationType.InjectSyntaxError, rng);
-        Assert.IsFalse(m_Compiler.Recompile(),
-          $"Cycle {cycle}: should fail with syntax error");
-        Assert.IsNotEmpty(m_Compiler.LastErrors,
-          $"Cycle {cycle}: failed compile but no errors reported");
+        Assert.IsFalse(m_Compiler.Recompile(), $"Cycle {cycle}: should fail with syntax error");
+        Assert.IsNotEmpty(
+          m_Compiler.LastErrors,
+          $"Cycle {cycle}: failed compile but no errors reported"
+        );
 
         ApplyMutation(target, MutationType.FixSyntaxError, rng);
-        Assert.IsTrue(m_Compiler.Recompile(),
-          $"Cycle {cycle}: should succeed after fix:\n"
-          + string.Join("\n", m_Compiler.LastErrors));
+        Assert.IsTrue(
+          m_Compiler.Recompile(),
+          $"Cycle {cycle}: should succeed after fix:\n" + string.Join("\n", m_Compiler.LastErrors)
+        );
       }
     }
 
@@ -228,9 +266,10 @@ namespace UnityJS.Entities.EditModeTests
         ApplyMutation(module, MutationType.ChangeConstant, rng);
       }
 
-      Assert.IsTrue(m_Compiler.Recompile(),
-        "Recompile after mixed mutations must succeed:\n"
-        + string.Join("\n", m_Compiler.LastErrors));
+      Assert.IsTrue(
+        m_Compiler.Recompile(),
+        "Recompile after mixed mutations must succeed:\n" + string.Join("\n", m_Compiler.LastErrors)
+      );
 
       // Verify each compiled module has the expected VALUE
       foreach (var mod in ModuleNames)
@@ -240,9 +279,9 @@ namespace UnityJS.Entities.EditModeTests
         var jsContent = File.ReadAllText(jsPath);
         var expected = m_CurrentValues[mod];
         Assert.IsTrue(
-          jsContent.Contains($"VALUE = {expected}") ||
-          jsContent.Contains($"VALUE={expected}"),
-          $"Module {mod}: expected VALUE={expected} in compiled output");
+          jsContent.Contains($"VALUE = {expected}") || jsContent.Contains($"VALUE={expected}"),
+          $"Module {mod}: expected VALUE={expected} in compiled output"
+        );
       }
     }
   }

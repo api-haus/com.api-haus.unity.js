@@ -15,7 +15,8 @@ namespace UnityJS.Entities.Core
   {
     // ── Query (from JsQueryBridge) ──
     public readonly Dictionary<int, EntityQuery> QueryCache = new();
-    public readonly Dictionary<int, (ComponentType[] all, ComponentType[] none)> PendingQueries = new();
+    public readonly Dictionary<int, (ComponentType[] all, ComponentType[] none)> PendingQueries =
+      new();
     public readonly Dictionary<int, int[]> PrecomputedIds = new();
     public EntityManager QueryEntityManager;
     public bool QueryInitialized;

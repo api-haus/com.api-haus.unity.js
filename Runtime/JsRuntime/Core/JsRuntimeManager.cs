@@ -31,6 +31,7 @@ namespace UnityJS.Runtime
 
     readonly List<string> m_CapturedExceptions = new();
     public IReadOnlyList<string> CapturedExceptions => m_CapturedExceptions;
+
     public void ClearCapturedExceptions() => m_CapturedExceptions.Clear();
 
     public JSRuntime Runtime => m_Runtime;
@@ -42,7 +43,6 @@ namespace UnityJS.Runtime
     /// Disposed atomically with the VM. Typed as object to avoid circular assembly reference.
     /// </summary>
     public IDisposable BridgeState { get; set; }
-
 
     /// <summary>
     /// Returns true if a script module with this ID is already loaded.
@@ -492,7 +492,11 @@ namespace UnityJS.Runtime
     /// Calls globalThis.__componentInit(scriptName, entityId, propsJson).
     /// Returns true if the module's default export was a Component class (handled).
     /// </summary>
-    public unsafe bool TryComponentInit(string scriptName, int entityId, string propertiesJson = null)
+    public unsafe bool TryComponentInit(
+      string scriptName,
+      int entityId,
+      string propertiesJson = null
+    )
     {
       var global = QJS.JS_GetGlobalObject(m_Context);
       var handled = false;
@@ -557,7 +561,8 @@ namespace UnityJS.Runtime
 
       foreach (var (scriptId, ns) in m_ScriptRefs)
       {
-        if (scriptId.StartsWith("__")) continue;
+        if (scriptId.StartsWith("__"))
+          continue;
         var argv = stackalloc JSValue[1];
         argv[0] = QJS.JS_DupValue(m_Context, ns);
         var result = QJS.JS_Call(m_Context, checkFn, global, 1, argv);

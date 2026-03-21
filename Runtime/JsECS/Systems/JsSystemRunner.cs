@@ -497,8 +497,13 @@ globalThis.__componentReload = function(scriptName) {
         m_SystemNames.Remove(systemName);
       }
 
-      if (!JsScriptSourceRegistry.TryReadScript(
-            "systems/" + systemName, out var source, out var resolvedId))
+      if (
+        !JsScriptSourceRegistry.TryReadScript(
+          "systems/" + systemName,
+          out var source,
+          out var resolvedId
+        )
+      )
         return;
 
       var scriptId = "system:" + systemName;

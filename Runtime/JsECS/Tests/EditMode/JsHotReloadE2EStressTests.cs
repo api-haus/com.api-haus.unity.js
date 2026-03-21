@@ -46,6 +46,7 @@ namespace UnityJS.Entities.EditModeTests
     readonly object m_FileLock = new();
 
     string TsRoot => Path.Combine(Application.streamingAssetsPath, "unity.js");
+
     string GetTsPath(string relativePath) => Path.Combine(TsRoot, relativePath);
 
     [UnitySetUp]
@@ -89,7 +90,13 @@ namespace UnityJS.Entities.EditModeTests
 
     // ── Mutation engine ──
 
-    enum MutationType { TouchComment, ChangeConstant, InjectSyntaxError, FixSyntaxError }
+    enum MutationType
+    {
+      TouchComment,
+      ChangeConstant,
+      InjectSyntaxError,
+      FixSyntaxError,
+    }
 
     MutationType PickMutation(System.Random rng, string file)
     {
@@ -97,9 +104,12 @@ namespace UnityJS.Entities.EditModeTests
         return rng.NextDouble() < 0.5 ? MutationType.FixSyntaxError : MutationType.TouchComment;
 
       var roll = rng.NextDouble();
-      if (roll < 0.4) return MutationType.TouchComment;
-      if (roll < 0.8) return MutationType.ChangeConstant;
-      if (roll < 0.9) return MutationType.InjectSyntaxError;
+      if (roll < 0.4)
+        return MutationType.TouchComment;
+      if (roll < 0.8)
+        return MutationType.ChangeConstant;
+      if (roll < 0.9)
+        return MutationType.InjectSyntaxError;
       return MutationType.TouchComment;
     }
 
@@ -122,18 +132,24 @@ namespace UnityJS.Entities.EditModeTests
             {
               var newVal = rng.Next(1, 100);
               content = Regex.Replace(
-                content, pattern, $"${{1}}{newVal}",
-                RegexOptions.None, TimeSpan.FromSeconds(1)
+                content,
+                pattern,
+                $"${{1}}{newVal}",
+                RegexOptions.None,
+                TimeSpan.FromSeconds(1)
               );
             }
             break;
 
           case MutationType.InjectSyntaxError:
-            if (content.Contains(SyntaxErrorMarker)) break;
+            if (content.Contains(SyntaxErrorMarker))
+              break;
             var importIdx = content.IndexOf("import", StringComparison.Ordinal);
-            if (importIdx < 0) break;
+            if (importIdx < 0)
+              break;
             var eol = content.IndexOf('\n', importIdx);
-            if (eol < 0) break;
+            if (eol < 0)
+              break;
             content = content.Insert(eol + 1, SyntaxErrorMarker + "\n");
             m_HasSyntaxError[file] = true;
             break;
@@ -151,8 +167,10 @@ namespace UnityJS.Entities.EditModeTests
 
     void StartMutatorThread(
       int seed,
-      int minIntervalMs = 50, int maxIntervalMs = 200,
-      bool commentOnly = false)
+      int minIntervalMs = 50,
+      int maxIntervalMs = 200,
+      bool commentOnly = false
+    )
     {
       m_MutatorRunning = true;
       m_MutatorThread = new Thread(() =>
@@ -162,8 +180,13 @@ namespace UnityJS.Entities.EditModeTests
         {
           var file = MutableFiles[rng.Next(MutableFiles.Length)];
           var type = commentOnly ? MutationType.TouchComment : PickMutation(rng, file);
-          try { ApplyMutation(file, type, rng); }
-          catch { /* file may be locked by tsc — ignore */ }
+          try
+          {
+            ApplyMutation(file, type, rng);
+          }
+          catch
+          { /* file may be locked by tsc — ignore */
+          }
           Thread.Sleep(rng.Next(minIntervalMs, maxIntervalMs));
         }
       });
@@ -200,8 +223,11 @@ namespace UnityJS.Entities.EditModeTests
         {
           TscFileWatcher.ReloadAllCompiledScripts(vm, compiler);
 
-          Assert.AreEqual(epochBefore + 1, compiler.Epoch,
-            $"Cycle {cycle}: epoch should advance by 1 on success");
+          Assert.AreEqual(
+            epochBefore + 1,
+            compiler.Epoch,
+            $"Cycle {cycle}: epoch should advance by 1 on success"
+          );
 
           var health = vm.VerifyModuleHealth();
           Assert.IsNull(health, $"Cycle {cycle}: TDZ after reload: {health}");
@@ -214,11 +240,14 @@ namespace UnityJS.Entities.EditModeTests
         else
         {
           Assert.AreEqual(
-            epochBefore, compiler.Epoch,
+            epochBefore,
+            compiler.Epoch,
             $"Cycle {cycle}: epoch advanced despite failed compile"
           );
-          Assert.IsNotEmpty(compiler.LastErrors,
-            $"Cycle {cycle}: failed compile but no errors reported");
+          Assert.IsNotEmpty(
+            compiler.LastErrors,
+            $"Cycle {cycle}: failed compile but no errors reported"
+          );
         }
       }
 
@@ -255,8 +284,7 @@ namespace UnityJS.Entities.EditModeTests
         var path = GetTsPath("components/slime_wander.ts");
         File.AppendAllText(path, $"// reload-{cycle}\n");
 
-        Assert.IsTrue(compiler.Recompile(),
-          $"Cycle {cycle}: comment-only change must compile");
+        Assert.IsTrue(compiler.Recompile(), $"Cycle {cycle}: comment-only change must compile");
         TscFileWatcher.ReloadAllCompiledScripts(vm, compiler);
 
         yield return null;
@@ -296,8 +324,7 @@ namespace UnityJS.Entities.EditModeTests
           yield return null;
 
         var errorResult = compiler.Recompile();
-        Assert.IsFalse(errorResult,
-          $"Cycle {cycle}: compilation should fail with syntax error");
+        Assert.IsFalse(errorResult, $"Cycle {cycle}: compilation should fail with syntax error");
 
         ApplyMutation(targetFile, MutationType.FixSyntaxError, new System.Random(cycle));
 
@@ -305,8 +332,7 @@ namespace UnityJS.Entities.EditModeTests
           yield return null;
 
         var fixResult = compiler.Recompile();
-        Assert.IsTrue(fixResult,
-          $"Cycle {cycle}: compilation should succeed after fix");
+        Assert.IsTrue(fixResult, $"Cycle {cycle}: compilation should succeed after fix");
 
         TscFileWatcher.ReloadAllCompiledScripts(vm, compiler);
 
@@ -337,19 +363,27 @@ namespace UnityJS.Entities.EditModeTests
           yield return null;
 
         var epochBefore = compiler.Epoch;
-        Assert.IsTrue(compiler.Recompile(),
-          $"Cycle {cycle}: comment-only mutations must always compile");
+        Assert.IsTrue(
+          compiler.Recompile(),
+          $"Cycle {cycle}: comment-only mutations must always compile"
+        );
 
-        Assert.AreEqual(epochBefore + 1, compiler.Epoch,
-          $"Cycle {cycle}: epoch should advance by 1 on success");
+        Assert.AreEqual(
+          epochBefore + 1,
+          compiler.Epoch,
+          $"Cycle {cycle}: epoch should advance by 1 on success"
+        );
         ourSuccessCount++;
 
         TscFileWatcher.ReloadAllCompiledScripts(vm, compiler);
       }
 
       Assert.AreEqual(10, ourSuccessCount, "All 10 cycles should have succeeded");
-      Assert.GreaterOrEqual(compiler.Epoch, initialEpoch + 10,
-        "Epoch should advance at least 10 times");
+      Assert.GreaterOrEqual(
+        compiler.Epoch,
+        initialEpoch + 10,
+        "Epoch should advance at least 10 times"
+      );
 
       Assert.IsEmpty(
         vm.CapturedExceptions,
@@ -362,21 +396,26 @@ namespace UnityJS.Entities.EditModeTests
     static Entity CreateScriptedEntity(EntityManager em, string scriptName)
     {
       var entity = em.CreateEntity();
-      em.AddComponentData(entity, new LocalTransform
-      {
-        Position = float3.zero,
-        Rotation = quaternion.identity,
-        Scale = 1f,
-      });
+      em.AddComponentData(
+        entity,
+        new LocalTransform
+        {
+          Position = float3.zero,
+          Rotation = quaternion.identity,
+          Scale = 1f,
+        }
+      );
       var entityId = JsEntityRegistry.AllocateId();
       em.AddComponentData(entity, new JsEntityId { value = entityId });
       var requests = em.AddBuffer<JsScriptRequest>(entity);
-      requests.Add(new JsScriptRequest
-      {
-        scriptName = new FixedString64Bytes(scriptName),
-        requestHash = JsScriptPathUtility.HashScriptName(scriptName),
-        fulfilled = false,
-      });
+      requests.Add(
+        new JsScriptRequest
+        {
+          scriptName = new FixedString64Bytes(scriptName),
+          requestHash = JsScriptPathUtility.HashScriptName(scriptName),
+          fulfilled = false,
+        }
+      );
       return entity;
     }
   }
