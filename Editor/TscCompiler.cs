@@ -30,11 +30,13 @@ namespace UnityJS.Editor
     readonly List<string> m_Errors = new();
     public IReadOnlyList<string> LastErrors => m_Errors;
 
-    public TscCompiler(string sourceRoot)
+    public TscCompiler(string sourceRoot, string outDir = null)
     {
       SourceRoot = Path.GetFullPath(sourceRoot);
       TsconfigPath = Path.Combine(SourceRoot, "tsconfig.json");
-      OutDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "TscBuild"));
+      OutDir = outDir != null
+        ? Path.GetFullPath(outDir)
+        : Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "TscBuild"));
       Epoch = SessionState.GetInt(EpochKey, 0);
       LastCompilationSucceeded = true;
       State = File.Exists(TsconfigPath) ? TscState.Success : TscState.Dead;
