@@ -1,7 +1,7 @@
 {
-  "name": "im.pala.unity.js",
+  "name": "com.api-haus.unity.js",
   "version": "1.0.0",
-  "displayName": "[Pala] unity.js",
+  "displayName": "unity.js",
   "description": "JavaScript/TypeScript scripting framework for Unity via QuickJS-ng. Includes QuickJS P/Invoke bindings, ECS bridge, and Roslyn codegen.",
   "unity": "2022.3",
   "dependencies": {
@@ -20,6 +20,6 @@
     "dots"
   ],
   "author": {
-    "name": "Pala"
+    "name": "api-haus"
   }
 }

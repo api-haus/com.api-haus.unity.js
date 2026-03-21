@@ -7,13 +7,13 @@ TypeScript/JavaScript scripting for Unity DOTS via [QuickJS-ng](https://github.c
 Add to your project via git URL in Unity Package Manager:
 
 ```
-https://github.com/api-haus/unity.js.git
+https://github.com/api-haus/com.api-haus.unity.js.git
 ```
 
 Or via [OpenUPM](https://openupm.com):
 
 ```
-openupm add im.pala.unity.js
+openupm add com.api-haus.unity.js
 ```
 
 ### Requirements
