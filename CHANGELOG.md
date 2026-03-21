@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/api-haus/com.api-haus.unity.js/compare/v1.0.0...v1.0.1) (2026-03-21)
+
+
+### Bug Fixes
+
+* also gitignore csc.rsp.meta files in Integrations ([43f8155](https://github.com/api-haus/com.api-haus.unity.js/commit/43f81559a6bd9722c6109c6aa31afafc2bbf3fb5))
+
 # 1.0.0 (2026-03-21)
 
 
