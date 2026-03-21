@@ -8,11 +8,6 @@ using UnityEngine.UIElements;
 
 namespace UnityJS.Editor
 {
-  /// <summary>
-  /// Injects a tsc --watch state icon into the Unity Editor status bar (AppStatusBar).
-  /// AppStatusBar inherits from GUIView (not EditorWindow), so we use reflection
-  /// to access its visual tree and overlay a VisualElement with absolute positioning.
-  /// </summary>
   [InitializeOnLoad]
   static class TscStatusBarIndicator
   {
@@ -40,7 +35,6 @@ namespace UnityJS.Editor
       var visualTree = FindStatusBarVisualTree();
       if (visualTree == null)
       {
-        // Retry once — status bar may not be ready yet on first domain reload frame
         EditorApplication.delayCall += () =>
         {
           var vt = FindStatusBarVisualTree();
@@ -61,13 +55,11 @@ namespace UnityJS.Editor
       var instances = Resources.FindObjectsOfTypeAll(statusBarType);
       if (instances.Length == 0) return null;
 
-      // GUIView.visualTree is the root VisualElement (internal property)
       var guiViewType = asm.GetType("UnityEditor.GUIView");
       if (guiViewType == null) return null;
 
       var prop = guiViewType.GetProperty("visualTree",
         BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
-      // Fallback name used in some Unity versions
       prop ??= guiViewType.GetProperty("rootVisualElement",
         BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
 
@@ -110,8 +102,12 @@ namespace UnityJS.Editor
       s_Container.AddManipulator(new Clickable(OnClick));
       visualTree.Add(s_Container);
 
-      TscWatchService.StateChanged -= OnStateChanged;
-      TscWatchService.StateChanged += OnStateChanged;
+      var compiler = TscCompiler.Instance;
+      if (compiler != null)
+      {
+        compiler.StateChanged -= OnStateChanged;
+        compiler.StateChanged += OnStateChanged;
+      }
       EditorApplication.update -= OnEditorUpdate;
       EditorApplication.update += OnEditorUpdate;
 
@@ -126,7 +122,8 @@ namespace UnityJS.Editor
 
     static void OnEditorUpdate()
     {
-      if (TscWatchService.State == TscWatchState.Compiling)
+      var compiler = TscCompiler.Instance;
+      if (compiler != null && compiler.State == TscState.Compiling)
       {
         var now = EditorApplication.timeSinceStartup;
         if (now - s_LastSpinTime >= SpinInterval)
@@ -149,20 +146,20 @@ namespace UnityJS.Editor
     static void UpdateIcon()
     {
       if (s_Icon == null) return;
-      var state = TscWatchService.State;
+      var compiler = TscCompiler.Instance;
+      var state = compiler?.State ?? TscState.Dead;
       s_Icon.image = IconForState(state);
       s_Container.tooltip = TooltipForState(state);
     }
 
-    static Texture IconForState(TscWatchState state)
+    static Texture IconForState(TscState state)
     {
       var name = state switch
       {
-        TscWatchState.Dead => "d_winbtn_mac_close",
-        TscWatchState.Idle => "d_ViewToolOrbit",
-        TscWatchState.Compiling => k_SpinIcons[s_SpinFrame],
-        TscWatchState.Success => "TestPassed",
-        TscWatchState.Error => "console.erroricon.sml",
+        TscState.Dead => "d_winbtn_mac_close",
+        TscState.Compiling => k_SpinIcons[s_SpinFrame],
+        TscState.Success => "TestPassed",
+        TscState.Error => "console.erroricon.sml",
         _ => null,
       };
       if (name == null) return null;
@@ -170,23 +167,23 @@ namespace UnityJS.Editor
       return content?.image;
     }
 
-    static string TooltipForState(TscWatchState state)
+    static string TooltipForState(TscState state)
     {
       return state switch
       {
-        TscWatchState.Dead => "tsc --watch is not running\nClick to restart",
-        TscWatchState.Idle => "tsc --watch is idle",
-        TscWatchState.Compiling => "tsc is compiling…",
-        TscWatchState.Success => "tsc compilation succeeded",
-        TscWatchState.Error => BuildErrorTooltip(),
+        TscState.Dead => "tsc is not available\nClick to recompile",
+        TscState.Compiling => "tsc is compiling\u2026",
+        TscState.Success => "tsc compilation succeeded",
+        TscState.Error => BuildErrorTooltip(),
         _ => "",
       };
     }
 
     static string BuildErrorTooltip()
     {
-      var errors = TscWatchService.LastErrors;
-      if (errors.Count == 0)
+      var compiler = TscCompiler.Instance;
+      var errors = compiler?.LastErrors;
+      if (errors == null || errors.Count == 0)
         return "tsc compilation failed";
 
       var sb = new StringBuilder();
@@ -195,19 +192,22 @@ namespace UnityJS.Editor
       for (int i = 0; i < count; i++)
         sb.AppendLine(errors[i]);
       if (errors.Count > 5)
-        sb.AppendLine($"… and {errors.Count - 5} more");
+        sb.AppendLine($"\u2026 and {errors.Count - 5} more");
       return sb.ToString().TrimEnd();
     }
 
     static void OnClick()
     {
-      switch (TscWatchService.State)
+      var compiler = TscCompiler.Instance;
+      if (compiler == null) return;
+
+      switch (compiler.State)
       {
-        case TscWatchState.Error:
+        case TscState.Error:
           EditorApplication.ExecuteMenuItem("Window/General/Console");
           break;
-        case TscWatchState.Dead:
-          EditorApplication.ExecuteMenuItem("Tools/JS/Restart tsc --watch");
+        case TscState.Dead:
+          EditorApplication.ExecuteMenuItem("Tools/JS/Recompile TypeScript");
           break;
       }
     }

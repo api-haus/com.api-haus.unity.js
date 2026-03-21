@@ -1,4 +1,6 @@
 #if UNITY_EDITOR
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -8,46 +10,80 @@ using UnityEngine;
 
 namespace UnityJS.Editor
 {
-  static class TscCompiler
+  public enum TscState { Dead, Compiling, Success, Error }
+
+  public sealed class TscCompiler
   {
-    internal static string TsconfigPath =>
-      Path.GetFullPath(
-        Path.Combine(Application.dataPath, "StreamingAssets", "unity.js", "tsconfig.json")
-      );
+    const string EpochKey = "TscCompiler.Epoch";
 
-    internal static string OutDir =>
-      Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "TscBuild"));
+    public static TscCompiler Instance { get; internal set; }
 
-    internal static void CleanOutDir()
+    public string SourceRoot { get; }
+    public string TsconfigPath { get; }
+    public string OutDir { get; }
+
+    public TscState State { get; private set; }
+    public event Action StateChanged;
+    public int Epoch { get; private set; }
+    public bool LastCompilationSucceeded { get; private set; }
+
+    readonly List<string> m_Errors = new();
+    public IReadOnlyList<string> LastErrors => m_Errors;
+
+    public TscCompiler(string sourceRoot)
     {
+      SourceRoot = Path.GetFullPath(sourceRoot);
+      TsconfigPath = Path.Combine(SourceRoot, "tsconfig.json");
+      OutDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "TscBuild"));
+      Epoch = SessionState.GetInt(EpochKey, 0);
+      LastCompilationSucceeded = true;
+      State = File.Exists(TsconfigPath) ? TscState.Success : TscState.Dead;
+    }
+
+    void SetState(TscState newState)
+    {
+      if (State == newState) return;
+      State = newState;
+      EditorApplication.delayCall += () => StateChanged?.Invoke();
+    }
+
+    public bool Recompile()
+    {
+      if (!File.Exists(TsconfigPath))
+      {
+        SetState(TscState.Dead);
+        return false;
+      }
+
+      SetState(TscState.Compiling);
+
       if (Directory.Exists(OutDir))
         Directory.Delete(OutDir, true);
+
+      var (success, errors) = RunTscProcess();
+
+      m_Errors.Clear();
+      m_Errors.AddRange(errors);
+      LastCompilationSucceeded = success;
+
+      if (success)
+      {
+        Epoch++;
+        SessionState.SetInt(EpochKey, Epoch);
+      }
+
+      SetState(success ? TscState.Success : TscState.Error);
+      return success;
     }
 
-    internal static void OnDomainReload()
-    {
-      if (ShouldCompile())
-        RunTsc();
-    }
-
-    [MenuItem("Tools/JS/Compile TypeScript")]
-    public static void CompileMenu()
-    {
-      RunTsc();
-    }
-
-    static bool ShouldCompile()
+    public bool IsStale()
     {
       if (!Directory.Exists(OutDir))
         return true;
 
-      var tsRoot = Path.GetFullPath(
-        Path.Combine(Application.dataPath, "StreamingAssets", "unity.js")
-      );
-
-      foreach (var subdir in new[] { "systems", "components" })
+      foreach (var subdir in new[] { "systems", "components", "types" })
       {
-        var tsDir = Path.Combine(tsRoot, subdir);
+        var tsDir = Path.Combine(SourceRoot, subdir);
         if (!Directory.Exists(tsDir))
           continue;
 
@@ -64,28 +100,40 @@ namespace UnityJS.Editor
           if (File.GetLastWriteTimeUtc(ts) > File.GetLastWriteTimeUtc(jsPath))
             return true;
         }
+
+        // Check for dead .js files with no corresponding .ts
+        if (!Directory.Exists(outSubdir))
+          continue;
+        var jsFiles = Directory.GetFiles(outSubdir, "*.js", SearchOption.AllDirectories);
+        foreach (var js in jsFiles)
+        {
+          var relative = js.Substring(outSubdir.Length)
+            .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+          var tsName = Path.ChangeExtension(relative, ".ts");
+          var tsPath = Path.Combine(tsDir, tsName);
+          if (!File.Exists(tsPath))
+            return true;
+        }
       }
 
       return false;
     }
 
-    internal static bool RunTsc()
+    public bool RecompileIfStale()
     {
-      CleanOutDir();
-      var tsconfigPath = TsconfigPath;
-      if (!File.Exists(tsconfigPath))
-      {
-        Log.Warning("[TscCompiler] tsconfig.json not found at {0}", tsconfigPath);
+      if (!IsStale())
         return false;
-      }
+      return Recompile();
+    }
 
+    (bool success, List<string> errors) RunTscProcess()
+    {
+      var errors = new List<string>();
       var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-      var npx = "npx";
-
       var psi = new ProcessStartInfo
       {
-        FileName = npx,
-        Arguments = $"tsc -p \"{tsconfigPath}\"",
+        FileName = "npx",
+        Arguments = $"tsc -p \"{TsconfigPath}\"",
         WorkingDirectory = projectRoot,
         RedirectStandardOutput = true,
         RedirectStandardError = true,
@@ -95,29 +143,35 @@ namespace UnityJS.Editor
 
       using var proc = Process.Start(psi);
       if (proc == null)
-      {
-        Log.Error("[TscCompiler] Failed to start tsc process");
-        return false;
-      }
+        return (false, new List<string> { "Failed to start tsc process" });
 
       var stdout = proc.StandardOutput.ReadToEnd();
       var stderr = proc.StandardError.ReadToEnd();
       proc.WaitForExit(30000);
 
-      if (proc.ExitCode != 0)
+      foreach (var line in (stdout + "\n" + stderr).Split('\n'))
+        if (line.Contains("error TS"))
+          errors.Add(line.Trim());
+
+      var success = proc.ExitCode == 0;
+      if (success)
       {
-        var output = (stdout + "\n" + stderr).Trim();
-        var errorCount = output.Split('\n').Count(l => l.Contains("error TS"));
-        Log.Error("[TscCompiler] tsc failed with {0} error(s):\n{1}", errorCount, output);
-        return false;
+        var jsCount = Directory.Exists(OutDir)
+          ? Directory.GetFiles(OutDir, "*.js", SearchOption.AllDirectories).Length
+          : 0;
+        Log.Debug("[TscCompiler] Compiled {0} file(s) to Library/TscBuild/", jsCount);
+      }
+      else
+      {
+        Log.Error("[TscCompiler] tsc failed with {0} error(s):\n{1}",
+          errors.Count, (stdout + "\n" + stderr).Trim());
       }
 
-      var jsCount = Directory.Exists(OutDir)
-        ? Directory.GetFiles(OutDir, "*.js", SearchOption.AllDirectories).Length
-        : 0;
-      Log.Debug("[TscCompiler] Compiled {0} file(s) to Library/TscBuild/", jsCount);
-      return true;
+      return (success, errors);
     }
+
+    [MenuItem("Tools/JS/Recompile TypeScript")]
+    static void RecompileMenu() => Instance?.Recompile();
   }
 }
 #endif

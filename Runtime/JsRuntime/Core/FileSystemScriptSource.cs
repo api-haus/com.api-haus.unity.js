@@ -45,27 +45,22 @@ namespace UnityJS.Runtime
       if (string.IsNullOrEmpty(scriptName))
         return false;
 
-      string[] extensions = { ".js", ".ts" };
-
-      foreach (var ext in extensions)
+      // Try direct path: {basePath}/{scriptName}.js
+      var directPath = Path.Combine(m_BasePath, scriptName + ".js");
+      if (File.Exists(directPath))
       {
-        // Try direct path: {basePath}/{scriptName}{ext}
-        var directPath = Path.Combine(m_BasePath, scriptName + ext);
-        if (File.Exists(directPath))
-        {
-          source = File.ReadAllText(directPath);
-          resolvedId = Path.GetFullPath(directPath);
-          return true;
-        }
+        source = File.ReadAllText(directPath);
+        resolvedId = Path.GetFullPath(directPath);
+        return true;
+      }
 
-        // Try under systems/: {basePath}/systems/{scriptName}{ext}
-        var systemsPath = Path.Combine(m_BasePath, "systems", scriptName + ext);
-        if (File.Exists(systemsPath))
-        {
-          source = File.ReadAllText(systemsPath);
-          resolvedId = Path.GetFullPath(systemsPath);
-          return true;
-        }
+      // Try under systems/: {basePath}/systems/{scriptName}.js
+      var systemsPath = Path.Combine(m_BasePath, "systems", scriptName + ".js");
+      if (File.Exists(systemsPath))
+      {
+        source = File.ReadAllText(systemsPath);
+        resolvedId = Path.GetFullPath(systemsPath);
+        return true;
       }
 
       return false;

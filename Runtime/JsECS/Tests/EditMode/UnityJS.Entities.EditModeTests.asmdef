@@ -1,0 +1,35 @@
+{
+  "name": "UnityJS.Entities.EditModeTests",
+  "rootNamespace": "UnityJS.Entities.EditModeTests",
+  "references": [
+    "UnityJS.QJS",
+    "UnityJS.Runtime",
+    "UnityJS.Entities",
+    "UnityJS.Editor",
+    "Unity.Entities",
+    "Unity.Entities.Hybrid",
+    "Unity.Mathematics",
+    "Unity.Collections",
+    "Unity.Transforms",
+    "Unity.Burst",
+    "Unity.Logging",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "Project.ECS"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

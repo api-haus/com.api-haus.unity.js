@@ -12,7 +12,8 @@ namespace UnityJS.Editor
   {
     public int callbackOrder => 0;
 
-    static string TscBuildRoot => TscCompiler.OutDir;
+    static string TscBuildRoot => TscCompiler.Instance?.OutDir
+      ?? Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "TscBuild"));
 
     static string StreamingAssetsRoot =>
       Path.Combine(Application.dataPath, "StreamingAssets", "unity.js");
@@ -21,7 +22,8 @@ namespace UnityJS.Editor
 
     public void OnPreprocessBuild(BuildReport report)
     {
-      if (!TscCompiler.RunTsc())
+      var compiler = TscCompiler.Instance;
+      if (compiler == null || !compiler.Recompile())
         throw new BuildFailedException("[TscBuildPreprocessor] TypeScript compilation failed");
 
       var src = TscBuildRoot;
