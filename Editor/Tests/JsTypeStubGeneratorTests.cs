@@ -138,12 +138,11 @@ namespace UnityJS.Editor.Tests
       }
     }
 
-    // ── ReadOnly component (NeedSetters = false) ─────────────────
+    // ── ECSCharacterState component accessor ───────────────────
 
     [Test]
-    public void GenerateContent_ReadOnlyComponent_NoSetFunction()
+    public void GenerateContent_ECSCharacterState_HasComponentAccessor()
     {
-      // ECSCharacterState has NeedSetters = false → ReadonlyComponentAccessor
       if (!m_Content.Contains("interface ECSCharacterState"))
       {
         Assert.Inconclusive("ECSCharacterState not in stub");
@@ -151,7 +150,7 @@ namespace UnityJS.Editor.Tests
       }
 
       StringAssert.Contains(
-        "export const ECSCharacterState: ReadonlyComponentAccessor<ECSCharacterState>;",
+        "export const ECSCharacterState: ComponentAccessor<ECSCharacterState>;",
         m_Content
       );
     }

@@ -62,6 +62,24 @@ namespace UnityJS.Entities.Core
       };
     }
 
+    /// <summary>
+    /// Clears all entity mappings without disposing the NativeContainers.
+    /// Use in test SetUp to get a clean state without destroying the shared registry.
+    /// </summary>
+    public static void Clear()
+    {
+      ref var data = ref s_registry.Data;
+      if (!data.isCreated)
+        return;
+
+      if (data.idToEntity.IsCreated) data.idToEntity.Clear();
+      if (data.entityToId.IsCreated) data.entityToId.Clear();
+      if (data.pendingCreations.IsCreated) data.pendingCreations.Clear();
+      if (data.pendingDestructions.IsCreated) data.pendingDestructions.Clear();
+      if (data.pendingEntityIds.IsCreated) data.pendingEntityIds.Clear();
+      data.nextId = 1;
+    }
+
     public static void Dispose()
     {
       ref var data = ref s_registry.Data;

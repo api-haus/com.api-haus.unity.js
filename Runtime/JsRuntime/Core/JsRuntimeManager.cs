@@ -24,6 +24,19 @@ namespace UnityJS.Runtime
     public static JsRuntimeManager Instance => s_Instance;
     public static int InstanceVersion => s_InstanceVersion;
 
+    /// <summary>
+    /// Restores a previously saved VM as the global singleton.
+    /// Used by tests that temporarily replace the singleton with a test VM.
+    /// </summary>
+    public static void RestoreInstance(JsRuntimeManager vm)
+    {
+      if (vm != null && vm.IsValid)
+      {
+        s_Instance = vm;
+        // Don't increment version — the VM didn't change, it was just temporarily shadowed
+      }
+    }
+
     JSRuntime m_Runtime;
     JSContext m_Context;
     readonly Dictionary<string, JSValue> m_ScriptRefs = new();
@@ -765,9 +778,9 @@ namespace UnityJS.Runtime
       m_CapturedExceptions.Add($"{context}: {msg}");
 
       if (!string.IsNullOrEmpty(stack))
-        Log.Error("[JsRuntime] Exception in {0}: {1}\n{2}", context, msg, stack);
+        UnityEngine.Debug.LogError($"[JsRuntime] Exception in {context}: {msg}\n{stack}");
       else
-        Log.Error("[JsRuntime] Exception in {0}: {1}", context, msg);
+        UnityEngine.Debug.LogError($"[JsRuntime] Exception in {context}: {msg}");
     }
   }
 }

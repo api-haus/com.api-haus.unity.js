@@ -1,6 +1,7 @@
 namespace UnityJS.Entities.PlayModeTests
 {
   using System.Collections;
+  using System.Collections.Generic;
   using System.Runtime.InteropServices;
   using Components;
   using Core;
@@ -18,6 +19,7 @@ namespace UnityJS.Entities.PlayModeTests
     JsRuntimeManager m_Vm;
     World m_World;
     EntityManager m_EntityManager;
+    readonly List<Entity> m_CreatedEntities = new();
 
     static readonly string s_testsPath = System.IO.Path.Combine(
       Application.streamingAssetsPath,
@@ -31,14 +33,20 @@ namespace UnityJS.Entities.PlayModeTests
       m_World = World.DefaultGameObjectInjectionWorld;
       m_EntityManager = m_World.EntityManager;
 
+      // Ensure the VM + system pipeline is fully initialized by ticking two frames.
       m_Vm = JsRuntimeManager.GetOrCreate();
-      m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
+      yield return null;
+      yield return null;
+
+      // Re-acquire in case the system pipeline recreated the VM
+      m_Vm = JsRuntimeManager.Instance ?? m_Vm;
+
       JsECSBridge.Initialize(m_World);
 
       JsScriptSearchPaths.AddSearchPath(s_testsPath, 0);
 
-      JsEntityRegistry.Dispose();
-      JsEntityRegistry.Initialize(16);
+      if (!JsEntityRegistry.IsCreated)
+        JsEntityRegistry.Initialize(16);
 
       // Clear globals
       ClearGlobal("_testInitCalled");
@@ -51,14 +59,11 @@ namespace UnityJS.Entities.PlayModeTests
     [UnityTearDown]
     public IEnumerator TearDown()
     {
-      JsEntityRegistry.Dispose();
       JsScriptSearchPaths.RemoveSearchPath(s_testsPath);
-      var query = m_EntityManager.CreateEntityQuery(typeof(JsEntityId));
-      m_EntityManager.DestroyEntity(query);
-
-      // Clean up JsScript cleanup entities too
-      var cleanupQuery = m_EntityManager.CreateEntityQuery(typeof(JsScript));
-      m_EntityManager.DestroyEntity(cleanupQuery);
+      foreach (var entity in m_CreatedEntities)
+        if (m_EntityManager.Exists(entity))
+          m_EntityManager.DestroyEntity(entity);
+      m_CreatedEntities.Clear();
 
       yield return null;
     }

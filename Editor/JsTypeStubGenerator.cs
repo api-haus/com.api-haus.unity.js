@@ -304,7 +304,7 @@ namespace UnityJS.Editor
       sb.AppendLine("// ── Component Interfaces (ambient) ──────────────────────");
       sb.AppendLine();
 
-      var targets = new List<(string jsName, Type type, bool needAccessors, bool needSetters)>();
+      var targets = new List<(string jsName, Type type)>();
 
       foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
       {
@@ -326,7 +326,7 @@ namespace UnityJS.Editor
           if (attr == null)
             continue;
           var jsName = !string.IsNullOrEmpty(attr.JsName) ? attr.JsName : t.Name;
-          targets.Add((jsName, t, attr.NeedAccessors, attr.NeedSetters));
+          targets.Add((jsName, t));
         }
 
         foreach (var attr in asm.GetCustomAttributes<JsBridgeAttribute>())
@@ -334,13 +334,13 @@ namespace UnityJS.Editor
           if (attr.ComponentType == null)
             continue;
           var jsName = !string.IsNullOrEmpty(attr.JsName) ? attr.JsName : attr.ComponentType.Name;
-          targets.Add((jsName, attr.ComponentType, attr.NeedAccessors, attr.NeedSetters));
+          targets.Add((jsName, attr.ComponentType));
         }
       }
 
       targets.Sort((a, b) => string.Compare(a.jsName, b.jsName, StringComparison.Ordinal));
 
-      foreach (var (jsName, type, needAccessors, needSetters) in targets)
+      foreach (var (jsName, type) in targets)
       {
         var className = type.Name;
         var docs = GetComponentDocs(type);
@@ -392,21 +392,14 @@ namespace UnityJS.Editor
         }
       }
 
-      foreach (var (jsName, type, needAccessors, needSetters) in targets)
+      foreach (var (jsName, type) in targets)
       {
         var className = type.Name;
         var isComponent = typeof(Unity.Entities.IComponentData).IsAssignableFrom(type);
         if (!isComponent)
           continue;
 
-        if (needSetters)
-        {
-          sb.AppendLine($"  export const {jsName}: ComponentAccessor<{className}>;");
-        }
-        else if (needAccessors)
-        {
-          sb.AppendLine($"  export const {jsName}: ReadonlyComponentAccessor<{className}>;");
-        }
+        sb.AppendLine($"  export const {jsName}: ComponentAccessor<{className}>;");
       }
 
       sb.AppendLine("}");

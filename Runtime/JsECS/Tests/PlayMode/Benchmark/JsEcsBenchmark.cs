@@ -2,6 +2,7 @@ namespace UnityJS.Entities.PlayModeTests
 {
   using System;
   using System.Collections;
+  using System.Collections.Generic;
   using System.Runtime.InteropServices;
   using System.Text;
   using Components;
@@ -20,6 +21,7 @@ namespace UnityJS.Entities.PlayModeTests
     JsRuntimeManager m_Vm;
     World m_World;
     EntityManager m_EntityManager;
+    readonly List<Entity> m_CreatedEntities = new();
 
     static readonly string[] s_CompNames =
     {
@@ -53,16 +55,16 @@ namespace UnityJS.Entities.PlayModeTests
 
       m_Vm = JsRuntimeManager.GetOrCreate();
 
-      JsEntityRegistry.Dispose();
       JsEntityRegistry.Initialize(128_000);
     }
 
     [UnityTearDown]
     public IEnumerator TearDown()
     {
-      JsEntityRegistry.Dispose();
-      var query = m_EntityManager.CreateEntityQuery(typeof(JsEntityId));
-      m_EntityManager.DestroyEntity(query);
+      foreach (var entity in m_CreatedEntities)
+        if (m_EntityManager.Exists(entity))
+          m_EntityManager.DestroyEntity(entity);
+      m_CreatedEntities.Clear();
 
       yield return null;
     }
@@ -81,6 +83,7 @@ namespace UnityJS.Entities.PlayModeTests
 
       for (var i = 0; i < entities.Length; i++)
       {
+        m_CreatedEntities.Add(entities[i]);
         var id = JsEntityRegistry.AllocateId();
         JsEntityRegistry.RegisterImmediate(entities[i], id, m_EntityManager);
       }

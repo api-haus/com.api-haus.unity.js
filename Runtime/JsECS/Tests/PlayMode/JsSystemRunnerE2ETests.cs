@@ -1,6 +1,7 @@
 namespace UnityJS.Entities.PlayModeTests
 {
   using System.Collections;
+  using System.Collections.Generic;
   using System.Runtime.InteropServices;
   using System.Text;
   using Components;
@@ -26,6 +27,7 @@ namespace UnityJS.Entities.PlayModeTests
     World m_World;
     EntityManager m_EntityManager;
     JsRuntimeManager m_Vm;
+    readonly List<Entity> m_CreatedEntities = new();
 
     [UnitySetUp]
     public IEnumerator SetUp()
@@ -44,11 +46,11 @@ namespace UnityJS.Entities.PlayModeTests
     [UnityTearDown]
     public IEnumerator TearDown()
     {
-      // Clean up any test entities
-      var query = m_EntityManager.CreateEntityQuery(typeof(JsEntityId));
-      m_EntityManager.DestroyEntity(query);
-      var cleanupQuery = m_EntityManager.CreateEntityQuery(typeof(JsScript));
-      m_EntityManager.DestroyEntity(cleanupQuery);
+      // Destroy only entities created by this test
+      foreach (var entity in m_CreatedEntities)
+        if (m_EntityManager.Exists(entity))
+          m_EntityManager.DestroyEntity(entity);
+      m_CreatedEntities.Clear();
 
       yield return null;
     }

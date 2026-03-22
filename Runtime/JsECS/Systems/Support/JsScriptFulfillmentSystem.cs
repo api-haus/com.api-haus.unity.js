@@ -122,6 +122,8 @@ namespace UnityJS.Entities.Systems.Support
           continue;
 
         var entityId = JsEntityRegistry.GetOrAssignEntityId(entity, ecb, EntityManager);
+        // Ensure entity is in the main map (not just pending) so BurstContext can find it
+        JsEntityRegistry.RegisterImmediate(entity, entityId, EntityManager);
 
         for (var i = 0; i < scripts.Length; i++)
         {
@@ -141,7 +143,7 @@ namespace UnityJS.Entities.Systems.Support
 
           if (string.IsNullOrEmpty(scriptName))
           {
-            Log.Error("[JsComponentInit] Script name is empty for entity {0}", entity);
+            UnityEngine.Debug.LogError($"[JsComponentInit] Script name is empty for entity {entity}");
             entry.disabled = true;
             scripts[i] = entry;
             continue;
@@ -149,7 +151,7 @@ namespace UnityJS.Entities.Systems.Support
 
           if (!JsScriptSourceRegistry.TryReadScript(scriptName, out var source, out var resolvedId))
           {
-            Log.Error("[JsComponentInit] Script not found in any source: {0}", scriptName);
+            UnityEngine.Debug.LogError($"[JsComponentInit] Script not found in any source: {scriptName}");
             entry.disabled = true;
             scripts[i] = entry;
             continue;
@@ -161,7 +163,7 @@ namespace UnityJS.Entities.Systems.Support
           }
           else if (!m_Vm.LoadScriptAsModule(scriptName, source, resolvedId))
           {
-            Log.Error("[JsComponentInit] Failed to load script: {0}", scriptName);
+            UnityEngine.Debug.LogError($"[JsComponentInit] Failed to load script: {scriptName}");
             entry.disabled = true;
             scripts[i] = entry;
             continue;
@@ -173,11 +175,7 @@ namespace UnityJS.Entities.Systems.Support
           var stateRef = m_Vm.CreateEntityState(scriptName, entityId);
           if (stateRef < 0)
           {
-            Log.Error(
-              "[JsComponentInit] CreateEntityState failed for {0} entity={1}",
-              scriptName,
-              entityId
-            );
+            UnityEngine.Debug.LogError($"[JsComponentInit] CreateEntityState failed for {scriptName} entity={entityId}");
             entry.disabled = true;
             scripts[i] = entry;
             continue;

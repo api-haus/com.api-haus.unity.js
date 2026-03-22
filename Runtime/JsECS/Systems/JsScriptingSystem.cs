@@ -104,7 +104,8 @@ namespace UnityJS.Entities.Systems
 
       s_frameCount++;
 
-      var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
+      if (!SystemAPI.TryGetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>(out var ecbSingleton))
+        return;
       m_CurrentECB = ecbSingleton.CreateCommandBuffer(World.Unmanaged);
       m_ECBValid = true;
 

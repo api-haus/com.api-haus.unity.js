@@ -32,6 +32,12 @@ namespace UnityJS.Entities.PlayModeTests
     {
       m_Manager?.Dispose();
       m_Manager = null;
+
+      // Restore a valid VM for the DefaultWorld's system pipeline.
+      // Without this, JsComponentInitSystem/JsSystemRunner detect a null VM
+      // and may fail to re-initialize, contaminating subsequent tests.
+      if (JsRuntimeManager.Instance == null || !JsRuntimeManager.Instance.IsValid)
+        JsRuntimeManager.GetOrCreate();
     }
 
     /// <summary>

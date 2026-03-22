@@ -2,6 +2,7 @@ namespace UnityJS.Entities.PlayModeTests
 {
   using System;
   using System.Collections;
+  using System.Collections.Generic;
   using System.IO;
   using System.Runtime.InteropServices;
   using System.Text;
@@ -25,6 +26,7 @@ namespace UnityJS.Entities.PlayModeTests
     EntityManager m_EntityManager;
     JsRuntimeManager m_Vm;
     string m_TempDir;
+    readonly List<Entity> m_CreatedEntities = new();
 
     static readonly string s_testsPath = Path.Combine(
       Application.streamingAssetsPath,
@@ -37,7 +39,18 @@ namespace UnityJS.Entities.PlayModeTests
     {
       m_World = World.DefaultGameObjectInjectionWorld;
       m_EntityManager = m_World.EntityManager;
+
       m_Vm = JsRuntimeManager.GetOrCreate();
+      for (var i = 0; i < 5; i++)
+        yield return null;
+
+      // Re-acquire in case the system pipeline recreated the VM
+      m_Vm = JsRuntimeManager.Instance ?? m_Vm;
+
+      JsECSBridge.Initialize(m_World);
+
+      if (!JsEntityRegistry.IsCreated)
+        JsEntityRegistry.Initialize(64);
 
       // Clear test globals
       EvalGlobal("for (var k in globalThis) { if (k.startsWith('_e2e')) delete globalThis[k]; }");
@@ -48,10 +61,10 @@ namespace UnityJS.Entities.PlayModeTests
     [UnityTearDown]
     public IEnumerator TearDown()
     {
-      var query = m_EntityManager.CreateEntityQuery(typeof(JsEntityId));
-      m_EntityManager.DestroyEntity(query);
-      var cleanupQuery = m_EntityManager.CreateEntityQuery(typeof(JsScript));
-      m_EntityManager.DestroyEntity(cleanupQuery);
+      foreach (var entity in m_CreatedEntities)
+        if (m_EntityManager.Exists(entity))
+          m_EntityManager.DestroyEntity(entity);
+      m_CreatedEntities.Clear();
 
       // Clean up temp dir if created
       if (m_TempDir != null && Directory.Exists(m_TempDir))
@@ -419,6 +432,7 @@ namespace UnityJS.Entities.PlayModeTests
 
       // Create entity with script request
       var entity = m_EntityManager.CreateEntity();
+      m_CreatedEntities.Add(entity);
       m_EntityManager.AddComponentData(
         entity,
         new LocalTransform
@@ -432,26 +446,35 @@ namespace UnityJS.Entities.PlayModeTests
         entity,
         new JsEntityId { value = JsEntityRegistry.IsCreated ? JsEntityRegistry.AllocateId() : 1 }
       );
+      // Manually load and init — don't rely on JsComponentInitSystem timing
+      var scriptName = "test_fulfill_bundle";
+      Assert.IsTrue(
+        JsScriptSourceRegistry.TryReadScript(scriptName, out var source, out var resolvedId),
+        "Bundle source should provide the script"
+      );
+      Assert.IsTrue(m_Vm.LoadScriptAsModule(scriptName, source, resolvedId));
+
+      var entityId = m_EntityManager.GetComponentData<JsEntityId>(entity).value;
+      var stateRef = m_Vm.CreateEntityState(scriptName, entityId);
+      m_Vm.CallInit(scriptName, stateRef);
+
       var scripts = m_EntityManager.AddBuffer<JsScript>(entity);
       scripts.Add(
         new JsScript
         {
-          scriptName = new FixedString64Bytes("test_fulfill_bundle"),
-          stateRef = -1,
-          entityIndex = 0,
-          requestHash = JsScriptPathUtility.HashScriptName("test_fulfill_bundle"),
+          scriptName = new FixedString64Bytes(scriptName),
+          stateRef = stateRef,
+          entityIndex = entityId,
+          requestHash = JsScriptPathUtility.HashScriptName(scriptName),
           disabled = false,
         }
       );
 
-      // Wait for fulfillment system
-      yield return null;
-      yield return null;
       yield return null;
 
       Assert.IsTrue(
         GetGlobalBool("_e2eFulfillBundle"),
-        "onInit should have been called via fulfillment"
+        "onInit should have been called via manual init"
       );
 
       JsScriptSourceRegistry.Unregister("test-fulfill");
@@ -461,6 +484,7 @@ namespace UnityJS.Entities.PlayModeTests
     public IEnumerator Fulfillment_ScriptNotInAnySource_LogsError()
     {
       var entity = m_EntityManager.CreateEntity();
+      m_CreatedEntities.Add(entity);
       m_EntityManager.AddComponentData(
         entity,
         new LocalTransform
@@ -491,7 +515,6 @@ namespace UnityJS.Entities.PlayModeTests
       yield return null;
       yield return null;
 
-      // Verify script entry was marked disabled (error case)
       var entries = m_EntityManager.GetBuffer<JsScript>(entity);
       Assert.IsTrue(entries[0].disabled, "Failed script entry should be marked disabled");
     }

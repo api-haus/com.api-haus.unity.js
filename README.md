@@ -184,9 +184,6 @@ Generates `.get(eid)` / `.set(eid, obj)` accessors:
 ```csharp
 [JsBridge]
 public struct MyData : IComponentData { public float speed; }
-
-[JsBridge(NeedSetters = false)]  // read-only, no .set()
-public struct MyState : IComponentData { public bool active; }
 ```
 
 ### On enums

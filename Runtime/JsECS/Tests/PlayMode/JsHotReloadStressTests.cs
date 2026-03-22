@@ -83,7 +83,12 @@ namespace UnityJS.Entities.PlayModeTests
     [TearDown]
     public void TearDown()
     {
-      JsRuntimeManager.Instance?.Dispose();
+      // Dispose any test VM that replaced the singleton
+      if (JsRuntimeManager.Instance != null)
+        JsRuntimeManager.Instance.Dispose();
+
+      // Create a fresh VM for the DefaultWorld pipeline
+      JsRuntimeManager.GetOrCreate();
     }
 
     // --------------- tests ---------------

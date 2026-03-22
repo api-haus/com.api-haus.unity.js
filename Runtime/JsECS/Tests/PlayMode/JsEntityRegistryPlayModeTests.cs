@@ -22,8 +22,10 @@ namespace UnityJS.Entities.PlayModeTests
       m_EntityManager = m_World.EntityManager;
       m_ECBSystem = m_World.GetExistingSystemManaged<EndSimulationEntityCommandBufferSystem>();
 
-      JsEntityRegistry.Dispose();
-      JsEntityRegistry.Initialize(16);
+      if (!JsEntityRegistry.IsCreated)
+        JsEntityRegistry.Initialize(16);
+      else
+        JsEntityRegistry.Clear();
 
       yield return null;
     }
@@ -36,7 +38,6 @@ namespace UnityJS.Entities.PlayModeTests
     [UnityTearDown]
     public IEnumerator TearDown()
     {
-      JsEntityRegistry.Dispose();
       var query = m_EntityManager.CreateEntityQuery(typeof(JsEntityId));
       m_EntityManager.DestroyEntity(query);
       yield return null;

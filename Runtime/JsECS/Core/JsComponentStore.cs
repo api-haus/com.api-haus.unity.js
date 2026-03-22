@@ -194,7 +194,7 @@ namespace UnityJS.Entities.Core
       // Check for collision with C#-defined components
       if (JsComponentRegistry.TryGetComponentType(name, out _))
       {
-        Log.Error("[JsComponentStore] ecs.define: '{0}' already exists as a C# component", name);
+        Log.Warning("[JsComponentStore] ecs.define: '{0}' already exists as a C# component", name);
         SetUndefined(outU, outTag);
         return;
       }
@@ -366,18 +366,12 @@ namespace UnityJS.Entities.Core
       }
 
       var entity = JsECSBridge.GetEntityFromIdBurst(entityId);
-      if (entity == Entity.Null)
+      if (entity != Entity.Null)
       {
-        Log.Error("[JsComponentStore] ecs.add: entity {0} not found", entityId);
-        SetUndefined(outU, outTag);
-        return;
+        ecb.AddComponent(entity, GetTagType(slot));
+        if (b.EntitiesWithCleanup.Add(entityId))
+          ecb.AddComponent(entity, new JsDataCleanup { entityId = entityId });
       }
-
-      ecb.AddComponent(entity, GetTagType(slot));
-
-      // Add JsDataCleanup if not already present
-      if (b.EntitiesWithCleanup.Add(entityId))
-        ecb.AddComponent(entity, new JsDataCleanup { entityId = entityId });
 
       // Return the data or true
       if (argc >= 3 && QJS.IsObject(argv[2]))

@@ -20,6 +20,7 @@ namespace UnityJS.Entities.PlayModeTests
     World m_World;
     EntityManager m_EntityManager;
     List<(string scriptId, int stateRef)> m_LoadedScripts;
+    readonly List<Entity> m_CreatedEntities = new();
     int m_UniqueCounter;
 
     [UnitySetUp]
@@ -32,7 +33,6 @@ namespace UnityJS.Entities.PlayModeTests
       m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
       JsECSBridge.Initialize(m_World);
 
-      JsEntityRegistry.Dispose();
       JsEntityRegistry.Initialize(64);
 
       m_LoadedScripts = new List<(string, int)>();
@@ -52,11 +52,10 @@ namespace UnityJS.Entities.PlayModeTests
           m_Vm.ReleaseEntityState(stateRef);
       m_LoadedScripts.Clear();
 
-      JsEntityRegistry.Dispose();
-      var query = m_EntityManager.CreateEntityQuery(typeof(JsEntityId));
-      m_EntityManager.DestroyEntity(query);
-      var cleanupQuery = m_EntityManager.CreateEntityQuery(typeof(JsScript));
-      m_EntityManager.DestroyEntity(cleanupQuery);
+      foreach (var entity in m_CreatedEntities)
+        if (m_EntityManager.Exists(entity))
+          m_EntityManager.DestroyEntity(entity);
+      m_CreatedEntities.Clear();
 
       yield return null;
     }

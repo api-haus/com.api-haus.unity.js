@@ -107,7 +107,7 @@ public struct ECSCharacterStats : IComponentData
 }
 
 /// <summary>Read-only character physics state exposed to Lua.</summary>
-[JsBridge(NeedSetters = false)]
+[JsBridge]
 public struct ECSCharacterState : IComponentData
 {
   /// <summary>Whether the character is currently touching ground.</summary>

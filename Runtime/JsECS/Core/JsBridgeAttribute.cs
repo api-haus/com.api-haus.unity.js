@@ -10,9 +10,6 @@ namespace UnityJS.Entities.Core
   {
     public string JsName { get; }
     public Type ComponentType { get; }
-    public bool NeedAccessors { get; set; } = true;
-    public bool NeedSetters { get; set; } = true;
-
     public JsBridgeAttribute(string jsName = null) => JsName = jsName;
 
     public JsBridgeAttribute(Type componentType, string jsName = null)

@@ -118,31 +118,14 @@ namespace JsGameCodegen
           continue;
 
         var jsName = (string)null;
-        var needAccessors = true;
-        var needSetters = true;
 
         if (attrData.ConstructorArguments.Length > 0)
           jsName = attrData.ConstructorArguments[0].Value as string;
 
-        foreach (var named in attrData.NamedArguments)
-        {
-          if (named.Key == "NeedAccessors" && named.Value.Value is bool na)
-            needAccessors = na;
-          else if (named.Key == "NeedSetters" && named.Value.Value is bool ns)
-            needSetters = ns;
-        }
-
         if (string.IsNullOrEmpty(jsName))
           jsName = symbol.Name;
 
-        // Non-components don't need ECS accessors
-        if (!isComponent)
-        {
-          needAccessors = false;
-          needSetters = false;
-        }
-
-        var fields = GetSupportedFields(symbol, needAccessors, needSetters, ct);
+        var fields = GetSupportedFields(symbol, ct);
         if (fields.Length == 0)
           return null;
 
@@ -151,8 +134,6 @@ namespace JsGameCodegen
           symbol.Name,
           symbol.ToDisplayString(),
           jsName,
-          needAccessors,
-          needSetters,
           isComponent,
           fields,
           desc
@@ -193,8 +174,6 @@ namespace JsGameCodegen
       var isComponent = ImplementsIComponentData(targetType);
 
       string jsName = null;
-      var needAccessors = true;
-      var needSetters = true;
 
       // Parse remaining args (positional or named)
       for (var i = 1; i < args.Value.Count; i++)
@@ -209,10 +188,6 @@ namespace JsGameCodegen
           var propName = arg.NameEquals.Name.Identifier.Text;
           if (propName == "jsName" && constVal.Value is string s)
             jsName = s;
-          else if (propName == "NeedAccessors" && constVal.Value is bool na)
-            needAccessors = na;
-          else if (propName == "NeedSetters" && constVal.Value is bool ns)
-            needSetters = ns;
         }
         else
         {
@@ -225,14 +200,7 @@ namespace JsGameCodegen
       if (string.IsNullOrEmpty(jsName))
         jsName = targetType.Name;
 
-      // Non-components don't need ECS accessors
-      if (!isComponent)
-      {
-        needAccessors = false;
-        needSetters = false;
-      }
-
-      var fields = GetSupportedFields(targetType, needAccessors, needSetters, ct);
+      var fields = GetSupportedFields(targetType, ct);
       if (fields.Length == 0)
         return null;
 
@@ -241,8 +209,6 @@ namespace JsGameCodegen
         targetType.Name,
         targetType.ToDisplayString(),
         jsName,
-        needAccessors,
-        needSetters,
         isComponent,
         fields,
         desc
@@ -301,8 +267,6 @@ namespace JsGameCodegen
 
     static ImmutableArray<FieldInfo> GetSupportedFields(
       INamedTypeSymbol type,
-      bool needAccessors,
-      bool needSetters,
       CancellationToken ct = default
     )
     {
@@ -325,8 +289,6 @@ namespace JsGameCodegen
             field.Name,
             field.Name,
             jsType,
-            needAccessors,
-            needSetters,
             enumTypeName,
             desc
           )
@@ -431,8 +393,6 @@ namespace JsGameCodegen
       var typeName = target.TypeName;
       var fullTypeName = target.FullTypeName;
       var jsName = target.JsName;
-      var needAccessors = target.NeedAccessors;
-      var needSetters = target.NeedSetters;
       var isComponent = target.IsComponent;
       var fields = target.Fields;
       var className = "Js" + typeName + "Bridge";
@@ -500,18 +460,17 @@ namespace JsGameCodegen
         EmitByteArray(sb, "s_w", "w");
 
       // Byte arrays for "get" and "set" function names
-      if (needAccessors)
+      if (isComponent)
+      {
         EmitByteArray(sb, "s_get", "get");
-      if (needSetters)
         EmitByteArray(sb, "s_set", "set");
+      }
       EmitByteArray(sb, "s___name", "__name");
       if (isComponent)
       {
         // Batch API byte arrays
-        if (needAccessors)
-          EmitByteArray(sb, "s_getAll", "getAll");
-        if (needSetters)
-          EmitByteArray(sb, "s_setAll", "setAll");
+        EmitByteArray(sb, "s_getAll", "getAll");
+        EmitByteArray(sb, "s_setAll", "setAll");
         EmitByteArray(sb, "s___stride", "__stride");
         EmitByteArray(sb, "s___fieldLayout", "__fieldLayout");
       }
@@ -547,7 +506,7 @@ namespace JsGameCodegen
       sb.AppendLine("\t\tpublic static unsafe void Register(JSContext ctx)");
       sb.AppendLine("\t\t{");
       sb.AppendLine("\t\t\tvar ns = QJS.JS_NewObject(ctx);");
-      if (needAccessors)
+      if (isComponent)
       {
         sb.AppendLine("\t\t\tfixed (byte* pGet = s_get)");
         sb.AppendLine("\t\t\t{");
@@ -556,9 +515,6 @@ namespace JsGameCodegen
         );
         sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pGet, fn);");
         sb.AppendLine("\t\t\t}");
-      }
-      if (needSetters)
-      {
         sb.AppendLine("\t\t\tfixed (byte* pSet = s_set)");
         sb.AppendLine("\t\t\t{");
         sb.AppendLine(
@@ -566,30 +522,21 @@ namespace JsGameCodegen
         );
         sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pSet, fn);");
         sb.AppendLine("\t\t\t}");
-      }
-      if (isComponent)
-      {
         // Batch getAll/setAll
-        if (needAccessors)
-        {
-          sb.AppendLine("\t\t\tfixed (byte* pGetAll = s_getAll)");
-          sb.AppendLine("\t\t\t{");
-          sb.AppendLine(
-            "\t\t\t\tvar fn = QJSShim.qjs_shim_new_function(ctx, GetAll_Component, pGetAll, 1);"
-          );
-          sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pGetAll, fn);");
-          sb.AppendLine("\t\t\t}");
-        }
-        if (needSetters)
-        {
-          sb.AppendLine("\t\t\tfixed (byte* pSetAll = s_setAll)");
-          sb.AppendLine("\t\t\t{");
-          sb.AppendLine(
-            "\t\t\t\tvar fn = QJSShim.qjs_shim_new_function(ctx, SetAll_Component, pSetAll, 2);"
-          );
-          sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pSetAll, fn);");
-          sb.AppendLine("\t\t\t}");
-        }
+        sb.AppendLine("\t\t\tfixed (byte* pGetAll = s_getAll)");
+        sb.AppendLine("\t\t\t{");
+        sb.AppendLine(
+          "\t\t\t\tvar fn = QJSShim.qjs_shim_new_function(ctx, GetAll_Component, pGetAll, 1);"
+        );
+        sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pGetAll, fn);");
+        sb.AppendLine("\t\t\t}");
+        sb.AppendLine("\t\t\tfixed (byte* pSetAll = s_setAll)");
+        sb.AppendLine("\t\t\t{");
+        sb.AppendLine(
+          "\t\t\t\tvar fn = QJSShim.qjs_shim_new_function(ctx, SetAll_Component, pSetAll, 2);"
+        );
+        sb.AppendLine("\t\t\t\tQJS.JS_SetPropertyStr(ctx, ns, pSetAll, fn);");
+        sb.AppendLine("\t\t\t}");
         // Metadata: __stride and __fieldLayout
         {
           var stride = ComputeStride(fields);
@@ -654,8 +601,7 @@ namespace JsGameCodegen
           "\t\t\ts_lookup.Data = state.GetComponentLookup<"
             + fullTypeName
             + ">("
-            + (!needSetters ? "true" : "false")
-            + ");"
+            + "false);"
         );
         sb.AppendLine("\t\t}");
         sb.AppendLine();
@@ -665,15 +611,14 @@ namespace JsGameCodegen
       EmitReadFromJsObject(sb, fields, fullTypeName);
 
       // Get/Set component functions (per-entity)
-      if (needAccessors)
+      if (isComponent)
+      {
         EmitGetComponent(sb, fields, fullTypeName);
-      if (needSetters)
         EmitSetComponent(sb, fields, fullTypeName);
-      // Batch GetAll/SetAll component functions
-      if (needAccessors)
+        // Batch GetAll/SetAll component functions
         EmitGetAllComponent(sb, fields, fullTypeName);
-      if (needSetters)
         EmitSetAllComponent(sb, fields, fullTypeName);
+      }
 
       // Emit Descriptions dictionary for editor stub generation
       var hasAnyDoc = target.Description != null || fields.Any(f => f.Description != null);
@@ -1414,8 +1359,6 @@ namespace JsGameCodegen
       public string TypeName;
       public string FullTypeName;
       public string JsName;
-      public bool NeedAccessors;
-      public bool NeedSetters;
       public bool IsComponent;
       public ImmutableArray<FieldInfo> Fields;
       public string Description;
@@ -1424,8 +1367,6 @@ namespace JsGameCodegen
         string typeName,
         string fullTypeName,
         string jsName,
-        bool needAccessors,
-        bool needSetters,
         bool isComponent,
         ImmutableArray<FieldInfo> fields,
         string description = null
@@ -1434,8 +1375,6 @@ namespace JsGameCodegen
         TypeName = typeName;
         FullTypeName = fullTypeName;
         JsName = jsName;
-        NeedAccessors = needAccessors;
-        NeedSetters = needSetters;
         IsComponent = isComponent;
         Fields = fields;
         Description = description;
@@ -1447,8 +1386,6 @@ namespace JsGameCodegen
       public string Name;
       public string JsName;
       public JsFieldType Type;
-      public bool HasGetter;
-      public bool HasSetter;
       public string EnumTypeName;
       public string Description;
 
@@ -1456,8 +1393,6 @@ namespace JsGameCodegen
         string name,
         string jsName,
         JsFieldType type,
-        bool needAccessors,
-        bool needSetters,
         string enumTypeName = null,
         string description = null
       )
@@ -1465,8 +1400,6 @@ namespace JsGameCodegen
         Name = name;
         JsName = jsName;
         Type = type;
-        HasGetter = needAccessors;
-        HasSetter = needSetters;
         EnumTypeName = enumTypeName;
         Description = description;
       }
