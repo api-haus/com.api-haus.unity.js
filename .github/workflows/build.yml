@@ -251,6 +251,10 @@ jobs:
       - name: Clone QuickJS
         run: git clone --depth 1 ${{ env.QUICKJS_REPO }} quickjs
 
+      - name: Patch x87 FPU guard for Android x86
+        run: |
+          sed -i 's/#if defined(__i386__) && !defined(_MSC_VER)/#if defined(__i386__) \&\& !defined(_MSC_VER) \&\& !defined(__ANDROID__)/' quickjs/cutils.h
+
       - name: Setup NDK
         uses: nttld/setup-ndk@v1
         id: setup-ndk
@@ -267,8 +271,7 @@ jobs:
             -DANDROID_ABI=x86 \
             -DANDROID_PLATFORM=android-21 \
             -DBUILD_SHARED_LIBS=ON \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_FLAGS="-msse2 -mfpmath=sse"
+            -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j$(nproc)
 
       - name: Build shim
