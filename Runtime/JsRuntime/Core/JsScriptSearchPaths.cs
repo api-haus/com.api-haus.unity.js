@@ -51,8 +51,12 @@ namespace UnityJS.Runtime
         RegisterPathAsSource(DefaultScriptsPath, "default", 100);
 
 #if UNITY_EDITOR
-        var tscBuildPath = Path.Combine(Application.dataPath, "..", "Library", "TscBuild");
-        RegisterPathAsSource(tscBuildPath, "tsc-build", 50);
+        // Register Library/TscBuild for baked script names (full path like "Assets/StreamingAssets/unity.js/components/slime_wander")
+        var tscBuildRoot = Path.Combine(Application.dataPath, "..", "Library", "TscBuild");
+        RegisterPathAsSource(tscBuildRoot, "tsc-build", 50);
+        // Also register the mirrored StreamingAssets subtree for system discovery (relative names like "systems/character_input")
+        var tscBuildScripts = Path.Combine(tscBuildRoot, "Assets", "StreamingAssets", "unity.js");
+        RegisterPathAsSource(tscBuildScripts, "tsc-build-scripts", 45);
 #endif
 
         s_initialized = true;

@@ -7,13 +7,17 @@ using System.Security.Cryptography;
 using System.Text;
 using Unity.Logging;
 using UnityEditor;
+using UnityEngine;
 using UnityJS.Entities.Core;
 
 namespace UnityJS.Editor
 {
   public static class JsTypeStubGenerator
   {
-    const string OutputPath = "Assets/StreamingAssets/unity.js/types/unity.d.ts";
+    static string ProjectRoot => Directory.GetParent(Application.dataPath)!.FullName;
+    static string TypesDir => Path.Combine(ProjectRoot, "Library/unity.js/types");
+    static string OutputPath => Path.Combine(TypesDir, "unity.d.ts");
+    static string TsconfigPath => Path.Combine(ProjectRoot, "tsconfig.json");
 
     static readonly Dictionary<string, string> TypeMap = new()
     {
@@ -29,34 +33,164 @@ namespace UnityJS.Editor
     [InitializeOnLoadMethod]
     static void OnDomainReload()
     {
-      var content = GenerateContent();
-      if (File.Exists(OutputPath))
-      {
-        var existingHash = ComputeHash(File.ReadAllText(OutputPath));
-        var newHash = ComputeHash(content);
-        if (existingHash == newHash)
-          return;
-      }
-
-      WriteOutput(content);
+      EnsureTypesDirectory();
+      CopyHandwrittenTypes();
+      GenerateStubs();
+      GenerateTsconfig();
     }
 
     [MenuItem("Tools/JS/Generate Type Stubs")]
     public static void Generate()
     {
+      EnsureTypesDirectory();
+      CopyHandwrittenTypes();
       var content = GenerateContent();
-      WriteOutput(content);
+      WriteFile(OutputPath, content);
+      GenerateTsconfig();
+      Log.Debug("[JsTypeStubs] Regenerated all type infrastructure");
     }
 
-    static void WriteOutput(string content)
+    static void EnsureTypesDirectory()
     {
-      var dir = Path.GetDirectoryName(OutputPath);
-      if (!Directory.Exists(dir))
-        Directory.CreateDirectory(dir);
+      if (!Directory.Exists(TypesDir))
+        Directory.CreateDirectory(TypesDir);
+    }
 
-      File.WriteAllText(OutputPath, content);
-      AssetDatabase.Refresh();
-      Log.Debug("[JsTypeStubs] Generated {0}", OutputPath);
+    static void GenerateStubs()
+    {
+      var content = GenerateContent();
+      WriteFileIfChanged(OutputPath, content);
+    }
+
+    // ── Hand-written type copying ──
+
+    static void CopyHandwrittenTypes()
+    {
+      var packagePath = GetPackagePath();
+      if (packagePath == null)
+      {
+        Log.Warning("[JsTypeStubs] Could not resolve unity.js package path");
+        return;
+      }
+
+      var typeDefsDir = Path.Combine(packagePath, "TypeDefinitions~");
+      if (!Directory.Exists(typeDefsDir))
+      {
+        Log.Warning("[JsTypeStubs] TypeDefinitions~ not found at {0}", typeDefsDir);
+        return;
+      }
+
+      CopyFileIfChanged(Path.Combine(typeDefsDir, "globals.d.ts"), Path.Combine(TypesDir, "globals.d.ts"));
+      CopyFileIfChanged(Path.Combine(typeDefsDir, "modules.d.ts"), Path.Combine(TypesDir, "modules.d.ts"));
+    }
+
+    static void CopyFileIfChanged(string src, string dst)
+    {
+      if (!File.Exists(src))
+        return;
+      var srcContent = File.ReadAllText(src);
+      if (File.Exists(dst) && ComputeHash(File.ReadAllText(dst)) == ComputeHash(srcContent))
+        return;
+      File.WriteAllText(dst, srcContent);
+    }
+
+    // ── tsconfig.json generation ──
+
+    static void GenerateTsconfig()
+    {
+      var packageIncludePath = GetPackageIncludePath();
+      var sb = new StringBuilder();
+      sb.AppendLine("{");
+      sb.AppendLine("  \"compilerOptions\": {");
+      sb.AppendLine("    \"strict\": true,");
+      sb.AppendLine("    \"strictPropertyInitialization\": false,");
+      sb.AppendLine("    \"target\": \"ES2020\",");
+      sb.AppendLine("    \"module\": \"ES2020\",");
+      sb.AppendLine("    \"moduleResolution\": \"node\",");
+      sb.AppendLine("    \"rootDir\": \".\",");
+      sb.AppendLine("    \"outDir\": \"Library/TscBuild\",");
+      sb.AppendLine("    \"declaration\": false,");
+      sb.AppendLine("    \"sourceMap\": false,");
+      sb.AppendLine("    \"skipLibCheck\": true,");
+      sb.AppendLine("    \"types\": [],");
+      sb.AppendLine("    \"lib\": [\"ES2020\"]");
+      sb.AppendLine("  },");
+      sb.AppendLine("  \"include\": [");
+      sb.AppendLine("    \"Library/unity.js/types/*.d.ts\",");
+      sb.AppendLine("    \"Assets/StreamingAssets/unity.js/**/*.ts\"");
+
+      if (packageIncludePath != null)
+      {
+        // Include fixture and test .ts files from the package
+        var escaped = packageIncludePath.Replace("\\", "/");
+        sb.AppendLine($"    ,\"{escaped}/Integrations/**/Fixtures~/**/*.ts\"");
+        sb.AppendLine($"    ,\"{escaped}/tests~/**/*.ts\"");
+      }
+
+      sb.AppendLine("  ]");
+      sb.AppendLine("}");
+
+      WriteFileIfChanged(TsconfigPath, sb.ToString());
+    }
+
+    // ── Path resolution ──
+
+    static string GetPackagePath()
+    {
+      var info = UnityEditor.PackageManager.PackageInfo.FindForAssembly(
+        typeof(JsTypeStubGenerator).Assembly
+      );
+      if (info?.resolvedPath != null)
+        return info.resolvedPath;
+
+      // Fallback: check common package locations
+      var projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+      var localPath = Path.Combine(projectRoot, "Packages/com.api-haus.unity.js");
+      if (Directory.Exists(localPath))
+        return Path.GetFullPath(localPath);
+
+      // Check PackageCache
+      var cacheDir = Path.Combine(projectRoot, "Library/PackageCache");
+      if (Directory.Exists(cacheDir))
+        foreach (var dir in Directory.GetDirectories(cacheDir, "com.api-haus.unity.js*"))
+          return dir;
+
+      return null;
+    }
+
+    static string GetPackageIncludePath()
+    {
+      var resolved = GetPackagePath();
+      if (resolved == null)
+        return null;
+
+      var projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+      // Normalize separators for comparison
+      var normalizedResolved = resolved.Replace("\\", "/");
+      var normalizedRoot = projectRoot.Replace("\\", "/");
+
+      if (normalizedResolved.StartsWith(normalizedRoot))
+        return normalizedResolved.Substring(normalizedRoot.Length + 1);
+
+      return resolved;
+    }
+
+    // ── File utilities ──
+
+    static void WriteFileIfChanged(string path, string content)
+    {
+      if (File.Exists(path) && ComputeHash(File.ReadAllText(path)) == ComputeHash(content))
+        return;
+      WriteFile(path, content);
+    }
+
+    static void WriteFile(string path, string content)
+    {
+      var dir = Path.GetDirectoryName(path);
+      if (dir != null && !Directory.Exists(dir))
+        Directory.CreateDirectory(dir);
+      File.WriteAllText(path, content);
+      Log.Debug("[JsTypeStubs] Wrote {0}", path);
     }
 
     static string ComputeHash(string text)
@@ -65,6 +199,8 @@ namespace UnityJS.Editor
       var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(text));
       return Convert.ToBase64String(bytes);
     }
+
+    // ── Content generation ──
 
     internal static string GenerateContent()
     {
@@ -116,7 +252,6 @@ namespace UnityJS.Editor
 
       enums.Sort((a, b) => string.Compare(a.jsName, b.jsName, StringComparison.Ordinal));
 
-      // Emit type aliases at top level (ambient)
       sb.AppendLine("// ── Enum Type Aliases ────────────────────────────────────");
       sb.AppendLine();
       foreach (var (jsName, type) in enums)
@@ -129,7 +264,6 @@ namespace UnityJS.Editor
         sb.AppendLine();
       }
 
-      // Store enums for later use in the module block
       s_enumList = enums;
     }
 
@@ -195,7 +329,6 @@ namespace UnityJS.Editor
           targets.Add((jsName, t, attr.NeedAccessors, attr.NeedSetters));
         }
 
-        // Assembly-level [JsBridge(typeof(T), ...)]
         foreach (var attr in asm.GetCustomAttributes<JsBridgeAttribute>())
         {
           if (attr.ComponentType == null)
@@ -207,7 +340,6 @@ namespace UnityJS.Editor
 
       targets.Sort((a, b) => string.Compare(a.jsName, b.jsName, StringComparison.Ordinal));
 
-      // Emit interfaces at top level (ambient)
       foreach (var (jsName, type, needAccessors, needSetters) in targets)
       {
         var className = type.Name;
@@ -233,12 +365,10 @@ namespace UnityJS.Editor
         sb.AppendLine();
       }
 
-      // Emit module declaration for component accessors and enums
       sb.AppendLine("// ── Module: unity.js/components ─────────────────────────");
       sb.AppendLine();
       sb.AppendLine("declare module 'unity.js/components' {");
 
-      // Enum constants
       if (s_enumList != null)
       {
         foreach (var (jsName, type) in s_enumList)
@@ -262,7 +392,6 @@ namespace UnityJS.Editor
         }
       }
 
-      // Component accessors
       foreach (var (jsName, type, needAccessors, needSetters) in targets)
       {
         var className = type.Name;

@@ -14,6 +14,9 @@ namespace UnityJS.Entities.Core
   {
     static JsBridgeState B => JsRuntimeManager.Instance?.BridgeState as JsBridgeState;
 
+    [System.ThreadStatic] static List<ComponentType> s_tempAll;
+    [System.ThreadStatic] static List<ComponentType> s_tempNone;
+
     public static void Initialize(EntityManager entityManager)
     {
       var b = B;
@@ -62,8 +65,13 @@ namespace UnityJS.Entities.Core
           continue;
 
         var entities = query.ToEntityArray(Allocator.Temp);
-        var ids = new int[entities.Length];
         var count = 0;
+
+        // Reuse existing array if large enough — never shrink, track count separately
+        b.PrecomputedIds.TryGetValue(kvp.Key, out var entry);
+        var ids = entry.ids;
+        if (ids == null || ids.Length < entities.Length)
+          ids = new int[System.Math.Max(entities.Length, 64)];
 
         for (var i = 0; i < entities.Length; i++)
         {
@@ -77,11 +85,7 @@ namespace UnityJS.Entities.Core
         }
 
         entities.Dispose();
-
-        if (count < ids.Length)
-          System.Array.Resize(ref ids, count);
-
-        b.PrecomputedIds[kvp.Key] = ids;
+        b.PrecomputedIds[kvp.Key] = (ids, count);
       }
     }
 
@@ -145,8 +149,12 @@ namespace UnityJS.Entities.Core
         return;
       }
 
-      var allComponents = new List<ComponentType>();
-      var noneComponents = new List<ComponentType>();
+      s_tempAll ??= new List<ComponentType>(8);
+      s_tempNone ??= new List<ComponentType>(4);
+      s_tempAll.Clear();
+      s_tempNone.Clear();
+      var allComponents = s_tempAll;
+      var noneComponents = s_tempNone;
 
       if (argc >= 1 && QJS.IsObject(argv[0]) && QJS.JS_IsArray(ctx, argv[0]) == 0)
       {
@@ -191,13 +199,13 @@ namespace UnityJS.Entities.Core
       var hash = ComputeQueryHash(allComponents, noneComponents);
 
       // Return precomputed results if available
-      if (b.PrecomputedIds.TryGetValue(hash, out var ids) && ids.Length > 0)
+      if (b.PrecomputedIds.TryGetValue(hash, out var entry) && entry.count > 0)
       {
         // Use a plain JS array — Int32Array via qjs_shim_new_int32array references
         // the source buffer, which is invalid after the callback returns.
         var arr = QJS.JS_NewArray(ctx);
-        for (var i = 0; i < ids.Length; i++)
-          QJS.JS_SetPropertyUint32(ctx, arr, (uint)i, QJS.NewInt32(ctx, ids[i]));
+        for (var i = 0; i < entry.count; i++)
+          QJS.JS_SetPropertyUint32(ctx, arr, (uint)i, QJS.NewInt32(ctx, entry.ids[i]));
         SetResult(outU, outTag, arr);
         return;
       }

@@ -1,114 +1,107 @@
 namespace UnityJS.Entities.Systems.Tick
 {
-  using System.Collections.Generic;
   using Components;
   using Core;
   using Runtime;
+  using Unity.Collections;
   using Unity.Entities;
   using Unity.Logging;
   using Unity.Transforms;
 
-  public abstract partial class JsTickSystemBase : SystemBase
+  /// <summary>
+  /// Shared logic for all JS tick systems. Each concrete tick system is an
+  /// ISystem struct that delegates to these static methods — no abstract class,
+  /// no managed allocation from SystemBase virtual dispatch.
+  /// </summary>
+  public static class JsTickSystemHelper
   {
-    protected JsRuntimeManager m_Vm;
-    ComponentLookup<LocalTransform> m_TransformLookup;
-    BufferLookup<JsScript> m_ScriptBufferLookup;
-
-    readonly List<(
-      Entity entity,
-      string scriptName,
-      int entityIndex,
-      int stateRef
-    )> m_PendingTicks = new(64);
-
-    protected abstract JsTickGroup GetTickGroup();
-
-    protected override void OnCreate()
+    public struct State
     {
-      base.OnCreate();
-      m_TransformLookup = GetComponentLookup<LocalTransform>(false);
-      m_ScriptBufferLookup = GetBufferLookup<JsScript>(true);
+      public ComponentLookup<LocalTransform> TransformLookup;
+      public BufferLookup<JsScript> ScriptBufferLookup;
+      public EntityQuery ScriptQuery;
     }
 
-    protected override void OnStartRunning()
+    public static void OnCreate(ref SystemState state, out State tickState)
     {
-      m_Vm = JsRuntimeManager.Instance ?? JsRuntimeManager.GetOrCreate();
-    }
-
-    protected override void OnUpdate()
-    {
-      if (m_Vm == null || !m_Vm.IsValid)
+      tickState = new State
       {
-        if (JsRuntimeManager.Instance != null && JsRuntimeManager.Instance.IsValid)
-          m_Vm = JsRuntimeManager.Instance;
-        else
-          return;
-      }
+        TransformLookup = state.GetComponentLookup<LocalTransform>(false),
+        ScriptBufferLookup = state.GetBufferLookup<JsScript>(true),
+        ScriptQuery = new EntityQueryBuilder(Allocator.Temp)
+          .WithAll<JsScript, JsEntityId>()
+          .Build(ref state),
+      };
+    }
 
-      EntityManager.CompleteDependencyBeforeRW<LocalTransform>();
-      m_TransformLookup.Update(this);
-      m_ScriptBufferLookup.Update(this);
+    /// <summary>
+    /// Called from each concrete tick system's OnUpdate. The caller passes the ECB
+    /// obtained via SystemAPI.TryGetSingleton (which only works inside ISystem methods).
+    /// </summary>
+    public static void OnUpdate(
+      ref SystemState state,
+      ref State tickState,
+      JsTickGroup tickGroup,
+      EntityCommandBuffer ecb
+    )
+    {
+      var vm = JsRuntimeManager.Instance;
+      if (vm == null || !vm.IsValid)
+        return;
 
-      ref var sysState = ref CheckedStateRef;
-      JsComponentRegistry.UpdateAllLookups(ref sysState);
-      CompleteDependency();
+      state.EntityManager.CompleteDependencyBeforeRW<LocalTransform>();
+      tickState.TransformLookup.Update(ref state);
+      tickState.ScriptBufferLookup.Update(ref state);
 
-      var tickGroup = GetTickGroup();
+      JsComponentRegistry.UpdateAllLookups(ref state);
+      state.CompleteDependency();
 
-      var deltaTime = SystemAPI.Time.DeltaTime;
+      var worldTime = state.WorldUnmanaged.Time;
+      var deltaTime = worldTime.DeltaTime;
       if (deltaTime <= 0f)
         deltaTime = UnityEngine.Time.deltaTime;
 
-      var elapsedTime = SystemAPI.Time.ElapsedTime;
+      var elapsedTime = worldTime.ElapsedTime;
 
-      var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
-      var ecb = ecbSingleton.CreateCommandBuffer(World.Unmanaged);
-      JsECSBridge.UpdateBurstContext(ecb, deltaTime, m_TransformLookup, m_ScriptBufferLookup);
+      JsECSBridge.UpdateBurstContext(ecb, deltaTime, tickState.TransformLookup, tickState.ScriptBufferLookup);
 
-      m_PendingTicks.Clear();
+      var entities = tickState.ScriptQuery.ToEntityArray(Allocator.Temp);
+      for (var e = 0; e < entities.Length; e++)
+      {
+        var entity = entities[e];
+        var scripts = state.EntityManager.GetBuffer<JsScript>(entity, true);
 
-      foreach (
-        var (scripts, entity) in SystemAPI
-          .Query<DynamicBuffer<JsScript>>()
-          .WithAll<JsEntityId>()
-          .WithEntityAccess()
-      )
         for (var i = 0; i < scripts.Length; i++)
         {
           var script = scripts[i];
-          if (script.stateRef >= 0 && !script.disabled && script.tickGroup == tickGroup)
-            m_PendingTicks.Add(
-              (entity, script.scriptName.ToString(), script.entityIndex, script.stateRef)
+          if (script.stateRef < 0 || script.disabled || script.tickGroup != tickGroup)
+            continue;
+
+          if (!vm.ValidateStateRef(script.stateRef))
+          {
+            Log.Warning(
+              "[JsTick:{0}] StateRef mismatch for entity={1} - skipping",
+              tickGroup,
+              script.entityIndex
             );
+            continue;
+          }
+
+          vm.CallTick(vm.Intern(script.scriptName), script.stateRef, deltaTime, elapsedTime);
+
+          // Entity may have been destroyed by a JS callback
+          if (!state.EntityManager.Exists(entity))
+            break;
         }
-
-      foreach (var (entity, scriptName, entityIndex, stateRef) in m_PendingTicks)
-      {
-        if (!EntityManager.Exists(entity))
-          continue;
-
-        if (!EntityManager.HasComponent<JsEntityId>(entity))
-          continue;
-
-        if (!m_Vm.ValidateStateRef(stateRef))
-        {
-          Log.Warning(
-            "[JsTick:{0}] StateRef mismatch for {1} entity={2} - skipping",
-            tickGroup,
-            scriptName,
-            entityIndex
-          );
-          continue;
-        }
-
-        m_Vm.CallTick(scriptName, stateRef, deltaTime, elapsedTime);
       }
+
+      entities.Dispose();
 
       // Tick Component instances for matching tick groups
       if (tickGroup == JsTickGroup.Fixed)
-        m_Vm.TickComponents("fixedUpdate", deltaTime);
+        vm.TickComponents(JsRuntimeManager.GroupFixedUpdateBytes, deltaTime);
       else if (tickGroup == JsTickGroup.AfterTransform)
-        m_Vm.TickComponents("lateUpdate", deltaTime);
+        vm.TickComponents(JsRuntimeManager.GroupLateUpdateBytes, deltaTime);
     }
   }
 }

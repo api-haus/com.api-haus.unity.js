@@ -161,7 +161,6 @@ namespace UnityJS.Editor.Tests
     [Test]
     public void GenerateContent_PassesTscNoEmit()
     {
-      // Write generated content to a temp file and run tsc --noEmit
       var projectRoot = System.IO.Path.GetFullPath(".");
       var tscPath = System.IO.Path.Combine(projectRoot, "node_modules/.bin/tsc");
 
@@ -171,17 +170,25 @@ namespace UnityJS.Editor.Tests
         return;
       }
 
-      var tsDir = System.IO.Path.Combine(projectRoot, "Assets/StreamingAssets/unity.js/types");
-      var tsconfigDir = System.IO.Path.Combine(projectRoot, "Assets/StreamingAssets/unity.js");
+      var tsconfigPath = System.IO.Path.Combine(projectRoot, "tsconfig.json");
+      if (!System.IO.File.Exists(tsconfigPath))
+      {
+        Assert.Inconclusive("tsconfig.json not found at project root — domain reload should generate it");
+        return;
+      }
 
-      // Ensure the stub is up-to-date
-      var stubPath = System.IO.Path.Combine(tsDir, "unity.d.ts");
+      // Ensure the stub is up-to-date in Library/
+      var typesDir = System.IO.Path.Combine(projectRoot, "Library/unity.js/types");
+      if (!System.IO.Directory.Exists(typesDir))
+        System.IO.Directory.CreateDirectory(typesDir);
+      var stubPath = System.IO.Path.Combine(typesDir, "unity.d.ts");
       System.IO.File.WriteAllText(stubPath, m_Content);
 
       var psi = new System.Diagnostics.ProcessStartInfo
       {
         FileName = tscPath,
-        Arguments = "--noEmit --project " + tsconfigDir,
+        Arguments = "--noEmit --project " + projectRoot,
+        WorkingDirectory = projectRoot,
         RedirectStandardOutput = true,
         RedirectStandardError = true,
         UseShellExecute = false,

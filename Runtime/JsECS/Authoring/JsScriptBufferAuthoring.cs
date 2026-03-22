@@ -53,7 +53,7 @@ namespace UnityJS.Entities.Authoring
         }
 
         var entity = GetEntity(transformFlags);
-        var requestsBuffer = AddBuffer<JsScriptRequest>(entity);
+        var scriptsBuffer = AddBuffer<JsScript>(entity);
 
         foreach (var scriptAuthor in m_Scripts)
         {
@@ -66,11 +66,14 @@ namespace UnityJS.Entities.Authoring
 
           var hash = JsScriptPathUtility.HashScriptName(scriptId);
 
-          var request = new JsScriptRequest
+          var script = new JsScript
           {
             scriptName = new FixedString64Bytes(scriptId),
+            stateRef = -1,
+            entityIndex = 0,
             requestHash = hash,
-            fulfilled = false,
+            disabled = false,
+            tickGroup = default,
           };
 
           if (scriptAuthor.propertyOverrides is { Count: > 0 })
@@ -86,10 +89,10 @@ namespace UnityJS.Entities.Authoring
               json = json.Substring(0, FixedString512Bytes.UTF8MaxLengthInBytes);
             }
 
-            request.propertiesJson = new FixedString512Bytes(json);
+            script.propertiesJson = new FixedString512Bytes(json);
           }
 
-          requestsBuffer.Add(request);
+          scriptsBuffer.Add(script);
         }
 
         AddBuffer<JsEvent>(entity);

@@ -121,13 +121,20 @@ namespace UnityJS.Editor
       if (Directory.Exists(systemsDir))
       {
         var world = World.DefaultGameObjectInjectionWorld;
-        var runner = world?.GetExistingSystemManaged<JsSystemRunner>();
-        foreach (var jsFile in Directory.GetFiles(systemsDir, "*.js", SearchOption.AllDirectories))
+        if (world != null)
         {
-          var systemName = Path.GetFileNameWithoutExtension(jsFile);
-          if (!vm.HasScript("system:" + systemName))
-            continue;
-          runner?.ReloadSystem(systemName);
+          var runnerHandle = world.Unmanaged.GetExistingUnmanagedSystem<JsSystemRunner>();
+          foreach (var jsFile in Directory.GetFiles(systemsDir, "*.js", SearchOption.AllDirectories))
+          {
+            var systemName = Path.GetFileNameWithoutExtension(jsFile);
+            if (!vm.HasScript("system:" + systemName))
+              continue;
+            if (runnerHandle != SystemHandle.Null)
+            {
+              ref var sysState = ref world.Unmanaged.ResolveSystemStateRef(runnerHandle);
+              JsSystemRunner.ReloadSystem(ref sysState, systemName);
+            }
+          }
         }
       }
 

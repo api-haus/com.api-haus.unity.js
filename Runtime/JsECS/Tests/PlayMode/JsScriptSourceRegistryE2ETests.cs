@@ -432,13 +432,15 @@ namespace UnityJS.Entities.PlayModeTests
         entity,
         new JsEntityId { value = JsEntityRegistry.IsCreated ? JsEntityRegistry.AllocateId() : 1 }
       );
-      var requests = m_EntityManager.AddBuffer<JsScriptRequest>(entity);
-      requests.Add(
-        new JsScriptRequest
+      var scripts = m_EntityManager.AddBuffer<JsScript>(entity);
+      scripts.Add(
+        new JsScript
         {
           scriptName = new FixedString64Bytes("test_fulfill_bundle"),
+          stateRef = -1,
+          entityIndex = 0,
           requestHash = JsScriptPathUtility.HashScriptName("test_fulfill_bundle"),
-          fulfilled = false,
+          disabled = false,
         }
       );
 
@@ -472,13 +474,15 @@ namespace UnityJS.Entities.PlayModeTests
         entity,
         new JsEntityId { value = JsEntityRegistry.IsCreated ? JsEntityRegistry.AllocateId() : 1 }
       );
-      var requests = m_EntityManager.AddBuffer<JsScriptRequest>(entity);
-      requests.Add(
-        new JsScriptRequest
+      var scripts = m_EntityManager.AddBuffer<JsScript>(entity);
+      scripts.Add(
+        new JsScript
         {
           scriptName = new FixedString64Bytes("nonexistent_abc_xyz"),
+          stateRef = -1,
+          entityIndex = 0,
           requestHash = JsScriptPathUtility.HashScriptName("nonexistent_abc_xyz"),
-          fulfilled = false,
+          disabled = false,
         }
       );
 
@@ -487,9 +491,9 @@ namespace UnityJS.Entities.PlayModeTests
       yield return null;
       yield return null;
 
-      // Verify request was marked fulfilled (error case)
-      var reqs = m_EntityManager.GetBuffer<JsScriptRequest>(entity);
-      Assert.IsTrue(reqs[0].fulfilled, "Failed request should be marked fulfilled");
+      // Verify script entry was marked disabled (error case)
+      var entries = m_EntityManager.GetBuffer<JsScript>(entity);
+      Assert.IsTrue(entries[0].disabled, "Failed script entry should be marked disabled");
     }
 
     #endregion

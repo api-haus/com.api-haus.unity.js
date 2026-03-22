@@ -63,10 +63,10 @@ namespace UnityJS.Entities.PlayModeTests
       var simGroup = world.GetOrCreateSystemManaged<SimulationSystemGroup>();
       var ecb = world.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>();
       var scripting = world.GetOrCreateSystemManaged<JsScriptingSystem>();
-      var runner = world.GetOrCreateSystemManaged<JsSystemRunner>();
+      var runnerHandle = world.GetOrCreateSystem<JsSystemRunner>();
       simGroup.AddSystemToUpdateList(ecb);
       simGroup.AddSystemToUpdateList(scripting);
-      simGroup.AddSystemToUpdateList(runner);
+      simGroup.AddSystemToUpdateList(runnerHandle);
       simGroup.SortSystems();
       return world;
     }

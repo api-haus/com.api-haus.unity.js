@@ -8,6 +8,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 using UnityJS.Editor;
 using UnityJS.Entities.Components;
 using UnityJS.Entities.Core;
@@ -40,9 +41,12 @@ namespace UnityJS.Integrations.Editor
     // ── TypeScript Compilation ──
 
     /// <summary>
-    /// Compiles .ts fixtures to a temp output directory using TscCompiler.
-    /// Expects a tsconfig.json in the fixtures folder.
-    /// Returns the absolute path to the compiled output directory.
+    /// Compiles fixture .ts files via the project-root tsconfig.
+    /// All fixtures are included in the single tsconfig and compile to Library/TscBuild/.
+    /// Returns the compiled output path matching the fixture source tree.
+    ///
+    /// For fixtures with their own tsconfig.json (e.g. hot-reload stress tests),
+    /// a separate TscCompiler is used with a temp output directory.
     /// </summary>
     public static string CompileFixtures(string fixturesPath)
     {
@@ -51,19 +55,39 @@ namespace UnityJS.Integrations.Editor
         $"Fixtures directory does not exist: {fixturesPath}"
       );
 
-      var outDir = Path.Combine(
-        Path.GetTempPath(),
-        "unity-js-fixtures-" + fixturesPath.GetHashCode().ToString("x8")
-      );
+      // Fixtures with their own tsconfig compile independently (e.g. hot-reload tests)
+      var fixtureConfig = Path.Combine(fixturesPath, "tsconfig.json");
+      if (File.Exists(fixtureConfig))
+      {
+        var outDir = Path.Combine(
+          Path.GetTempPath(),
+          "unity-js-fixtures-" + fixturesPath.GetHashCode().ToString("x8")
+        );
+        var compiler = new TscCompiler(fixturesPath, outDir, fixtureConfig);
+        var success = compiler.Recompile();
+        Assert.IsTrue(
+          success,
+          $"Fixture compilation failed:\n{string.Join("\n", compiler.LastErrors)}"
+        );
+        return outDir;
+      }
 
-      var compiler = new TscCompiler(fixturesPath, outDir);
-      var success = compiler.Recompile();
-      Assert.IsTrue(
-        success,
-        $"Fixture compilation failed:\n{string.Join("\n", compiler.LastErrors)}"
-      );
+      // No per-fixture tsconfig — compiled by the project-root tsconfig
+      var mainCompiler = TscCompiler.Instance;
+      Assert.IsNotNull(mainCompiler, "TscCompiler.Instance not initialized");
+      mainCompiler.RecompileIfStale();
 
-      return outDir;
+      var projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+      var normalizedFixtures = Path.GetFullPath(fixturesPath).Replace("\\", "/");
+      var normalizedRoot = projectRoot.Replace("\\", "/");
+
+      string relative;
+      if (normalizedFixtures.StartsWith(normalizedRoot + "/"))
+        relative = normalizedFixtures.Substring(normalizedRoot.Length + 1);
+      else
+        relative = normalizedFixtures;
+
+      return Path.Combine(mainCompiler.OutDir, relative);
     }
 
     // ── Search Path Scope ──
@@ -91,7 +115,7 @@ namespace UnityJS.Integrations.Editor
     // ── Entity Creation ──
 
     /// <summary>
-    /// Creates an entity with JsEntityId, LocalTransform, and a JsScriptRequest
+    /// Creates an entity with JsEntityId, LocalTransform, and a JsScript (unfulfilled)
     /// for the given script name, plus any extra component types.
     /// Follows the same pattern as JsPlayModeCycleTests.CreateSlimeEntities.
     /// </summary>
@@ -111,15 +135,18 @@ namespace UnityJS.Integrations.Editor
 
       var entityId = JsEntityRegistry.AllocateId();
       JsEntityRegistry.RegisterImmediate(entity, entityId, em);
+      em.SetComponentData(entity, new JsEntityId { value = entityId });
       em.SetComponentData(entity, LocalTransform.FromPosition(float3.zero));
 
-      var requests = em.AddBuffer<JsScriptRequest>(entity);
-      requests.Add(
-        new JsScriptRequest
+      var scripts = em.AddBuffer<JsScript>(entity);
+      scripts.Add(
+        new JsScript
         {
           scriptName = new FixedString64Bytes(scriptName),
+          stateRef = -1,
+          entityIndex = 0,
           requestHash = JsScriptPathUtility.HashScriptName(scriptName),
-          fulfilled = false,
+          disabled = false,
         }
       );
       return entity;

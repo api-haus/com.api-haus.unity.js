@@ -189,7 +189,7 @@ namespace UnityJS.Entities.Core
       var entity = ecb.CreateEntity();
       ecb.AddComponent(entity, LocalTransform.FromPosition(position));
       ecb.AddComponent(entity, new JsEntityId { value = id });
-      ecb.AddBuffer<JsScriptRequest>(entity);
+      ecb.AddBuffer<JsScript>(entity);
       ecb.AddBuffer<JsEvent>(entity);
 
       data.pendingCreations[id] = entity;
@@ -433,25 +433,27 @@ namespace UnityJS.Entities.Core
         return false;
       }
 
-      var request = new JsScriptRequest
+      var script = new JsScript
       {
         scriptName = scriptName,
+        stateRef = -1,
+        entityIndex = 0,
         requestHash = JsScriptPathUtility.HashScriptName(scriptName),
-        fulfilled = false,
+        disabled = false,
       };
 
       if (IsPending(entityId))
       {
-        ecb.AppendToBuffer(entity, request);
+        ecb.AppendToBuffer(entity, script);
         return true;
       }
 
-      if (!entityManager.HasBuffer<JsScriptRequest>(entity))
-        ecb.AddBuffer<JsScriptRequest>(entity);
+      if (!entityManager.HasBuffer<JsScript>(entity))
+        ecb.AddBuffer<JsScript>(entity);
       if (!entityManager.HasBuffer<JsEvent>(entity))
         ecb.AddBuffer<JsEvent>(entity);
 
-      ecb.AppendToBuffer(entity, request);
+      ecb.AppendToBuffer(entity, script);
       return true;
     }
 

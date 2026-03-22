@@ -10,7 +10,8 @@
     "Unity.Mathematics",
     "Unity.Collections",
     "Unity.Logging",
-    "Unity.Burst"
+    "Unity.Burst",
+    "Unity.Transforms"
   ],
   "includePlatforms": [
     "Editor"

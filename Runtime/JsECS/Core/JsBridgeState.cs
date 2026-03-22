@@ -17,7 +17,7 @@ namespace UnityJS.Entities.Core
     public readonly Dictionary<int, EntityQuery> QueryCache = new();
     public readonly Dictionary<int, (ComponentType[] all, ComponentType[] none)> PendingQueries =
       new();
-    public readonly Dictionary<int, int[]> PrecomputedIds = new();
+    public readonly Dictionary<int, (int[] ids, int count)> PrecomputedIds = new();
     public EntityManager QueryEntityManager;
     public bool QueryInitialized;
 

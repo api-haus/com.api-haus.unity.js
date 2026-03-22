@@ -18,7 +18,7 @@ namespace UnityJS.Entities.Systems
   public partial class JsScriptingSystem : SystemBase
   {
     JsRuntimeManager m_Vm;
-    JsScriptFulfillmentSystem m_FulfillmentSystem;
+    JsComponentInitSystem m_FulfillmentSystem;
 
     EntityCommandBuffer m_CurrentECB;
     bool m_ECBValid;
@@ -44,7 +44,7 @@ namespace UnityJS.Entities.Systems
 
     protected override void OnCreate()
     {
-      m_FulfillmentSystem = World.GetOrCreateSystemManaged<JsScriptFulfillmentSystem>();
+      m_FulfillmentSystem = World.GetOrCreateSystemManaged<JsComponentInitSystem>();
 
       m_EventQuery = GetEntityQuery(
         ComponentType.ReadWrite<JsScript>(),
@@ -95,7 +95,12 @@ namespace UnityJS.Entities.Systems
     protected override void OnUpdate()
     {
       if (m_Vm == null || !m_Vm.IsValid)
-        return;
+      {
+        if (JsRuntimeManager.Instance != null && JsRuntimeManager.Instance.IsValid)
+          m_Vm = JsRuntimeManager.Instance;
+        else
+          return;
+      }
 
       s_frameCount++;
 
@@ -144,7 +149,7 @@ namespace UnityJS.Entities.Systems
               (
                 entity,
                 i,
-                script.scriptName.ToString(),
+                m_Vm.Intern(script.scriptName),
                 script.entityIndex,
                 script.stateRef,
                 script.tickGroup
@@ -265,12 +270,12 @@ namespace UnityJS.Entities.Systems
         if (!EntityManager.HasComponent<JsEntityId>(dispatch.entity))
           continue;
 
-        var scriptName = dispatch.scriptName.ToString();
+        var scriptName = m_Vm.Intern(dispatch.scriptName);
 
         for (var j = 0; j < dispatch.eventCount; j++)
         {
           var evt = JsECSBridge.GetEvent(dispatch.eventStartIndex + j);
-          var eventName = evt.eventName.ToString();
+          var eventName = m_Vm.Intern(evt.eventName);
           var sourceId = JsEntityRegistry.GetEntityIdFromEntity(evt.source, EntityManager);
           var targetId = JsEntityRegistry.GetEntityIdFromEntity(evt.target, EntityManager);
 
@@ -359,8 +364,7 @@ namespace UnityJS.Entities.Systems
         if (script.stateRef < 0 || script.disabled)
           continue;
 
-        var scriptName = script.scriptName.ToString();
-        m_Vm.CallCommand(scriptName, script.stateRef, command);
+        m_Vm.CallCommand(m_Vm.Intern(script.scriptName), script.stateRef, command);
       }
     }
 

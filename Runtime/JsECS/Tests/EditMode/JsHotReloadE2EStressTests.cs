@@ -407,13 +407,15 @@ namespace UnityJS.Entities.EditModeTests
       );
       var entityId = JsEntityRegistry.AllocateId();
       em.AddComponentData(entity, new JsEntityId { value = entityId });
-      var requests = em.AddBuffer<JsScriptRequest>(entity);
-      requests.Add(
-        new JsScriptRequest
+      var scripts = em.AddBuffer<JsScript>(entity);
+      scripts.Add(
+        new JsScript
         {
           scriptName = new FixedString64Bytes(scriptName),
+          stateRef = -1,
+          entityIndex = 0,
           requestHash = JsScriptPathUtility.HashScriptName(scriptName),
-          fulfilled = false,
+          disabled = false,
         }
       );
       return entity;

@@ -13,25 +13,15 @@ namespace UnityJS.Entities.Components
   }
 
   /// <summary>
-  /// Request to add a JS script to an entity.
-  /// Processed by fulfillment system which creates the runtime state
-  /// and adds the script to the JsScript buffer.
+  /// JS component script attached to an entity.
+  /// Written by baker with stateRef=-1 (needs init).
+  /// JsComponentInitSystem processes entries with stateRef=-1, loads the script,
+  /// and sets stateRef to the runtime state handle.
   /// </summary>
-  public struct JsScriptRequest : IBufferElementData
+  public struct JsScript : IBufferElementData
   {
     public FixedString64Bytes scriptName;
     public FixedString512Bytes propertiesJson;
-    public Hash128 requestHash;
-    public bool fulfilled;
-  }
-
-  /// <summary>
-  /// Initialized JS script with runtime state.
-  /// This is a cleanup buffer - entity won't be destroyed until this buffer is removed.
-  /// </summary>
-  public struct JsScript : ICleanupBufferElementData
-  {
-    public FixedString64Bytes scriptName;
     public int stateRef;
     public int entityIndex;
     public Hash128 requestHash;

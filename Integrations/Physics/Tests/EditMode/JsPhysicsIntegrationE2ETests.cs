@@ -20,13 +20,13 @@ namespace UnityJS.Integration.Physics.EditModeTests
       var world = World.DefaultGameObjectInjectionWorld;
       Assert.IsNotNull(world, "World should exist in play mode");
 
-      var beforePhysics = world.GetExistingSystemManaged<JsBeforePhysicsTickSystem>();
-      var afterPhysics = world.GetExistingSystemManaged<JsAfterPhysicsTickSystem>();
-      var fixedTick = world.GetExistingSystemManaged<JsFixedTickSystem>();
+      var beforePhysics = world.Unmanaged.GetExistingUnmanagedSystem<JsBeforePhysicsTickSystem>();
+      var afterPhysics = world.Unmanaged.GetExistingUnmanagedSystem<JsAfterPhysicsTickSystem>();
+      var fixedTick = world.Unmanaged.GetExistingUnmanagedSystem<JsFixedTickSystem>();
 
-      Assert.IsNotNull(beforePhysics, "JsBeforePhysicsTickSystem should exist");
-      Assert.IsNotNull(afterPhysics, "JsAfterPhysicsTickSystem should exist");
-      Assert.IsNotNull(fixedTick, "JsFixedTickSystem should exist");
+      Assert.That(beforePhysics != SystemHandle.Null, "JsBeforePhysicsTickSystem should exist");
+      Assert.That(afterPhysics != SystemHandle.Null, "JsAfterPhysicsTickSystem should exist");
+      Assert.That(fixedTick != SystemHandle.Null, "JsFixedTickSystem should exist");
 
       yield return null;
 
@@ -47,8 +47,8 @@ namespace UnityJS.Integration.Physics.EditModeTests
         var world = World.DefaultGameObjectInjectionWorld;
         Assert.IsNotNull(world, $"World should exist in cycle {cycle}");
 
-        var fixedTick = world.GetExistingSystemManaged<JsFixedTickSystem>();
-        Assert.IsNotNull(fixedTick, $"JsFixedTickSystem should exist in cycle {cycle}");
+        var fixedTick = world.Unmanaged.GetExistingUnmanagedSystem<JsFixedTickSystem>();
+        Assert.That(fixedTick != SystemHandle.Null, $"JsFixedTickSystem should exist in cycle {cycle}");
 
         yield return null;
 

@@ -1,34 +1,37 @@
 // @tick: variable
-// Example: Character input system that reads ECSCharacterControl/Stats/State.
-// In tests, input is injected via globalThis._testInput from C#.
-// In production, replace globalThis._testInput reads with real input.* calls.
-//
-// Uses global bridge objects (ecs, math) registered by unity.js runtime.
+import { ECSCharacterControl, ECSCharacterStats, ECSCharacterState } from 'unity.js/components';
+import { query } from 'unity.js/ecs';
+import { max, min } from 'unity.js/math';
+import { float3 } from 'unity.js/types';
 
 const STAMINA_DRAIN = 20; // per second while sprinting
 const STAMINA_REGEN = 10; // per second while not sprinting
 
-let charQuery: any;
+interface TestInput {
+  moveX?: number;
+  moveZ?: number;
+  sprint?: boolean;
+  jump?: boolean;
+}
 
-export function onUpdate(state: any): void {
-  charQuery ??= (globalThis as any).ecs.query()
-    .withAll('ECSCharacterControl', 'ECSCharacterStats', 'ECSCharacterState')
-    .build();
+const charQuery = query()
+  .withAll(ECSCharacterControl, ECSCharacterStats, ECSCharacterState)
+  .build();
 
+export function onTick(state: UpdateState): void {
   const dt = state.deltaTime;
-  const ti = (globalThis as any)._testInput ?? {};
-  const math = (globalThis as any).math;
+  const ti: TestInput = (globalThis as { _testInput?: TestInput })._testInput ?? {};
 
   for (const [eid, ctrl, stats, charSt] of charQuery) {
     // Build world-space move vector (XZ plane, Y=0)
-    ctrl.moveVector = { x: ti.moveX ?? 0, y: 0, z: ti.moveZ ?? 0 };
+    ctrl.moveVector = float3(ti.moveX ?? 0, 0, ti.moveZ ?? 0);
 
     // Sprinting + stamina
     const sprinting = (ti.sprint ?? false) && stats.stamina > 0;
     if (sprinting) {
-      stats.stamina = math.max(0, stats.stamina - STAMINA_DRAIN * dt);
+      stats.stamina = max(0, stats.stamina - STAMINA_DRAIN * dt);
     } else {
-      stats.stamina = math.min(stats.maxStamina, stats.stamina + STAMINA_REGEN * dt);
+      stats.stamina = min(stats.maxStamina, stats.stamina + STAMINA_REGEN * dt);
     }
     ctrl.sprint = sprinting;
 

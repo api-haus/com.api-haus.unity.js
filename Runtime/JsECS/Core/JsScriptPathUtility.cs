@@ -96,11 +96,6 @@ namespace UnityJS.Entities.Core
 
       var trimmed = input.Trim();
       trimmed = trimmed.Replace('\\', '/');
-
-      if (trimmed.StartsWith(SCRIPTS_FOLDER_RELATIVE, StringComparison.OrdinalIgnoreCase))
-        trimmed = trimmed.Substring(SCRIPTS_FOLDER_RELATIVE.Length);
-      if (trimmed.StartsWith(s_scriptsFolderRelativeWithSlash, StringComparison.OrdinalIgnoreCase))
-        trimmed = trimmed.Substring(s_scriptsFolderRelativeWithSlash.Length);
       trimmed = trimmed.TrimStart('/');
 
       if (trimmed.EndsWith(JS_EXTENSION, StringComparison.OrdinalIgnoreCase))
@@ -219,32 +214,7 @@ namespace UnityJS.Entities.Core
         return false;
       }
 
-      var normalized = assetPath.Replace('\\', '/');
-
-      if (
-        normalized.StartsWith(s_scriptsFolderRelativeWithSlash, StringComparison.OrdinalIgnoreCase)
-      )
-      {
-        normalized = normalized.Substring(s_scriptsFolderRelativeWithSlash.Length);
-      }
-      else if (normalized.StartsWith(SCRIPTS_FOLDER_RELATIVE, StringComparison.OrdinalIgnoreCase))
-      {
-        normalized = normalized.Substring(SCRIPTS_FOLDER_RELATIVE.Length);
-      }
-      else
-      {
-        error = $"Asset must be inside '{SCRIPTS_FOLDER_RELATIVE}'.";
-        return false;
-      }
-
-      if (!normalized.EndsWith(JS_EXTENSION, StringComparison.OrdinalIgnoreCase))
-      {
-        error = "Only .js files are supported.";
-        return false;
-      }
-
-      var relativeWithoutExtension = normalized[..^JS_EXTENSION.Length];
-      return TryNormalizeScriptId(relativeWithoutExtension, out scriptId, out error);
+      return TryNormalizeScriptId(assetPath, out scriptId, out error);
     }
 
 #if UNITY_EDITOR
@@ -273,7 +243,7 @@ namespace UnityJS.Entities.Core
         return string.Empty;
 
       var relativePath = ScriptIdToRelativePath(normalized);
-      return $"{SCRIPTS_FOLDER_RELATIVE}/{relativePath}{JS_EXTENSION}";
+      return relativePath + JS_EXTENSION;
     }
 #endif
   }

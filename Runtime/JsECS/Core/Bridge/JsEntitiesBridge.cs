@@ -79,7 +79,7 @@ namespace UnityJS.Entities.Core
       var entity = bctx.ecb.CreateEntity();
       bctx.ecb.AddComponent(entity, LocalTransform.FromPosition(position));
       bctx.ecb.AddComponent(entity, new JsEntityId { value = entityId });
-      bctx.ecb.AddBuffer<JsScriptRequest>(entity);
+      bctx.ecb.AddBuffer<JsScript>(entity);
       bctx.ecb.AddBuffer<JsEvent>(entity);
 
       AddPendingEntity(entityId, entity);
@@ -163,13 +163,15 @@ namespace UnityJS.Entities.Core
         return;
       }
 
-      var request = new JsScriptRequest
+      var script = new JsScript
       {
         scriptName = scriptName,
+        stateRef = -1,
+        entityIndex = 0,
         requestHash = JsScriptPathUtility.HashScriptName(scriptName.ToString()),
-        fulfilled = false,
+        disabled = false,
       };
-      bctx.ecb.AppendToBuffer(entity, request);
+      bctx.ecb.AppendToBuffer(entity, script);
       SetBool(outU, outTag, ctx, true);
     }
 

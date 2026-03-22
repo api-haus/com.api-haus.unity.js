@@ -5,6 +5,7 @@ namespace UnityJS.Runtime
   using System.Runtime.InteropServices;
   using System.Text;
   using QJS;
+  using Unity.Collections;
   using Unity.Logging;
 
   /// <summary>
@@ -19,7 +20,9 @@ namespace UnityJS.Runtime
     static bool s_shimDirty;
 
     static JsRuntimeManager s_Instance;
+    static int s_InstanceVersion;
     public static JsRuntimeManager Instance => s_Instance;
+    public static int InstanceVersion => s_InstanceVersion;
 
     JSRuntime m_Runtime;
     JSContext m_Context;
@@ -33,6 +36,34 @@ namespace UnityJS.Runtime
     public IReadOnlyList<string> CapturedExceptions => m_CapturedExceptions;
 
     public void ClearCapturedExceptions() => m_CapturedExceptions.Clear();
+
+    readonly Dictionary<FixedString64Bytes, string> m_StringCache = new();
+    readonly Dictionary<FixedString32Bytes, string> m_StringCache32 = new();
+
+    /// <summary>
+    /// Returns a cached managed string for a FixedString64. One allocation per unique
+    /// value across the VM lifetime; zero per frame.
+    /// </summary>
+    public string Intern(in FixedString64Bytes fs)
+    {
+      if (m_StringCache.TryGetValue(fs, out var s))
+        return s;
+      s = fs.ToString();
+      m_StringCache[fs] = s;
+      return s;
+    }
+
+    /// <summary>
+    /// Returns a cached managed string for a FixedString32.
+    /// </summary>
+    public string Intern(in FixedString32Bytes fs)
+    {
+      if (m_StringCache32.TryGetValue(fs, out var s))
+        return s;
+      s = fs.ToString();
+      m_StringCache32[fs] = s;
+      return s;
+    }
 
     public JSRuntime Runtime => m_Runtime;
     public JSContext Context => m_Context;
@@ -77,14 +108,14 @@ namespace UnityJS.Runtime
         var func = QJS.JS_GetPropertyStr(m_Context, global, p);
         if (QJS.JS_IsFunction(m_Context, func) != 0)
         {
-          var nameBytes = Encoding.UTF8.GetBytes(scriptName + '\0');
+          var nameBytes = GetOrCacheBytes(scriptName);
           fixed (byte* pName = nameBytes)
           {
             var argv = stackalloc JSValue[1];
             argv[0] = QJS.JS_NewString(m_Context, pName);
             var result = QJS.JS_Call(m_Context, func, global, 1, argv);
             if (QJS.IsException(result))
-              LogException($"ComponentReload({scriptName})");
+              LogException(scriptName);
             QJS.JS_FreeValue(m_Context, result);
             QJS.JS_FreeValue(m_Context, argv[0]);
           }
@@ -110,6 +141,7 @@ namespace UnityJS.Runtime
 
       JsModuleLoader.Install(m_Context);
 
+      s_InstanceVersion++;
       s_Instance = this;
     }
 
@@ -207,12 +239,20 @@ namespace UnityJS.Runtime
     static readonly byte[] s_onTick = QJS.U8("onTick");
     static readonly byte[] s_onEvent = QJS.U8("onEvent");
     static readonly byte[] s_onCommand = QJS.U8("onCommand");
+    static readonly byte[] s_onUpdate = QJS.U8("onUpdate");
+    static readonly byte[] s_onDestroy = QJS.U8("onDestroy");
     static readonly byte[] s_tickComponents = QJS.U8("__tickComponents");
     static readonly byte[] s_flushRefRw = QJS.U8("__flushRefRw");
     static readonly byte[] s_componentInit = QJS.U8("__componentInit");
     static readonly byte[] s_lastLoadedModule = QJS.U8("__lastLoadedModule");
     static readonly byte[] s_componentReload = QJS.U8("__componentReload");
     static readonly byte[] s_verifyModuleExports = QJS.U8("__verifyModuleExports");
+
+    static readonly byte[] s_groupUpdate = QJS.U8("update");
+    static readonly byte[] s_groupFixedUpdate = QJS.U8("fixedUpdate");
+    static readonly byte[] s_groupLateUpdate = QJS.U8("lateUpdate");
+
+    readonly Dictionary<string, byte[]> m_EncodedStringCache = new();
 
     public unsafe int CreateEntityState(string scriptName, int entityId)
     {
@@ -229,7 +269,7 @@ namespace UnityJS.Runtime
         QJS.JS_SetPropertyStr(m_Context, state, pDeltaTime, QJS.NewFloat64(m_Context, 0.0));
         QJS.JS_SetPropertyStr(m_Context, state, pElapsedTime, QJS.NewFloat64(m_Context, 0.0));
 
-        var nameBytes = Encoding.UTF8.GetBytes(scriptName + '\0');
+        var nameBytes = GetOrCacheBytes(scriptName);
         fixed (byte* pName = nameBytes)
         {
           var nameVal = QJS.JS_NewString(m_Context, pName);
@@ -313,18 +353,36 @@ namespace UnityJS.Runtime
 
     /// <summary>
     /// Calls a named function on a script's module namespace object.
+    /// Uses pre-cached byte array for the function name to avoid per-call allocation.
     /// </summary>
     public unsafe bool CallFunction(string scriptName, string funcName, int stateRef)
     {
-      var funcNameBytes = Encoding.UTF8.GetBytes(funcName + '\0');
       return InvokeExport(
         scriptName,
-        funcNameBytes,
+        GetOrCacheBytes(funcName),
         stateRef,
         null,
         0,
-        $"CallFunction({scriptName}.{funcName})"
+        scriptName
       );
+    }
+
+    /// <summary>
+    /// Calls a named function using a pre-encoded byte array for the function name.
+    /// Zero-allocation hot path.
+    /// </summary>
+    public unsafe bool CallFunction(string scriptName, byte[] funcNameBytes, int stateRef)
+    {
+      return InvokeExport(scriptName, funcNameBytes, stateRef, null, 0, scriptName);
+    }
+
+    byte[] GetOrCacheBytes(string value)
+    {
+      if (m_EncodedStringCache.TryGetValue(value, out var bytes))
+        return bytes;
+      bytes = QJS.U8(value);
+      m_EncodedStringCache[value] = bytes;
+      return bytes;
     }
 
     /// <summary>
@@ -369,7 +427,7 @@ namespace UnityJS.Runtime
     )
     {
       UpdateStateTimings(stateRef, deltaTime, elapsedTime);
-      return InvokeExport(scriptName, s_onTick, stateRef, null, 0, $"CallTick({scriptName})");
+      return InvokeExport(scriptName, s_onTick, stateRef, null, 0, scriptName);
     }
 
     /// <summary>
@@ -384,7 +442,7 @@ namespace UnityJS.Runtime
       int intParam
     )
     {
-      var eventNameBytes = Encoding.UTF8.GetBytes(eventName + '\0');
+      var eventNameBytes = GetOrCacheBytes(eventName);
       fixed (byte* pEventName = eventNameBytes)
       {
         var extras = stackalloc JSValue[4];
@@ -399,7 +457,7 @@ namespace UnityJS.Runtime
           stateRef,
           extras,
           4,
-          $"CallEvent({scriptName}, {eventName})"
+          scriptName
         );
 
         QJS.JS_FreeValue(m_Context, extras[0]);
@@ -412,7 +470,7 @@ namespace UnityJS.Runtime
     /// </summary>
     public unsafe bool CallCommand(string scriptName, int stateRef, string command)
     {
-      var cmdBytes = Encoding.UTF8.GetBytes(command + '\0');
+      var cmdBytes = GetOrCacheBytes(command);
       fixed (byte* pCmd = cmdBytes)
       {
         var extras = stackalloc JSValue[1];
@@ -424,7 +482,7 @@ namespace UnityJS.Runtime
           stateRef,
           extras,
           1,
-          $"CallCommand({scriptName}, {command})"
+          scriptName
         );
 
         QJS.JS_FreeValue(m_Context, extras[0]);
@@ -437,13 +495,20 @@ namespace UnityJS.Runtime
     /// </summary>
     public unsafe void TickComponents(string group, float dt)
     {
+      TickComponents(GetOrCacheBytes(group), dt);
+    }
+
+    /// <summary>
+    /// Ticks components using a pre-encoded group name. Zero-allocation hot path.
+    /// </summary>
+    public unsafe void TickComponents(byte[] groupBytes, float dt)
+    {
       var global = QJS.JS_GetGlobalObject(m_Context);
       fixed (byte* pName = s_tickComponents)
       {
         var func = QJS.JS_GetPropertyStr(m_Context, global, pName);
         if (QJS.JS_IsFunction(m_Context, func) != 0)
         {
-          var groupBytes = Encoding.UTF8.GetBytes(group + '\0');
           fixed (byte* pGroup = groupBytes)
           {
             var argv = stackalloc JSValue[2];
@@ -452,7 +517,7 @@ namespace UnityJS.Runtime
 
             var result = QJS.JS_Call(m_Context, func, global, 2, argv);
             if (QJS.IsException(result))
-              LogException($"TickComponents({group})");
+              LogException("TickComponents");
 
             QJS.JS_FreeValue(m_Context, result);
             QJS.JS_FreeValue(m_Context, argv[0]);
@@ -464,6 +529,13 @@ namespace UnityJS.Runtime
 
       QJS.JS_FreeValue(m_Context, global);
     }
+
+    /// <summary>Pre-cached group byte arrays for zero-allocation TickComponents calls.</summary>
+    public static byte[] GroupUpdateBytes => s_groupUpdate;
+    public static byte[] GroupFixedUpdateBytes => s_groupFixedUpdate;
+    public static byte[] GroupLateUpdateBytes => s_groupLateUpdate;
+    public static byte[] OnUpdateBytes => s_onUpdate;
+    public static byte[] OnDestroyBytes => s_onDestroy;
 
     /// <summary>
     /// Calls globalThis.__flushRefRw() — writes back any pending RefRW component data.
@@ -506,7 +578,7 @@ namespace UnityJS.Runtime
         var func = QJS.JS_GetPropertyStr(m_Context, global, pName);
         if (QJS.JS_IsFunction(m_Context, func) != 0)
         {
-          var scriptBytes = Encoding.UTF8.GetBytes(scriptName + '\0');
+          var scriptBytes = GetOrCacheBytes(scriptName);
           fixed (byte* pScript = scriptBytes)
           {
             var argc = propertiesJson != null ? 3 : 2;
@@ -516,7 +588,7 @@ namespace UnityJS.Runtime
 
             if (propertiesJson != null)
             {
-              var propsBytes = Encoding.UTF8.GetBytes(propertiesJson + '\0');
+              var propsBytes = GetOrCacheBytes(propertiesJson);
               fixed (byte* pProps = propsBytes)
                 argv[2] = QJS.JS_NewString(m_Context, pProps);
             }
@@ -527,7 +599,7 @@ namespace UnityJS.Runtime
 
             var result = QJS.JS_Call(m_Context, func, global, argc, argv);
             if (QJS.IsException(result))
-              LogException($"TryComponentInit({scriptName})");
+              LogException(scriptName);
             else
               handled = QJS.JS_ToBool(m_Context, result) != 0;
 
@@ -643,6 +715,10 @@ namespace UnityJS.Runtime
     public void Dispose()
     {
       BridgeState?.Dispose();
+
+      m_StringCache.Clear();
+      m_StringCache32.Clear();
+      m_EncodedStringCache.Clear();
 
       foreach (var kv in m_StateRefs)
         QJS.JS_FreeValue(m_Context, kv.Value);

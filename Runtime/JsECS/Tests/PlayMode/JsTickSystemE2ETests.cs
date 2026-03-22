@@ -18,7 +18,7 @@ namespace UnityJS.Entities.PlayModeTests
 
   /// <summary>
   /// End-to-end tests that exercise the real ECS pipeline:
-  /// JsScriptFulfillmentSystem parses annotations → tick systems execute scripts.
+  /// JsComponentInitSystem parses annotations → tick systems execute scripts.
   /// Uses actual JS files on disk with // @tick: annotations.
   /// </summary>
   public class JsTickSystemE2ETests
@@ -84,13 +84,15 @@ namespace UnityJS.Entities.PlayModeTests
       );
       var entityId = JsEntityRegistry.AllocateId();
       m_EntityManager.AddComponentData(entity, new JsEntityId { value = entityId });
-      var requests = m_EntityManager.AddBuffer<JsScriptRequest>(entity);
-      requests.Add(
-        new JsScriptRequest
+      var scripts = m_EntityManager.AddBuffer<JsScript>(entity);
+      scripts.Add(
+        new JsScript
         {
           scriptName = new FixedString64Bytes(scriptName),
+          stateRef = -1,
+          entityIndex = 0,
           requestHash = JsScriptPathUtility.HashScriptName(scriptName),
-          fulfilled = false,
+          disabled = false,
         }
       );
       return entity;
@@ -110,14 +112,16 @@ namespace UnityJS.Entities.PlayModeTests
       );
       var entityId = JsEntityRegistry.AllocateId();
       m_EntityManager.AddComponentData(entity, new JsEntityId { value = entityId });
-      var requests = m_EntityManager.AddBuffer<JsScriptRequest>(entity);
+      var scripts = m_EntityManager.AddBuffer<JsScript>(entity);
       foreach (var name in scriptNames)
-        requests.Add(
-          new JsScriptRequest
+        scripts.Add(
+          new JsScript
           {
             scriptName = new FixedString64Bytes(name),
+            stateRef = -1,
+            entityIndex = 0,
             requestHash = JsScriptPathUtility.HashScriptName(name),
-            fulfilled = false,
+            disabled = false,
           }
         );
       return entity;

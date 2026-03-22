@@ -9,11 +9,10 @@ namespace UnityJS.Entities.Systems.Support
   using Unity.Transforms;
 
   [UpdateInGroup(typeof(InitializationSystemGroup))]
-  public partial class JsScriptFulfillmentSystem : SystemBase
+  public partial class JsComponentInitSystem : SystemBase
   {
     JsRuntimeManager m_Vm;
     JsRuntimeManager m_LastVm;
-    EntityQuery m_RequestQuery;
     EntityQuery m_ScriptQuery;
     ComponentLookup<LocalTransform> m_TransformLookup;
     BufferLookup<JsScript> m_ScriptBufferLookup;
@@ -21,7 +20,6 @@ namespace UnityJS.Entities.Systems.Support
     protected override void OnCreate()
     {
       JsEntityRegistry.Initialize();
-      m_RequestQuery = GetEntityQuery(ComponentType.ReadWrite<JsScriptRequest>());
       m_ScriptQuery = GetEntityQuery(ComponentType.ReadWrite<JsScript>());
       m_TransformLookup = GetComponentLookup<LocalTransform>();
       m_ScriptBufferLookup = GetBufferLookup<JsScript>(true);
@@ -94,11 +92,11 @@ namespace UnityJS.Entities.Systems.Support
         InvalidateStaleScripts();
       }
 
-      if (m_RequestQuery.IsEmptyIgnoreFilter)
+      if (m_ScriptQuery.IsEmptyIgnoreFilter)
         return;
 
       using var ecb = new EntityCommandBuffer(Allocator.Temp);
-      var entities = m_RequestQuery.ToEntityArray(Allocator.Temp);
+      var entities = m_ScriptQuery.ToEntityArray(Allocator.Temp);
 
       foreach (var entity in entities)
       {
@@ -108,13 +106,13 @@ namespace UnityJS.Entities.Systems.Support
         if (!EntityManager.HasComponent<JsEntityId>(entity))
           continue;
 
-        var requests = EntityManager.GetBuffer<JsScriptRequest>(entity);
-        if (requests.Length == 0)
+        var scripts = EntityManager.GetBuffer<JsScript>(entity);
+        if (scripts.Length == 0)
           continue;
 
         var hasUnfulfilled = false;
-        for (var i = 0; i < requests.Length; i++)
-          if (!requests[i].fulfilled)
+        for (var i = 0; i < scripts.Length; i++)
+          if (scripts[i].stateRef == -1 && !scripts[i].disabled)
           {
             hasUnfulfilled = true;
             break;
@@ -125,43 +123,35 @@ namespace UnityJS.Entities.Systems.Support
 
         var entityId = JsEntityRegistry.GetOrAssignEntityId(entity, ecb, EntityManager);
 
-        if (!EntityManager.HasBuffer<JsScript>(entity))
+        for (var i = 0; i < scripts.Length; i++)
         {
-          EntityManager.AddBuffer<JsScript>(entity);
-          requests = EntityManager.GetBuffer<JsScriptRequest>(entity);
-        }
-
-        var scripts = EntityManager.GetBuffer<JsScript>(entity);
-
-        for (var i = 0; i < requests.Length; i++)
-        {
-          var request = requests[i];
-          if (request.fulfilled)
+          var entry = scripts[i];
+          if (entry.stateRef >= 0 || entry.disabled)
             continue;
 
-          if (HasScriptWithHash(scripts, request.requestHash))
+          if (HasFulfilledScriptWithHash(scripts, entry.requestHash))
           {
-            request.fulfilled = true;
-            requests[i] = request;
-            Log.Verbose("[JsFulfillment] Skipping duplicate request hash for entity {0}", entity);
+            entry.disabled = true;
+            scripts[i] = entry;
+            Log.Verbose("[JsComponentInit] Skipping duplicate request hash for entity {0}", entity);
             continue;
           }
 
-          var scriptName = JsScriptPathUtility.NormalizeScriptId(request.scriptName.ToString());
+          var scriptName = JsScriptPathUtility.NormalizeScriptId(entry.scriptName.ToString());
 
           if (string.IsNullOrEmpty(scriptName))
           {
-            Log.Error("[JsFulfillment] Script name is empty for entity {0}", entity);
-            request.fulfilled = true;
-            requests[i] = request;
+            Log.Error("[JsComponentInit] Script name is empty for entity {0}", entity);
+            entry.disabled = true;
+            scripts[i] = entry;
             continue;
           }
 
           if (!JsScriptSourceRegistry.TryReadScript(scriptName, out var source, out var resolvedId))
           {
-            Log.Error("[JsFulfillment] Script not found in any source: {0}", scriptName);
-            request.fulfilled = true;
-            requests[i] = request;
+            Log.Error("[JsComponentInit] Script not found in any source: {0}", scriptName);
+            entry.disabled = true;
+            scripts[i] = entry;
             continue;
           }
 
@@ -171,9 +161,9 @@ namespace UnityJS.Entities.Systems.Support
           }
           else if (!m_Vm.LoadScriptAsModule(scriptName, source, resolvedId))
           {
-            Log.Error("[JsFulfillment] Failed to load script: {0}", scriptName);
-            request.fulfilled = true;
-            requests[i] = request;
+            Log.Error("[JsComponentInit] Failed to load script: {0}", scriptName);
+            entry.disabled = true;
+            scripts[i] = entry;
             continue;
           }
 
@@ -184,30 +174,23 @@ namespace UnityJS.Entities.Systems.Support
           if (stateRef < 0)
           {
             Log.Error(
-              "[JsFulfillment] CreateEntityState failed for {0} entity={1}",
+              "[JsComponentInit] CreateEntityState failed for {0} entity={1}",
               scriptName,
               entityId
             );
-            request.fulfilled = true;
-            requests[i] = request;
+            entry.disabled = true;
+            scripts[i] = entry;
             continue;
           }
 
-          scripts = EntityManager.GetBuffer<JsScript>(entity);
-          scripts.Add(
-            new JsScript
-            {
-              scriptName = new FixedString64Bytes(scriptName),
-              stateRef = stateRef,
-              entityIndex = entityId,
-              requestHash = request.requestHash,
-              disabled = false,
-              tickGroup = annotations.tickGroup,
-            }
-          );
+          entry.scriptName = new FixedString64Bytes(scriptName);
+          entry.stateRef = stateRef;
+          entry.entityIndex = entityId;
+          entry.tickGroup = annotations.tickGroup;
+          scripts[i] = entry;
 
           Log.Verbose(
-            "[JsFulfillment] Fulfilled script '{0}' on entity {1}, stateRef={2}",
+            "[JsComponentInit] Initialized script '{0}' on entity {1}, stateRef={2}",
             scriptName,
             entityId,
             stateRef
@@ -220,15 +203,14 @@ namespace UnityJS.Entities.Systems.Support
           m_ScriptBufferLookup.Update(this);
           JsECSBridge.UpdateBurstContext(ecb, 0f, m_TransformLookup, m_ScriptBufferLookup);
 
-          var propsJson = request.propertiesJson.IsEmpty ? null : request.propertiesJson.ToString();
+          var propsJson = entry.propertiesJson.IsEmpty ? null : entry.propertiesJson.ToString();
           if (!m_Vm.TryComponentInit(scriptName, entityId, propsJson))
             m_Vm.CallInit(scriptName, stateRef);
 
           JsECSBridge.ClearBurstContext();
 
-          requests = EntityManager.GetBuffer<JsScriptRequest>(entity);
-          request.fulfilled = true;
-          requests[i] = request;
+          // Re-fetch buffer in case __componentInit modified it
+          scripts = EntityManager.GetBuffer<JsScript>(entity);
         }
       }
 
@@ -245,31 +227,26 @@ namespace UnityJS.Entities.Systems.Support
         if (!EntityManager.Exists(entity))
           continue;
 
-        // Clear stale JsScript entries (stateRefs point to dead VM)
+        // Reset stale JsScript entries (stateRefs point to dead VM)
+        // Set stateRef back to -1 so they get re-initialized
         var scripts = EntityManager.GetBuffer<JsScript>(entity);
-        scripts.Clear();
-
-        // Unfulfill all requests so they get re-processed
-        if (EntityManager.HasBuffer<JsScriptRequest>(entity))
+        for (var i = 0; i < scripts.Length; i++)
         {
-          var requests = EntityManager.GetBuffer<JsScriptRequest>(entity);
-          for (var i = 0; i < requests.Length; i++)
-          {
-            var r = requests[i];
-            r.fulfilled = false;
-            requests[i] = r;
-          }
+          var s = scripts[i];
+          s.stateRef = -1;
+          s.disabled = false;
+          scripts[i] = s;
         }
       }
 
       entities.Dispose();
-      Log.Debug("[JsFulfillment] VM changed — invalidated stale scripts for re-fulfillment");
+      Log.Debug("[JsComponentInit] VM changed — invalidated stale scripts for re-initialization");
     }
 
-    static bool HasScriptWithHash(DynamicBuffer<JsScript> scripts, Hash128 hash)
+    static bool HasFulfilledScriptWithHash(DynamicBuffer<JsScript> scripts, Hash128 hash)
     {
       for (var i = 0; i < scripts.Length; i++)
-        if (scripts[i].requestHash == hash)
+        if (scripts[i].requestHash == hash && scripts[i].stateRef >= 0)
           return true;
       return false;
     }
@@ -283,7 +260,7 @@ namespace UnityJS.Entities.Systems.Support
       for (var i = 0; i < scripts.Length; i++)
       {
         var script = scripts[i];
-        if (script.scriptName.ToString() == scriptName && !script.disabled && script.stateRef >= 0)
+        if (script.scriptName == new Unity.Collections.FixedString64Bytes(scriptName) && !script.disabled && script.stateRef >= 0)
         {
           DisableScriptAtIndex(entity, scripts, i);
           return true;
@@ -315,17 +292,16 @@ namespace UnityJS.Entities.Systems.Support
     void DisableScriptAtIndex(Entity entity, DynamicBuffer<JsScript> scripts, int index)
     {
       var script = scripts[index];
-      var scriptName = script.scriptName.ToString();
 
       if (m_Vm != null && m_Vm.IsValid)
       {
-        m_Vm.CallFunction(scriptName, "onDestroy", script.stateRef);
+        var scriptName = m_Vm.Intern(script.scriptName);
+        m_Vm.CallFunction(scriptName, JsRuntimeManager.OnDestroyBytes, script.stateRef);
         m_Vm.ReleaseEntityState(script.stateRef);
       }
 
       Log.Verbose(
-        "[JsFulfillment] Disabled script '{0}' on entity {1}",
-        scriptName,
+        "[JsComponentInit] Disabled script on entity {0}",
         script.entityIndex
       );
 

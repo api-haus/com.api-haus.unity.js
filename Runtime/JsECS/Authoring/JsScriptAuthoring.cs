@@ -8,7 +8,7 @@ namespace UnityJS.Entities.Authoring
   [RequireComponent(typeof(JsScriptBufferAuthoring))]
   public class JsScriptAuthoring : MonoBehaviour
   {
-    [Tooltip("Path relative to Assets/StreamingAssets/unity.js (e.g. components/slime_wander.ts)")]
+    [Tooltip("Path relative to project root (e.g. Assets/StreamingAssets/unity.js/components/slime_wander.ts)")]
     public string scriptPath;
 
     [Tooltip(

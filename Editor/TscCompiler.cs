@@ -36,14 +36,23 @@ namespace UnityJS.Editor
     readonly List<string> m_Errors = new();
     public IReadOnlyList<string> LastErrors => m_Errors;
 
-    public TscCompiler(string sourceRoot, string outDir = null)
+    public TscCompiler(string sourceRoot, string outDir = null, string tsconfigPath = null)
     {
       SourceRoot = Path.GetFullPath(sourceRoot);
-      TsconfigPath = Path.Combine(SourceRoot, "tsconfig.json");
+      var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+
+      if (tsconfigPath != null)
+        TsconfigPath = tsconfigPath;
+      else
+      {
+        // Prefer tsconfig.json in sourceRoot if it exists, else project root
+        var localConfig = Path.Combine(SourceRoot, "tsconfig.json");
+        TsconfigPath = File.Exists(localConfig) ? localConfig : Path.Combine(projectRoot, "tsconfig.json");
+      }
       OutDir =
         outDir != null
           ? Path.GetFullPath(outDir)
-          : Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "TscBuild"));
+          : Path.Combine(projectRoot, "Library", "TscBuild");
       Epoch = SessionState.GetInt(EpochKey, 0);
       LastCompilationSucceeded = true;
       State = File.Exists(TsconfigPath) ? TscState.Success : TscState.Dead;
@@ -91,13 +100,18 @@ namespace UnityJS.Editor
       if (!Directory.Exists(OutDir))
         return true;
 
+      // tsc mirrors SourceRoot under OutDir (rootDir is project root)
+      var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+      var sourceRelative = Path.GetRelativePath(projectRoot, SourceRoot).Replace('\\', '/');
+      var outMirror = Path.Combine(OutDir, sourceRelative);
+
       foreach (var subdir in new[] { "systems", "components", "types" })
       {
         var tsDir = Path.Combine(SourceRoot, subdir);
         if (!Directory.Exists(tsDir))
           continue;
 
-        var outSubdir = Path.Combine(OutDir, subdir);
+        var outSubdir = Path.Combine(outMirror, subdir);
         var tsFiles = Directory.GetFiles(tsDir, "*.ts", SearchOption.AllDirectories);
         foreach (var ts in tsFiles)
         {

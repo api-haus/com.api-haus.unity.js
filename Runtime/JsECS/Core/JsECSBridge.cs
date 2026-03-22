@@ -121,6 +121,8 @@ namespace UnityJS.Entities.Core
     static readonly SharedStatic<BurstBridgeContext> s_burstContext =
       SharedStatic<BurstBridgeContext>.GetOrCreate<BurstContextMarker, BurstBridgeContext>();
 
+    public static bool IsBurstContextValid => s_burstContext.Data.isValid;
+
     static readonly SharedStatic<int> s_nextEntityId =
       SharedStatic<int>.GetOrCreate<NextEntityIdMarker>();
 

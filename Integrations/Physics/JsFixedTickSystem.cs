@@ -7,11 +7,21 @@ namespace UnityJS.Integration.Physics
 
   [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
   [UpdateAfter(typeof(PhysicsSystemGroup))]
-  public partial class JsFixedTickSystem : JsTickSystemBase
+  public partial struct JsFixedTickSystem : ISystem
   {
-    protected override JsTickGroup GetTickGroup()
+    JsTickSystemHelper.State m_TickState;
+
+    public void OnCreate(ref SystemState state)
     {
-      return JsTickGroup.Fixed;
+      JsTickSystemHelper.OnCreate(ref state, out m_TickState);
+    }
+
+    public void OnUpdate(ref SystemState state)
+    {
+      if (!SystemAPI.TryGetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>(out var ecbSingleton))
+        return;
+      var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
+      JsTickSystemHelper.OnUpdate(ref state, ref m_TickState, JsTickGroup.Fixed, ecb);
     }
   }
 }

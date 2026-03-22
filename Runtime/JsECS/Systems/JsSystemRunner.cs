@@ -5,27 +5,41 @@ using System.Runtime.CompilerServices;
 
 namespace UnityJS.Entities.Systems
 {
-  using System.Collections.Generic;
-  using System.IO;
   using Core;
   using Runtime;
   using Unity.Collections;
   using Unity.Entities;
   using Unity.Logging;
   using Unity.Transforms;
-  using UnityEngine;
 
   public struct JsSystemManifest : IComponentData
   {
     public bool initialized;
   }
 
+  /// <summary>
+  /// Mutable state for JsSystemRunner, stored as IComponentData on the system entity.
+  /// All collections are Native — zero managed GC allocations.
+  /// </summary>
+  public struct JsSystemRunnerData : IComponentData
+  {
+    public NativeList<FixedString64Bytes> SystemNames;
+    public NativeHashMap<FixedString64Bytes, int> SystemStateRefs;
+    public NativeHashMap<FixedString64Bytes, FixedString64Bytes> SystemScriptIds;
+    public bool BridgesRegistered;
+    public int LastVmVersion;
+  }
+
   [UpdateInGroup(typeof(SimulationSystemGroup))]
   [UpdateAfter(typeof(JsScriptingSystem))]
-  public partial class JsSystemRunner : SystemBase
+  public partial struct JsSystemRunner : ISystem
   {
     internal const string QueryBuilderSourceForTests = QueryBuilderSource;
     internal const string ComponentGlueSourceForTests = ComponentGlueSource;
+
+    ComponentLookup<LocalTransform> m_TransformLookup;
+    BufferLookup<Components.JsScript> m_ScriptBufferLookup;
+    EntityQuery m_SentinelQuery;
 
     const string QueryBuilderSource =
       @"
@@ -355,89 +369,139 @@ globalThis.__componentReload = function(scriptName) {
 };
 ";
 
-    JsRuntimeManager m_Vm;
-    readonly List<string> m_SystemNames = new();
-    readonly Dictionary<string, int> m_SystemStateRefs = new();
-    bool m_BridgesRegistered;
-
-    ComponentLookup<LocalTransform> m_TransformLookup;
-    EntityQuery m_SentinelQuery;
-
-    protected override void OnCreate()
+    public void OnCreate(ref SystemState state)
     {
-      m_TransformLookup = GetComponentLookup<LocalTransform>();
-      m_SentinelQuery = GetEntityQuery(ComponentType.ReadWrite<Components.JsEntityId>());
+      m_TransformLookup = state.GetComponentLookup<LocalTransform>();
+      m_ScriptBufferLookup = state.GetBufferLookup<Components.JsScript>(true);
+      m_SentinelQuery = new EntityQueryBuilder(Allocator.Temp)
+        .WithAllRW<Components.JsEntityId>()
+        .Build(ref state);
+
+      state.EntityManager.AddComponentData(state.SystemHandle, new JsSystemRunnerData
+      {
+        SystemNames = new NativeList<FixedString64Bytes>(16, Allocator.Persistent),
+        SystemStateRefs = new NativeHashMap<FixedString64Bytes, int>(16, Allocator.Persistent),
+        SystemScriptIds = new NativeHashMap<FixedString64Bytes, FixedString64Bytes>(16, Allocator.Persistent),
+        BridgesRegistered = false,
+        LastVmVersion = -1,
+      });
+
     }
 
-    protected override void OnStartRunning()
+    public void OnDestroy(ref SystemState state)
     {
-      EnsureVmReady();
+      ref var data = ref state.EntityManager
+        .GetComponentDataRW<JsSystemRunnerData>(state.SystemHandle).ValueRW;
+      if (data.SystemNames.IsCreated) data.SystemNames.Dispose();
+      if (data.SystemStateRefs.IsCreated) data.SystemStateRefs.Dispose();
+      if (data.SystemScriptIds.IsCreated) data.SystemScriptIds.Dispose();
+
+      JsECSBridge.Shutdown();
     }
 
-    /// <summary>
-    /// Checks whether the VM is alive and belongs to this runner.
-    /// If the VM was disposed (e.g. JsScriptingSystem.OnDestroy during
-    /// subscene loading or play-mode re-entry) and a new one exists,
-    /// resets all cached state and re-discovers system scripts.
-    /// Returns true if the VM is ready for use.
-    /// </summary>
-    bool EnsureVmReady()
+    public void OnUpdate(ref SystemState state)
+    {
+      ref var data = ref state.EntityManager
+        .GetComponentDataRW<JsSystemRunnerData>(state.SystemHandle).ValueRW;
+
+      if (!EnsureVmReady(ref state, ref data))
+        return;
+
+      var vm = JsRuntimeManager.Instance;
+
+      var worldTime = state.WorldUnmanaged.Time;
+      var deltaTime = worldTime.DeltaTime;
+      if (deltaTime <= 0f)
+        deltaTime = UnityEngine.Time.deltaTime;
+
+      var elapsedTime = worldTime.ElapsedTime;
+
+      RegisterSentinelEntities(ref state);
+      PrewarmComponentQueries(ref state);
+
+      state.EntityManager.CompleteDependencyBeforeRW<LocalTransform>();
+      m_TransformLookup.Update(ref state);
+
+      JsSystemBridge.UpdateContext(deltaTime, elapsedTime);
+      JsComponentRegistry.UpdateAllLookups(ref state);
+
+      if (!SystemAPI.TryGetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>(out var ecbSingleton))
+        return;
+      var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
+      m_ScriptBufferLookup.Update(ref state);
+      JsECSBridge.UpdateBurstContext(ecb, deltaTime, m_TransformLookup, m_ScriptBufferLookup);
+
+      for (var i = 0; i < data.SystemNames.Length; i++)
+      {
+        var systemName = data.SystemNames[i];
+        if (!data.SystemStateRefs.TryGetValue(systemName, out var stateRef))
+          continue;
+
+        vm.UpdateStateTimings(stateRef, deltaTime, elapsedTime);
+
+        if (data.SystemScriptIds.TryGetValue(systemName, out var scriptId))
+        {
+          vm.CallFunction(vm.Intern(scriptId), JsRuntimeManager.OnUpdateBytes, stateRef);
+          vm.FlushRefRw();
+        }
+      }
+
+      vm.TickComponents(JsRuntimeManager.GroupUpdateBytes, deltaTime);
+    }
+
+    bool EnsureVmReady(ref SystemState state, ref JsSystemRunnerData data)
     {
       var vm = JsRuntimeManager.Instance;
       if (vm == null || !vm.IsValid)
-        return false;
-
-      if (vm == m_Vm && m_BridgesRegistered)
-        return true;
-
-      // VM changed — old script refs and state refs point to a dead context.
-      m_SystemNames.Clear();
-      m_SystemStateRefs.Clear();
-      m_BridgesRegistered = false;
-      m_Vm = vm;
-
-      // Ensure bridge state exists on new VM
-      m_Vm.BridgeState ??= new JsBridgeState();
-
-      // If fulfillment already loaded bridges + glue, skip re-registration.
-      // QueryBridge.Register and ComponentStore.Register overwrite ecs.query / ecs.add
-      // which the glue scripts have already wrapped — re-registering undoes the wrapping.
-      if (!m_Vm.HasScript("__ecs_component_glue"))
       {
-        m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
-        m_Vm.RegisterBridgeNow(JsQueryBridge.Register);
-        m_Vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
-        m_Vm.RegisterBridgeNow(JsComponentStore.Register);
-        m_Vm.LoadScriptFromString("__ecs_query_builder", QueryBuilderSource);
-        m_Vm.LoadScriptFromString("__ecs_component_glue", ComponentGlueSource);
+        Log.Debug("[JsSystemRunner] EnsureVmReady: VM not ready (null={0})", vm == null);
+        return false;
       }
 
-      m_Vm.RegisterBridgeNow(JsSystemBridge.Register);
-      m_BridgesRegistered = true;
+      var currentVersion = JsRuntimeManager.InstanceVersion;
+      if (data.LastVmVersion == currentVersion && data.BridgesRegistered)
+        return true;
 
-      var scriptingSystem = World.GetOrCreateSystemManaged<JsScriptingSystem>();
-      JsECSBridge.Initialize(World);
+      data.SystemNames.Clear();
+      data.SystemStateRefs.Clear();
+      data.SystemScriptIds.Clear();
+      data.BridgesRegistered = false;
+      data.LastVmVersion = currentVersion;
+
+      vm.BridgeState ??= new JsBridgeState();
+
+      if (!vm.HasScript("__ecs_component_glue"))
+      {
+        vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
+        vm.RegisterBridgeNow(JsQueryBridge.Register);
+        vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
+        vm.RegisterBridgeNow(JsComponentStore.Register);
+        vm.LoadScriptFromString("__ecs_query_builder", QueryBuilderSource);
+        vm.LoadScriptFromString("__ecs_component_glue", ComponentGlueSource);
+      }
+
+      vm.RegisterBridgeNow(JsSystemBridge.Register);
+      data.BridgesRegistered = true;
+
+      JsECSBridge.Initialize(state.World);
       JsEntityRegistry.Initialize();
-      JsQueryBridge.Initialize(EntityManager);
+      JsQueryBridge.Initialize(state.EntityManager);
 
       if (!SystemAPI.HasSingleton<JsSystemManifest>())
       {
-        var entity = EntityManager.CreateEntity();
-        EntityManager.AddComponentData(entity, new JsSystemManifest { initialized = false });
+        var entity = state.EntityManager.CreateEntity();
+        state.EntityManager.AddComponentData(entity, new JsSystemManifest { initialized = false });
       }
 
-      DiscoverAndLoadSystems();
+      DiscoverAndLoadSystems(ref state, ref data, vm);
       return true;
     }
 
-    protected override void OnDestroy()
-    {
-      // SharedStatic Persistent allocations — must be disposed exactly once
-      JsECSBridge.Shutdown();
-      // QueryBridge + ComponentStore state is cleared by JsBridgeState.Dispose()
-    }
-
-    void DiscoverAndLoadSystems()
+    void DiscoverAndLoadSystems(
+      ref SystemState state,
+      ref JsSystemRunnerData data,
+      JsRuntimeManager vm
+    )
     {
       JsScriptSearchPaths.Initialize();
       var systems = JsScriptSourceRegistry.DiscoverAllSystems();
@@ -451,132 +515,93 @@ globalThis.__componentReload = function(scriptName) {
 
       foreach (var (systemName, source) in systems)
       {
-        if (m_SystemStateRefs.ContainsKey(systemName))
+        var fsName = new FixedString64Bytes(systemName);
+        if (data.SystemStateRefs.ContainsKey(fsName))
           continue;
 
         if (!source.TryReadScript("systems/" + systemName, out var code, out var resolvedId))
           continue;
 
-        LoadSystem(systemName, code, resolvedId);
+        LoadSystem(ref data, vm, systemName, fsName, code, resolvedId);
       }
 
       ref var m = ref SystemAPI.GetSingletonRW<JsSystemManifest>().ValueRW;
       m.initialized = true;
     }
 
-    void LoadSystem(string systemName, string source, string resolvedId)
+    static void LoadSystem(
+      ref JsSystemRunnerData data,
+      JsRuntimeManager vm,
+      string systemName,
+      FixedString64Bytes fsName,
+      string source,
+      string resolvedId
+    )
     {
       var scriptId = "system:" + systemName;
 
-      // Always force fresh evaluation — ReloadScript frees any stale namespace
-      // and appends ?v=N to bypass QuickJS module cache.
-      if (!m_Vm.ReloadScript(scriptId, source, resolvedId))
+      if (!vm.ReloadScript(scriptId, source, resolvedId))
       {
         Log.Error("[JsSystemRunner] Failed to load system '{0}'", systemName);
         return;
       }
 
-      // System scripts have no entity (entityId = -1)
-      var stateRef = m_Vm.CreateEntityState(scriptId, -1);
+      var stateRef = vm.CreateEntityState(scriptId, -1);
       if (stateRef < 0)
       {
         Log.Error("[JsSystemRunner] Failed to create state for system '{0}'", systemName);
         return;
       }
 
-      m_SystemStateRefs[systemName] = stateRef;
-      m_SystemNames.Add(systemName);
+      var fsScriptId = new FixedString64Bytes(scriptId);
+      data.SystemStateRefs[fsName] = stateRef;
+      data.SystemScriptIds[fsName] = fsScriptId;
+      data.SystemNames.Add(fsName);
     }
 
-    public void ReloadSystem(string systemName)
+    public static void ReloadSystem(ref SystemState state, string systemName)
     {
-      if (m_SystemStateRefs.TryGetValue(systemName, out var oldRef))
-      {
-        m_Vm.ReleaseEntityState(oldRef);
-        m_SystemStateRefs.Remove(systemName);
-        m_SystemNames.Remove(systemName);
-      }
-
-      if (
-        !JsScriptSourceRegistry.TryReadScript(
-          "systems/" + systemName,
-          out var source,
-          out var resolvedId
-        )
-      )
+      var vm = JsRuntimeManager.Instance;
+      if (vm == null || !vm.IsValid)
         return;
 
-      var scriptId = "system:" + systemName;
-      if (!m_Vm.ReloadScript(scriptId, source, resolvedId))
+      ref var data = ref state.EntityManager
+        .GetComponentDataRW<JsSystemRunnerData>(state.SystemHandle).ValueRW;
+
+      var fsName = new FixedString64Bytes(systemName);
+      if (data.SystemStateRefs.TryGetValue(fsName, out var oldRef))
       {
-        Log.Error("[JsSystemRunner] Failed to reload system '{0}'", systemName);
-        return;
+        vm.ReleaseEntityState(oldRef);
+        data.SystemStateRefs.Remove(fsName);
+        data.SystemScriptIds.Remove(fsName);
+        for (var i = 0; i < data.SystemNames.Length; i++)
+        {
+          if (data.SystemNames[i] == fsName)
+          {
+            data.SystemNames.RemoveAtSwapBack(i);
+            break;
+          }
+        }
       }
 
-      var stateRef = m_Vm.CreateEntityState(scriptId, -1);
-      if (stateRef < 0)
-      {
-        Log.Error("[JsSystemRunner] Failed to create state for system '{0}'", systemName);
+      if (!JsScriptSourceRegistry.TryReadScript(
+            "systems/" + systemName, out var source, out var resolvedId))
         return;
-      }
 
-      m_SystemStateRefs[systemName] = stateRef;
-      m_SystemNames.Add(systemName);
+      LoadSystem(ref data, vm, systemName, fsName, source, resolvedId);
     }
 
-    protected override void OnUpdate()
+    void PrewarmComponentQueries(ref SystemState state)
     {
-      if (!EnsureVmReady())
+      JsQueryBridge.FlushPendingQueries(state.EntityManager);
+      JsQueryBridge.PrecomputeQueryResults(state.EntityManager);
+    }
+
+    void RegisterSentinelEntities(ref SystemState state)
+    {
+      if (m_SentinelQuery.IsEmptyIgnoreFilter)
         return;
 
-      var deltaTime = SystemAPI.Time.DeltaTime;
-      if (deltaTime <= 0f)
-        deltaTime = UnityEngine.Time.deltaTime;
-
-      var elapsedTime = SystemAPI.Time.ElapsedTime;
-
-      RegisterSentinelEntities();
-
-      PrewarmComponentQueries();
-
-      EntityManager.CompleteDependencyBeforeRW<LocalTransform>();
-      m_TransformLookup.Update(this);
-
-      JsSystemBridge.UpdateContext(deltaTime, elapsedTime);
-
-      ref var sysState = ref CheckedStateRef;
-      JsComponentRegistry.UpdateAllLookups(ref sysState);
-
-      var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
-      var ecb = ecbSingleton.CreateCommandBuffer(World.Unmanaged);
-      var scriptBufferLookup = GetBufferLookup<Components.JsScript>(true);
-      JsECSBridge.UpdateBurstContext(ecb, deltaTime, m_TransformLookup, scriptBufferLookup);
-
-      foreach (var systemName in m_SystemNames)
-      {
-        if (!m_SystemStateRefs.TryGetValue(systemName, out var stateRef))
-          continue;
-
-        m_Vm.UpdateStateTimings(stateRef, deltaTime, elapsedTime);
-
-        var scriptId = "system:" + systemName;
-        m_Vm.CallFunction(scriptId, "onUpdate", stateRef);
-        m_Vm.FlushRefRw();
-      }
-
-      // Tick Component-class instances (update lifecycle) — must happen here because
-      // generated bridge lookups are refreshed by UpdateAllLookups above.
-      m_Vm.TickComponents("update", deltaTime);
-    }
-
-    void PrewarmComponentQueries()
-    {
-      JsQueryBridge.FlushPendingQueries(EntityManager);
-      JsQueryBridge.PrecomputeQueryResults(EntityManager);
-    }
-
-    void RegisterSentinelEntities()
-    {
       var entities = m_SentinelQuery.ToEntityArray(Allocator.Temp);
       var ids = m_SentinelQuery.ToComponentDataArray<Components.JsEntityId>(Allocator.Temp);
 
@@ -589,8 +614,8 @@ globalThis.__componentReload = function(scriptName) {
         if (newId <= 0)
           continue;
 
-        EntityManager.SetComponentData(entities[i], new Components.JsEntityId { value = newId });
-        JsEntityRegistry.RegisterImmediate(entities[i], newId, EntityManager);
+        state.EntityManager.SetComponentData(entities[i], new Components.JsEntityId { value = newId });
+        JsEntityRegistry.RegisterImmediate(entities[i], newId, state.EntityManager);
       }
 
       entities.Dispose();

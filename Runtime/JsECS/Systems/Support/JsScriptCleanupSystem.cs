@@ -7,7 +7,7 @@ namespace UnityJS.Entities.Systems.Support
   using Unity.Logging;
 
   [UpdateInGroup(typeof(InitializationSystemGroup))]
-  [UpdateAfter(typeof(JsScriptFulfillmentSystem))]
+  [UpdateAfter(typeof(JsComponentInitSystem))]
   public partial class JsScriptCleanupSystem : SystemBase
   {
     JsRuntimeManager m_Vm;

@@ -46,11 +46,12 @@ namespace UnityJS.Editor
 
       if (GUILayout.Button("Browse", GUILayout.Width(60)))
       {
-        var basePath = Path.Combine(Application.streamingAssetsPath, "unity.js");
-        var path = EditorUtility.OpenFilePanel("Select TS Script", basePath, "ts");
+        var initialDir = Path.Combine(Application.streamingAssetsPath, "unity.js");
+        var path = EditorUtility.OpenFilePanel("Select TS Script", initialDir, "ts");
         if (!string.IsNullOrEmpty(path))
         {
-          var relative = GetRelativePath(path, basePath);
+          var projectRoot = Path.GetDirectoryName(Application.dataPath);
+          var relative = GetRelativePath(path, projectRoot);
           if (relative != null)
           {
             m_ScriptPath.stringValue = relative;
@@ -65,8 +66,8 @@ namespace UnityJS.Editor
       var scriptPath = m_ScriptPath.stringValue;
       if (!string.IsNullOrEmpty(scriptPath))
       {
-        var fullPath = Path.Combine(Application.streamingAssetsPath, "unity.js", scriptPath);
-        if (!File.Exists(fullPath))
+        var fullPath = ResolveScriptAbsolutePath(scriptPath);
+        if (fullPath == null || !File.Exists(fullPath))
           EditorGUILayout.HelpBox($"Script not found: {scriptPath}", MessageType.Warning);
       }
     }
@@ -74,8 +75,8 @@ namespace UnityJS.Editor
     void DrawPropertyOverrides(JsScriptAuthoring authoring)
     {
       var scriptPath = authoring.scriptPath;
-      var fullPath = Path.Combine(Application.streamingAssetsPath, "unity.js", scriptPath);
-      if (!File.Exists(fullPath))
+      var fullPath = ResolveScriptAbsolutePath(scriptPath);
+      if (fullPath == null || !File.Exists(fullPath))
         return;
 
       var content = File.ReadAllText(fullPath);
@@ -283,6 +284,14 @@ namespace UnityJS.Editor
     {
       // Skip properties that are runtime state, not configurable from inspector
       return name is "pauseTimer" or "paused" or "target" or "origin";
+    }
+
+    static string ResolveScriptAbsolutePath(string scriptPath)
+    {
+      if (string.IsNullOrEmpty(scriptPath))
+        return null;
+      var projectRoot = Path.GetDirectoryName(Application.dataPath);
+      return Path.Combine(projectRoot, scriptPath);
     }
 
     static string GetRelativePath(string fullPath, string basePath)
