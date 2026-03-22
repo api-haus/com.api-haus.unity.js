@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/api-haus/com.api-haus.unity.js/compare/v1.0.2...v1.0.3) (2026-03-22)
+
+
+### Bug Fixes
+
+* patch x87 FPU guard for android-x86 build ([c5604e3](https://github.com/api-haus/com.api-haus.unity.js/commit/c5604e36707cacc48798434155e3f8f9e4469b4b))
+
 ## [1.0.2](https://github.com/api-haus/com.api-haus.unity.js/compare/v1.0.1...v1.0.2) (2026-03-22)
 
 
