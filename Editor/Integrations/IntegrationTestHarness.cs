@@ -1,5 +1,5 @@
-#if UNITY_EDITOR
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -99,6 +99,13 @@ namespace UnityJS.Integrations.Editor
     /// </summary>
     public static SearchPathScope UseSearchPath(string absolutePath) => new(absolutePath);
 
+    /// <summary>
+    /// Registers a fixture path as the ONLY search path, removing all others
+    /// (StreamingAssets, TscBuild). Prevents game scripts from interfering with fixtures.
+    /// Restores original paths on dispose.
+    /// </summary>
+    public static IsolatedSearchPathScope UseIsolatedSearchPath(string absolutePath) => new(absolutePath);
+
     public sealed class SearchPathScope : IDisposable
     {
       readonly string m_Path;
@@ -110,6 +117,49 @@ namespace UnityJS.Integrations.Editor
       }
 
       public void Dispose() => JsScriptSearchPaths.RemoveSearchPath(m_Path);
+    }
+
+    public sealed class IsolatedSearchPathScope : IDisposable
+    {
+      readonly List<(string path, string sourceId, int priority)> m_Saved;
+      readonly string m_Path;
+
+      public IsolatedSearchPathScope(string path)
+      {
+        m_Path = path;
+        m_Saved = JsScriptSearchPaths.RemoveAllSources();
+        JsScriptSearchPaths.AddSearchPath(path, 0);
+
+        // Force JsSystemRunner to re-discover systems from the isolated path
+        var world = Unity.Entities.World.DefaultGameObjectInjectionWorld;
+        if (world != null)
+        {
+          var handle = world.Unmanaged.GetExistingUnmanagedSystem<Entities.Systems.JsSystemRunner>();
+          if (handle != Unity.Entities.SystemHandle.Null)
+          {
+            ref var sysState = ref world.Unmanaged.ResolveSystemStateRef(handle);
+            Entities.Systems.JsSystemRunner.ForceRediscovery(ref sysState);
+          }
+        }
+      }
+
+      public void Dispose()
+      {
+        JsScriptSearchPaths.RemoveSearchPath(m_Path);
+        JsScriptSearchPaths.RestoreSources(m_Saved);
+
+        // Force re-discovery with restored paths
+        var world = Unity.Entities.World.DefaultGameObjectInjectionWorld;
+        if (world != null)
+        {
+          var handle = world.Unmanaged.GetExistingUnmanagedSystem<Entities.Systems.JsSystemRunner>();
+          if (handle != Unity.Entities.SystemHandle.Null)
+          {
+            ref var sysState = ref world.Unmanaged.ResolveSystemStateRef(handle);
+            Entities.Systems.JsSystemRunner.ForceRediscovery(ref sysState);
+          }
+        }
+      }
     }
 
     // ── Entity Creation ──
@@ -250,4 +300,3 @@ namespace UnityJS.Integrations.Editor
     }
   }
 }
-#endif

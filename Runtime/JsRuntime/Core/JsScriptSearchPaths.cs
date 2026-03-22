@@ -172,6 +172,41 @@ namespace UnityJS.Runtime
     }
 
     /// <summary>
+    /// Removes all registered search paths and returns them for later restoration.
+    /// Used by fixture tests to isolate script discovery.
+    /// </summary>
+    public static List<(string path, string sourceId, int priority)> RemoveAllSources()
+    {
+      lock (s_searchPathLock)
+      {
+        var saved = new List<(string, string, int)>();
+        var sources = JsScriptSourceRegistry.GetSources();
+        foreach (var source in sources)
+          if (source is FileSystemScriptSource fs)
+            saved.Add((fs.BasePath, fs.SourceId, fs.Priority));
+
+        // Unregister directly by sourceId to avoid path normalization issues
+        foreach (var (_, sourceId, _) in saved)
+          JsScriptSourceRegistry.Unregister(sourceId);
+        s_pathToSourceId.Clear();
+
+        return saved;
+      }
+    }
+
+    /// <summary>
+    /// Restores previously saved search paths. Used after fixture test isolation.
+    /// </summary>
+    public static void RestoreSources(List<(string path, string sourceId, int priority)> saved)
+    {
+      lock (s_searchPathLock)
+      {
+        foreach (var (path, sourceId, priority) in saved)
+          RegisterPathAsSource(path, sourceId, priority);
+      }
+    }
+
+    /// <summary>
     /// Reset state for testing. Not thread-safe — call only in test SetUp.
     /// </summary>
     internal static void Reset()

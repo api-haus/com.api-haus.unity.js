@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 namespace UnityJS.Editor
 {
   using System;
@@ -115,4 +114,3 @@ namespace UnityJS.Editor
     }
   }
 }
-#endif

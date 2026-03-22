@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 namespace UnityJS.Editor
 {
   using System.Collections.Generic;
@@ -248,4 +247,3 @@ namespace UnityJS.Editor
     }
   }
 }
-#endif

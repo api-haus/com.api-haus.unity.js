@@ -18,7 +18,7 @@ const charQuery = query()
   .withAll(ECSCharacterControl, ECSCharacterStats, ECSCharacterState)
   .build();
 
-export function onTick(state: UpdateState): void {
+export function onUpdate(state: UpdateState): void {
   const dt = state.deltaTime;
   const ti: TestInput = (globalThis as { _testInput?: TestInput })._testInput ?? {};
 

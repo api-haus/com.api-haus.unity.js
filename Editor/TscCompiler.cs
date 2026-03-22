@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -201,4 +200,3 @@ namespace UnityJS.Editor
     static void RecompileMenu() => Instance?.Recompile();
   }
 }
-#endif

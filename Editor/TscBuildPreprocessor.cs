@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using System.Collections.Generic;
 using System.IO;
 using UnityEditor.Build;
@@ -71,4 +70,3 @@ namespace UnityJS.Editor
     }
   }
 }
-#endif

@@ -2,24 +2,54 @@ namespace UnityJS.Integration.CharacterController.EditModeTests
 {
   using System.Collections;
   using NUnit.Framework;
+  using Unity.Collections;
   using Unity.Entities;
   using Unity.Mathematics;
+  using Unity.Transforms;
   using UnityEngine;
   using UnityEngine.TestTools;
+  using UnityJS.Entities.Components;
+  using UnityJS.Entities.Core;
   using UnityJS.Integrations.Editor;
   using UnityJS.Runtime;
 
   /// <summary>
-  /// E2E tests verifying CharacterController integration: fixture script reads
-  /// _testInput and writes ECSCharacterControl, stamina, and jump state.
-  /// No scene loading — entities created programmatically.
+  /// E2E tests verifying CharacterController integration.
+  /// The fixture character_input system script reads _testInput and writes
+  /// ECSCharacterControl/Stats on matching entities.
   /// </summary>
   [TestFixture]
   public class JsCharacterControllerE2ETests
   {
+    /// <summary>
+    /// Creates an entity with character components and a JsEntityId.
+    /// No script attached — the system script finds it via ecs.query.
+    /// </summary>
+    static Entity CreateCharacterEntity(EntityManager em)
+    {
+      var types = new NativeList<ComponentType>(6, Allocator.Temp);
+      types.Add(ComponentType.ReadWrite<JsEntityId>());
+      types.Add(ComponentType.ReadWrite<LocalTransform>());
+      types.Add(ComponentType.ReadWrite<ECSCharacterControl>());
+      types.Add(ComponentType.ReadWrite<ECSCharacterStats>());
+      types.Add(ComponentType.ReadWrite<ECSCharacterState>());
+      types.Add(ComponentType.ReadWrite<ECSCharacterFixedInput>());
+      var entity = em.CreateEntity(types.AsArray());
+      types.Dispose();
+
+      var entityId = JsEntityRegistry.AllocateId();
+      JsEntityRegistry.RegisterImmediate(entity, entityId, em);
+      em.SetComponentData(entity, new JsEntityId { value = entityId });
+      em.SetComponentData(entity, LocalTransform.FromPosition(float3.zero));
+      em.SetComponentData(entity, ECSCharacterStats.Default());
+
+      return entity;
+    }
+
     [UnityTest]
     public IEnumerator CharacterInput_MoveVector_WrittenFromTestInput()
     {
+      // Register fixture search path BEFORE play mode so JsSystemRunner discovers the system
       var fixturesPath = IntegrationTestHarness.GetFixturesPath(
         "Integrations/CharacterController/Fixtures~"
       );
@@ -27,34 +57,29 @@ namespace UnityJS.Integration.CharacterController.EditModeTests
 
       yield return new EnterPlayMode();
 
-      using var searchPath = IntegrationTestHarness.UseSearchPath(compiledPath);
-      var em = World.DefaultGameObjectInjectionWorld.EntityManager;
-      var entity = IntegrationTestHarness.CreateScriptedEntity(
-        em,
-        "systems/character_input",
-        ComponentType.ReadWrite<ECSCharacterControl>(),
-        ComponentType.ReadWrite<ECSCharacterStats>(),
-        ComponentType.ReadWrite<ECSCharacterState>(),
-        ComponentType.ReadWrite<ECSCharacterFixedInput>()
-      );
-      em.SetComponentData(entity, ECSCharacterStats.Default());
+      // Register search path so system discovery finds systems/character_input
+      using var searchPath = IntegrationTestHarness.UseIsolatedSearchPath(compiledPath);
 
-      // Wait for fulfillment + query pipeline:
-      // Frame 1: fulfillment processes request
-      // Frame 2: script ticks, query registers as pending
-      // Frame 3: JsSystemRunner flushes pending query, precomputes
-      // Frame 4: script ticks with query results
-      // Frame 5+: stable
+      var world = World.DefaultGameObjectInjectionWorld;
+      var em = world.EntityManager;
+
+      // Create target entity with character components (system finds it via query)
+      var entity = CreateCharacterEntity(em);
+
+      // Wait for system discovery + query pipeline:
+      // Frame 1: JsSystemRunner.EnsureVmReady discovers and loads systems/character_input
+      // Frame 2: system's onUpdate runs, query registers as pending
+      // Frame 3: PrewarmComponentQueries creates EntityQuery, precomputes
+      // Frame 4+: system's query returns the entity, writes moveVector
       for (var frame = 0; frame < 10; frame++)
         yield return null;
 
       IntegrationTestHarness.AssertNoJsErrors("character input setup");
-      IntegrationTestHarness.AssertEntitiesFulfilled(em, entity);
 
       // Inject movement input
       IntegrationTestHarness.SetTestInput(moveX: 1f, moveZ: 0.5f);
 
-      // Let the script tick with the input applied
+      // Let the system tick with input applied
       for (var frame = 0; frame < 10; frame++)
         yield return null;
 
@@ -79,30 +104,21 @@ namespace UnityJS.Integration.CharacterController.EditModeTests
 
       yield return new EnterPlayMode();
 
-      using var searchPath = IntegrationTestHarness.UseSearchPath(compiledPath);
-      var em = World.DefaultGameObjectInjectionWorld.EntityManager;
-      var entity = IntegrationTestHarness.CreateScriptedEntity(
-        em,
-        "systems/character_input",
-        ComponentType.ReadWrite<ECSCharacterControl>(),
-        ComponentType.ReadWrite<ECSCharacterStats>(),
-        ComponentType.ReadWrite<ECSCharacterState>(),
-        ComponentType.ReadWrite<ECSCharacterFixedInput>()
-      );
-      em.SetComponentData(entity, ECSCharacterStats.Default());
+      using var searchPath = IntegrationTestHarness.UseIsolatedSearchPath(compiledPath);
 
-      // Wait for fulfillment + query pipeline
+      var world = World.DefaultGameObjectInjectionWorld;
+      var em = world.EntityManager;
+      var entity = CreateCharacterEntity(em);
+
+      // Wait for system discovery + query pipeline
       for (var frame = 0; frame < 10; frame++)
         yield return null;
-
-      IntegrationTestHarness.AssertEntitiesFulfilled(em, entity);
 
       var initialStamina = em.GetComponentData<ECSCharacterStats>(entity).stamina;
 
       // Inject sprint input
       IntegrationTestHarness.SetTestInput(moveX: 1f, sprint: true);
 
-      // Let the script tick with sprint active
       for (var frame = 0; frame < 10; frame++)
         yield return null;
 
@@ -160,24 +176,6 @@ namespace UnityJS.Integration.CharacterController.EditModeTests
           Assert.IsEmpty(vm.CapturedExceptions, $"No JS exceptions in cycle {cycle}");
 
         yield return new ExitPlayMode();
-      }
-    }
-    static unsafe string EvalString(JsRuntimeManager vm, string code)
-    {
-      var sourceBytes = System.Text.Encoding.UTF8.GetBytes(code + '\0');
-      var fileBytes = System.Text.Encoding.UTF8.GetBytes("<diag>\0");
-      fixed (byte* pSrc = sourceBytes, pFile = fileBytes)
-      {
-        var result = UnityJS.QJS.QJS.JS_Eval(vm.Context, pSrc, sourceBytes.Length - 1, pFile,
-          UnityJS.QJS.QJS.JS_EVAL_TYPE_GLOBAL);
-        if (UnityJS.QJS.QJS.IsException(result))
-        {
-          UnityJS.QJS.QJS.JS_FreeValue(vm.Context, UnityJS.QJS.QJS.JS_GetException(vm.Context));
-          return "<exception>";
-        }
-        var str = UnityJS.QJS.QJS.ToManagedString(vm.Context, result);
-        UnityJS.QJS.QJS.JS_FreeValue(vm.Context, result);
-        return str ?? "<null>";
       }
     }
   }

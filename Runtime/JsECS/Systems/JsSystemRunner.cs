@@ -559,6 +559,17 @@ globalThis.__componentReload = function(scriptName) {
       data.SystemNames.Add(fsName);
     }
 
+    /// <summary>
+    /// Forces system re-discovery on the next OnUpdate. Used by test harnesses
+    /// after changing search paths to load fixture systems.
+    /// </summary>
+    public static void ForceRediscovery(ref SystemState state)
+    {
+      ref var data = ref state.EntityManager
+        .GetComponentDataRW<JsSystemRunnerData>(state.SystemHandle).ValueRW;
+      data.LastVmVersion = -1;
+    }
+
     public static void ReloadSystem(ref SystemState state, string systemName)
     {
       var vm = JsRuntimeManager.Instance;
