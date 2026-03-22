@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/api-haus/com.api-haus.unity.js/compare/v1.0.4...v1.1.0) (2026-03-22)
+
+
+### Features
+
+* isolated search paths for fixture tests, force system rediscovery ([58a5ad6](https://github.com/api-haus/com.api-haus.unity.js/commit/58a5ad6042452ee0837bdaaad897d599b1a2bbb2))
+
 ## [1.0.4](https://github.com/api-haus/com.api-haus.unity.js/compare/v1.0.3...v1.0.4) (2026-03-22)
 
 
