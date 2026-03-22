@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/api-haus/com.api-haus.unity.js/compare/v1.0.3...v1.0.4) (2026-03-22)
+
+
+### Bug Fixes
+
+* pull --rebase before pushing binaries in CI ([2134e3a](https://github.com/api-haus/com.api-haus.unity.js/commit/2134e3a5be0ec16ead4b98f654a024681c2d7d3b))
+
 ## [1.0.3](https://github.com/api-haus/com.api-haus.unity.js/compare/v1.0.2...v1.0.3) (2026-03-22)
 
 
