@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/api-haus/com.api-haus.unity.js/compare/v1.0.1...v1.0.2) (2026-03-22)
+
+
+### Bug Fixes
+
+* windows and android-x86 quickjs-ng build failures ([24d405a](https://github.com/api-haus/com.api-haus.unity.js/commit/24d405a9286b0342fb89bb08a0ffb5c35854deff))
+
 ## [1.0.1](https://github.com/api-haus/com.api-haus.unity.js/compare/v1.0.0...v1.0.1) (2026-03-21)
 
 
