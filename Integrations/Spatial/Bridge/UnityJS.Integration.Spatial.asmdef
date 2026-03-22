@@ -1,0 +1,24 @@
+{
+  "name": "UnityJS.Integration.Spatial",
+  "rootNamespace": "UnityJS.Integration.Spatial",
+  "references": [
+    "UnityJS.Entities",
+    "UnityJS.QJS",
+    "UnityJS.Runtime",
+    "MiniSpatial",
+    "Unity.Entities",
+    "Unity.Mathematics",
+    "Unity.Collections",
+    "Unity.Burst",
+    "Unity.Physics"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

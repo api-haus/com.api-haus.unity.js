@@ -1,0 +1,27 @@
+{
+  "name": "MiniSpatial.PlayModeTests",
+  "rootNamespace": "MiniSpatial.PlayModeTests",
+  "references": [
+    "MiniSpatial",
+    "Unity.Entities",
+    "Unity.Mathematics",
+    "Unity.Collections",
+    "Unity.Transforms",
+    "Unity.Burst",
+    "Unity.Physics",
+    "UnityEngine.TestRunner"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

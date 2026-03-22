@@ -352,11 +352,12 @@ private async Task<World> CreateModeWorld(string modeName)
 
     // 5. Create mode entity with script
     var modeEntity = world.EntityManager.CreateEntity();
-    var buffer = world.EntityManager.AddBuffer<JsScriptRequest>(modeEntity);
-    buffer.Add(new JsScriptRequest
+    var buffer = world.EntityManager.AddBuffer<JsScript>(modeEntity);
+    buffer.Add(new JsScript
     {
-        ScriptName = $"GameModes/{modeName}",
-        RequestHash = JsScriptPathUtility.ComputeHash($"GameModes/{modeName}")
+        scriptName = new FixedString64Bytes($"GameModes/{modeName}"),
+        stateRef = -1,
+        requestHash = JsScriptPathUtility.HashScriptName($"GameModes/{modeName}"),
     });
 
     return world;

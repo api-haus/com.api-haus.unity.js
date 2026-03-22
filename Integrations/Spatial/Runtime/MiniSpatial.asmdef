@@ -1,0 +1,23 @@
+{
+  "name": "MiniSpatial",
+  "rootNamespace": "MiniSpatial",
+  "references": [
+    "Unity.Entities",
+    "Unity.Entities.Hybrid",
+    "Unity.Mathematics",
+    "Unity.Burst",
+    "Unity.Collections",
+    "Unity.Transforms",
+    "Unity.Physics",
+    "ALINE"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
