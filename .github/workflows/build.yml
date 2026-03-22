@@ -23,6 +23,8 @@ jobs:
           cmake -S quickjs -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_SHARED_LIBS=ON
           cmake --build build --config Release
 
+      - uses: ilammy/msvc-dev-cmd@v1
+
       - name: Build shim
         run: |
           cl /LD /O2 /Febuild/Release/qjs_shim.dll shim~/qjs_shim.c /Iquickjs /link /LIBPATH:build/Release qjs.lib
@@ -265,7 +267,8 @@ jobs:
             -DANDROID_ABI=x86 \
             -DANDROID_PLATFORM=android-21 \
             -DBUILD_SHARED_LIBS=ON \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="-msse2 -mfpmath=sse"
           cmake --build build -j$(nproc)
 
       - name: Build shim
