@@ -446,6 +446,11 @@ namespace UnityJS.Entities.Core
       QJS.JS_FreeValue(ctx, global);
     }
 
+    static bool ValidateEntity(Entity entity, ref BurstBridgeContext ctx)
+    {
+      return ctx.isValid && entity != Entity.Null && entity.Index >= 0;
+    }
+
     /// <summary>
     /// Burst-compatible entity lookup from entity ID.
     /// </summary>
@@ -466,10 +471,7 @@ namespace UnityJS.Entities.Core
       ref var ctx = ref s_burstContext.Data;
       transform = default;
 
-      if (!ctx.isValid || entity == Entity.Null)
-        return false;
-
-      if (entity.Index < 0)
+      if (!ValidateEntity(entity, ref ctx))
         return false;
 
       if (!ctx.transformLookup.HasComponent(entity))
@@ -483,10 +485,7 @@ namespace UnityJS.Entities.Core
     {
       ref var ctx = ref s_burstContext.Data;
 
-      if (!ctx.isValid || entity == Entity.Null)
-        return false;
-
-      if (entity.Index < 0)
+      if (!ValidateEntity(entity, ref ctx))
         return false;
 
       if (!ctx.transformLookup.HasComponent(entity))
@@ -504,10 +503,7 @@ namespace UnityJS.Entities.Core
     internal static bool HasScriptBurst(Entity entity, FixedString64Bytes scriptName)
     {
       ref var ctx = ref s_burstContext.Data;
-      if (!ctx.isValid || entity == Entity.Null)
-        return false;
-
-      if (entity.Index < 0)
+      if (!ValidateEntity(entity, ref ctx))
         return false;
 
       if (!ctx.scriptBufferLookup.HasBuffer(entity))

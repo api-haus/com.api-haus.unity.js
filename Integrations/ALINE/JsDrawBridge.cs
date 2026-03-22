@@ -18,6 +18,15 @@ namespace UnityJS.Integration.ALINE
     static Color s_drawColor = Color.white;
     static float s_drawDuration;
 
+    static void WithDraw(System.Action draw)
+    {
+      if (s_drawDuration > 0)
+        using (Draw.ingame.WithDuration(s_drawDuration))
+          draw();
+      else
+        draw();
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetSession()
     {
@@ -90,13 +99,7 @@ namespace UnityJS.Integration.ALINE
 
       var from = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       var to = JsStateExtensions.JsObjectToFloat3(ctx, argv[1]);
-      if (s_drawDuration > 0)
-        using (Draw.ingame.WithDuration(s_drawDuration))
-        {
-          Draw.ingame.Line(from, to, s_drawColor);
-        }
-      else
-        Draw.ingame.Line(from, to, s_drawColor);
+      WithDraw(() => Draw.ingame.Line(from, to, s_drawColor));
 
       SetUndefined(outU, outTag);
     }
@@ -120,13 +123,7 @@ namespace UnityJS.Integration.ALINE
 
       var origin = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       var direction = JsStateExtensions.JsObjectToFloat3(ctx, argv[1]);
-      if (s_drawDuration > 0)
-        using (Draw.ingame.WithDuration(s_drawDuration))
-        {
-          Draw.ingame.Ray(origin, direction, s_drawColor);
-        }
-      else
-        Draw.ingame.Ray(origin, direction, s_drawColor);
+      WithDraw(() => Draw.ingame.Ray(origin, direction, s_drawColor));
 
       SetUndefined(outU, outTag);
     }
@@ -150,13 +147,7 @@ namespace UnityJS.Integration.ALINE
 
       var from = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       var to = JsStateExtensions.JsObjectToFloat3(ctx, argv[1]);
-      if (s_drawDuration > 0)
-        using (Draw.ingame.WithDuration(s_drawDuration))
-        {
-          Draw.ingame.Arrow(from, to, s_drawColor);
-        }
-      else
-        Draw.ingame.Arrow(from, to, s_drawColor);
+      WithDraw(() => Draw.ingame.Arrow(from, to, s_drawColor));
 
       SetUndefined(outU, outTag);
     }
@@ -179,15 +170,10 @@ namespace UnityJS.Integration.ALINE
       }
 
       var center = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
-      double radius;
-      QJS.JS_ToFloat64(ctx, &radius, argv[1]);
-      if (s_drawDuration > 0)
-        using (Draw.ingame.WithDuration(s_drawDuration))
-        {
-          Draw.ingame.WireSphere(center, (float)radius, s_drawColor);
-        }
-      else
-        Draw.ingame.WireSphere(center, (float)radius, s_drawColor);
+      double rd;
+      QJS.JS_ToFloat64(ctx, &rd, argv[1]);
+      var radius = (float)rd;
+      WithDraw(() => Draw.ingame.WireSphere(center, radius, s_drawColor));
 
       SetUndefined(outU, outTag);
     }
@@ -211,13 +197,7 @@ namespace UnityJS.Integration.ALINE
 
       var center = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       var size = JsStateExtensions.JsObjectToFloat3(ctx, argv[1]);
-      if (s_drawDuration > 0)
-        using (Draw.ingame.WithDuration(s_drawDuration))
-        {
-          Draw.ingame.WireBox(center, size, s_drawColor);
-        }
-      else
-        Draw.ingame.WireBox(center, size, s_drawColor);
+      WithDraw(() => Draw.ingame.WireBox(center, size, s_drawColor));
 
       SetUndefined(outU, outTag);
     }
@@ -241,15 +221,10 @@ namespace UnityJS.Integration.ALINE
 
       var start = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       var end = JsStateExtensions.JsObjectToFloat3(ctx, argv[1]);
-      double radius;
-      QJS.JS_ToFloat64(ctx, &radius, argv[2]);
-      if (s_drawDuration > 0)
-        using (Draw.ingame.WithDuration(s_drawDuration))
-        {
-          Draw.ingame.WireCapsule(start, end, (float)radius, s_drawColor);
-        }
-      else
-        Draw.ingame.WireCapsule(start, end, (float)radius, s_drawColor);
+      double rd;
+      QJS.JS_ToFloat64(ctx, &rd, argv[2]);
+      var radius = (float)rd;
+      WithDraw(() => Draw.ingame.WireCapsule(start, end, radius, s_drawColor));
 
       SetUndefined(outU, outTag);
     }
@@ -272,15 +247,10 @@ namespace UnityJS.Integration.ALINE
       }
 
       var center = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
-      double radius;
-      QJS.JS_ToFloat64(ctx, &radius, argv[1]);
-      if (s_drawDuration > 0)
-        using (Draw.ingame.WithDuration(s_drawDuration))
-        {
-          Draw.ingame.xz.Circle(center, (float)radius, s_drawColor);
-        }
-      else
-        Draw.ingame.xz.Circle(center, (float)radius, s_drawColor);
+      double rd;
+      QJS.JS_ToFloat64(ctx, &rd, argv[1]);
+      var radius = (float)rd;
+      WithDraw(() => Draw.ingame.xz.Circle(center, radius, s_drawColor));
 
       SetUndefined(outU, outTag);
     }
@@ -304,13 +274,7 @@ namespace UnityJS.Integration.ALINE
 
       var center = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       var size = JsStateExtensions.JsObjectToFloat3(ctx, argv[1]);
-      if (s_drawDuration > 0)
-        using (Draw.ingame.WithDuration(s_drawDuration))
-        {
-          Draw.ingame.SolidBox(center, size, s_drawColor);
-        }
-      else
-        Draw.ingame.SolidBox(center, size, s_drawColor);
+      WithDraw(() => Draw.ingame.SolidBox(center, size, s_drawColor));
 
       SetUndefined(outU, outTag);
     }
@@ -334,15 +298,10 @@ namespace UnityJS.Integration.ALINE
 
       var center = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       var normal = JsStateExtensions.JsObjectToFloat3(ctx, argv[1]);
-      double radius;
-      QJS.JS_ToFloat64(ctx, &radius, argv[2]);
-      if (s_drawDuration > 0)
-        using (Draw.ingame.WithDuration(s_drawDuration))
-        {
-          Draw.ingame.SolidCircle(center, normal, (float)radius, s_drawColor);
-        }
-      else
-        Draw.ingame.SolidCircle(center, normal, (float)radius, s_drawColor);
+      double rd;
+      QJS.JS_ToFloat64(ctx, &rd, argv[2]);
+      var radius = (float)rd;
+      WithDraw(() => Draw.ingame.SolidCircle(center, normal, radius, s_drawColor));
 
       SetUndefined(outU, outTag);
     }
@@ -367,15 +326,7 @@ namespace UnityJS.Integration.ALINE
       var position = JsStateExtensions.JsObjectToFloat3(ctx, argv[0]);
       var text = QJS.ToManagedString(ctx, argv[1]);
       if (text != null)
-      {
-        if (s_drawDuration > 0)
-          using (Draw.ingame.WithDuration(s_drawDuration))
-          {
-            Draw.ingame.Label2D(position, text, s_drawColor);
-          }
-        else
-          Draw.ingame.Label2D(position, text, s_drawColor);
-      }
+        WithDraw(() => Draw.ingame.Label2D(position, text, s_drawColor));
 
       SetUndefined(outU, outTag);
     }

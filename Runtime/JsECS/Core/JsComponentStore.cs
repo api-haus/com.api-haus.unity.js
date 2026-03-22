@@ -163,6 +163,46 @@ namespace UnityJS.Entities.Core
       QJS.JS_FreeValue(ctx, global);
     }
 
+    /// <summary>
+    /// Allocates a tag slot for a new JS-defined component and creates its JS-side storage.
+    /// Returns the slot index, or -1 if the pool is exhausted or the name conflicts with C#.
+    /// </summary>
+    static unsafe int AllocateSlot(JsBridgeState b, JSContext ctx, string name, string caller)
+    {
+      if (JsComponentRegistry.TryGetComponentType(name, out _))
+      {
+        Log.Error("[JsComponentStore] {0}: '{1}' conflicts with C# component", caller, name);
+        return -1;
+      }
+
+      if (b.NextSlot >= MaxSlots)
+      {
+        Log.Error("[JsComponentStore] {0}: tag pool exhausted (max {1})", caller, MaxSlots);
+        return -1;
+      }
+
+      var slot = b.NextSlot++;
+      b.NameToSlot[name] = slot;
+      b.SlotToName[slot] = name;
+
+      JsComponentRegistry.Register(name, GetTagType(slot));
+
+      // Create JS-side storage: __js_comp[name] = {}
+      var global = QJS.JS_GetGlobalObject(ctx);
+      var pJsCompBytes = s_jsCompKey;
+      var pNameBytes = QJS.U8(name);
+      fixed (byte* pJsComp = pJsCompBytes, pN = pNameBytes)
+      {
+        var jsComp = QJS.JS_GetPropertyStr(ctx, global, pJsComp);
+        QJS.JS_SetPropertyStr(ctx, jsComp, pN, QJS.JS_NewObject(ctx));
+        QJS.JS_FreeValue(ctx, jsComp);
+      }
+      QJS.JS_FreeValue(ctx, global);
+
+      Log.Debug("[JsComponentStore] Defined '{0}' → slot {1}", name, slot);
+      return slot;
+    }
+
     #region Bridge Functions
 
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
@@ -191,14 +231,6 @@ namespace UnityJS.Entities.Core
         return;
       }
 
-      // Check for collision with C#-defined components
-      if (JsComponentRegistry.TryGetComponentType(name, out _))
-      {
-        Log.Warning("[JsComponentStore] ecs.define: '{0}' already exists as a C# component", name);
-        SetUndefined(outU, outTag);
-        return;
-      }
-
       if (b.NameToSlot.ContainsKey(name))
       {
         // Tolerate re-definition for hot reload
@@ -210,39 +242,12 @@ namespace UnityJS.Entities.Core
         return;
       }
 
-      if (b.NextSlot >= MaxSlots)
+      if (AllocateSlot(b, ctx, name, "ecs.define") < 0)
       {
-        Log.Error("[JsComponentStore] ecs.define: tag pool exhausted (max {0})", MaxSlots);
         SetUndefined(outU, outTag);
         return;
       }
 
-      // Assign tag slot
-      var slot = b.NextSlot++;
-      b.NameToSlot[name] = slot;
-      b.SlotToName[slot] = name;
-
-      // Register in JsComponentRegistry so ecs.query() resolves this name
-      var tagType = GetTagType(slot);
-      JsComponentRegistry.Register(name, tagType);
-
-      // Create JS-side storage: __js_comp[name] = {}
-      var global = QJS.JS_GetGlobalObject(ctx);
-      var pJsCompBytes = s_jsCompKey;
-      var pNameBytes = QJS.U8(name);
-      fixed (
-        byte* pJsComp = pJsCompBytes,
-          pN = pNameBytes
-      )
-      {
-        var jsComp = QJS.JS_GetPropertyStr(ctx, global, pJsComp);
-        QJS.JS_SetPropertyStr(ctx, jsComp, pN, QJS.JS_NewObject(ctx));
-        QJS.JS_FreeValue(ctx, jsComp);
-      }
-
-      QJS.JS_FreeValue(ctx, global);
-
-      Log.Debug("[JsComponentStore] Defined '{0}' → slot {1}", name, slot);
       SetUndefined(outU, outTag);
     }
 
@@ -284,43 +289,12 @@ namespace UnityJS.Entities.Core
       if (!b.NameToSlot.TryGetValue(name, out var slot))
       {
         // Auto-define on first use (supports Component classes that skip explicit define)
-        if (JsComponentRegistry.TryGetComponentType(name, out _))
+        slot = AllocateSlot(b, ctx, name, "ecs.add");
+        if (slot < 0)
         {
-          Log.Error("[JsComponentStore] ecs.add: '{0}' conflicts with C# component", name);
           SetUndefined(outU, outTag);
           return;
         }
-
-        if (b.NextSlot >= MaxSlots)
-        {
-          Log.Error("[JsComponentStore] ecs.add: tag pool exhausted (max {0})", MaxSlots);
-          SetUndefined(outU, outTag);
-          return;
-        }
-
-        slot = b.NextSlot++;
-        b.NameToSlot[name] = slot;
-        b.SlotToName[slot] = name;
-
-        var tagType = GetTagType(slot);
-        JsComponentRegistry.Register(name, tagType);
-
-        // Create JS-side storage
-        var g = QJS.JS_GetGlobalObject(ctx);
-        var pJcBytes = s_jsCompKey;
-        var pNmBytes = QJS.U8(name);
-        fixed (
-          byte* pJc = pJcBytes,
-            pNm = pNmBytes
-        )
-        {
-          var jc = QJS.JS_GetPropertyStr(ctx, g, pJc);
-          QJS.JS_SetPropertyStr(ctx, jc, pNm, QJS.JS_NewObject(ctx));
-          QJS.JS_FreeValue(ctx, jc);
-        }
-        QJS.JS_FreeValue(ctx, g);
-
-        Log.Debug("[JsComponentStore] Auto-defined '{0}' → slot {1}", name, slot);
       }
 
       // Store data in __js_comp[name][eid]
@@ -598,78 +572,49 @@ namespace UnityJS.Entities.Core
     #region Tag Pool Dispatch
 
     // @formatter:off
+    static readonly ComponentType[] s_tagTypes =
+    {
+      ComponentType.ReadWrite<JsDynTag0>(),  ComponentType.ReadWrite<JsDynTag1>(),
+      ComponentType.ReadWrite<JsDynTag2>(),  ComponentType.ReadWrite<JsDynTag3>(),
+      ComponentType.ReadWrite<JsDynTag4>(),  ComponentType.ReadWrite<JsDynTag5>(),
+      ComponentType.ReadWrite<JsDynTag6>(),  ComponentType.ReadWrite<JsDynTag7>(),
+      ComponentType.ReadWrite<JsDynTag8>(),  ComponentType.ReadWrite<JsDynTag9>(),
+      ComponentType.ReadWrite<JsDynTag10>(), ComponentType.ReadWrite<JsDynTag11>(),
+      ComponentType.ReadWrite<JsDynTag12>(), ComponentType.ReadWrite<JsDynTag13>(),
+      ComponentType.ReadWrite<JsDynTag14>(), ComponentType.ReadWrite<JsDynTag15>(),
+      ComponentType.ReadWrite<JsDynTag16>(), ComponentType.ReadWrite<JsDynTag17>(),
+      ComponentType.ReadWrite<JsDynTag18>(), ComponentType.ReadWrite<JsDynTag19>(),
+      ComponentType.ReadWrite<JsDynTag20>(), ComponentType.ReadWrite<JsDynTag21>(),
+      ComponentType.ReadWrite<JsDynTag22>(), ComponentType.ReadWrite<JsDynTag23>(),
+      ComponentType.ReadWrite<JsDynTag24>(), ComponentType.ReadWrite<JsDynTag25>(),
+      ComponentType.ReadWrite<JsDynTag26>(), ComponentType.ReadWrite<JsDynTag27>(),
+      ComponentType.ReadWrite<JsDynTag28>(), ComponentType.ReadWrite<JsDynTag29>(),
+      ComponentType.ReadWrite<JsDynTag30>(), ComponentType.ReadWrite<JsDynTag31>(),
+      ComponentType.ReadWrite<JsDynTag32>(), ComponentType.ReadWrite<JsDynTag33>(),
+      ComponentType.ReadWrite<JsDynTag34>(), ComponentType.ReadWrite<JsDynTag35>(),
+      ComponentType.ReadWrite<JsDynTag36>(), ComponentType.ReadWrite<JsDynTag37>(),
+      ComponentType.ReadWrite<JsDynTag38>(), ComponentType.ReadWrite<JsDynTag39>(),
+      ComponentType.ReadWrite<JsDynTag40>(), ComponentType.ReadWrite<JsDynTag41>(),
+      ComponentType.ReadWrite<JsDynTag42>(), ComponentType.ReadWrite<JsDynTag43>(),
+      ComponentType.ReadWrite<JsDynTag44>(), ComponentType.ReadWrite<JsDynTag45>(),
+      ComponentType.ReadWrite<JsDynTag46>(), ComponentType.ReadWrite<JsDynTag47>(),
+      ComponentType.ReadWrite<JsDynTag48>(), ComponentType.ReadWrite<JsDynTag49>(),
+      ComponentType.ReadWrite<JsDynTag50>(), ComponentType.ReadWrite<JsDynTag51>(),
+      ComponentType.ReadWrite<JsDynTag52>(), ComponentType.ReadWrite<JsDynTag53>(),
+      ComponentType.ReadWrite<JsDynTag54>(), ComponentType.ReadWrite<JsDynTag55>(),
+      ComponentType.ReadWrite<JsDynTag56>(), ComponentType.ReadWrite<JsDynTag57>(),
+      ComponentType.ReadWrite<JsDynTag58>(), ComponentType.ReadWrite<JsDynTag59>(),
+      ComponentType.ReadWrite<JsDynTag60>(), ComponentType.ReadWrite<JsDynTag61>(),
+      ComponentType.ReadWrite<JsDynTag62>(), ComponentType.ReadWrite<JsDynTag63>(),
+    };
+    // @formatter:on
+
     static ComponentType GetTagType(int slot)
     {
-      return slot switch
-      {
-        0 => ComponentType.ReadWrite<JsDynTag0>(),
-        1 => ComponentType.ReadWrite<JsDynTag1>(),
-        2 => ComponentType.ReadWrite<JsDynTag2>(),
-        3 => ComponentType.ReadWrite<JsDynTag3>(),
-        4 => ComponentType.ReadWrite<JsDynTag4>(),
-        5 => ComponentType.ReadWrite<JsDynTag5>(),
-        6 => ComponentType.ReadWrite<JsDynTag6>(),
-        7 => ComponentType.ReadWrite<JsDynTag7>(),
-        8 => ComponentType.ReadWrite<JsDynTag8>(),
-        9 => ComponentType.ReadWrite<JsDynTag9>(),
-        10 => ComponentType.ReadWrite<JsDynTag10>(),
-        11 => ComponentType.ReadWrite<JsDynTag11>(),
-        12 => ComponentType.ReadWrite<JsDynTag12>(),
-        13 => ComponentType.ReadWrite<JsDynTag13>(),
-        14 => ComponentType.ReadWrite<JsDynTag14>(),
-        15 => ComponentType.ReadWrite<JsDynTag15>(),
-        16 => ComponentType.ReadWrite<JsDynTag16>(),
-        17 => ComponentType.ReadWrite<JsDynTag17>(),
-        18 => ComponentType.ReadWrite<JsDynTag18>(),
-        19 => ComponentType.ReadWrite<JsDynTag19>(),
-        20 => ComponentType.ReadWrite<JsDynTag20>(),
-        21 => ComponentType.ReadWrite<JsDynTag21>(),
-        22 => ComponentType.ReadWrite<JsDynTag22>(),
-        23 => ComponentType.ReadWrite<JsDynTag23>(),
-        24 => ComponentType.ReadWrite<JsDynTag24>(),
-        25 => ComponentType.ReadWrite<JsDynTag25>(),
-        26 => ComponentType.ReadWrite<JsDynTag26>(),
-        27 => ComponentType.ReadWrite<JsDynTag27>(),
-        28 => ComponentType.ReadWrite<JsDynTag28>(),
-        29 => ComponentType.ReadWrite<JsDynTag29>(),
-        30 => ComponentType.ReadWrite<JsDynTag30>(),
-        31 => ComponentType.ReadWrite<JsDynTag31>(),
-        32 => ComponentType.ReadWrite<JsDynTag32>(),
-        33 => ComponentType.ReadWrite<JsDynTag33>(),
-        34 => ComponentType.ReadWrite<JsDynTag34>(),
-        35 => ComponentType.ReadWrite<JsDynTag35>(),
-        36 => ComponentType.ReadWrite<JsDynTag36>(),
-        37 => ComponentType.ReadWrite<JsDynTag37>(),
-        38 => ComponentType.ReadWrite<JsDynTag38>(),
-        39 => ComponentType.ReadWrite<JsDynTag39>(),
-        40 => ComponentType.ReadWrite<JsDynTag40>(),
-        41 => ComponentType.ReadWrite<JsDynTag41>(),
-        42 => ComponentType.ReadWrite<JsDynTag42>(),
-        43 => ComponentType.ReadWrite<JsDynTag43>(),
-        44 => ComponentType.ReadWrite<JsDynTag44>(),
-        45 => ComponentType.ReadWrite<JsDynTag45>(),
-        46 => ComponentType.ReadWrite<JsDynTag46>(),
-        47 => ComponentType.ReadWrite<JsDynTag47>(),
-        48 => ComponentType.ReadWrite<JsDynTag48>(),
-        49 => ComponentType.ReadWrite<JsDynTag49>(),
-        50 => ComponentType.ReadWrite<JsDynTag50>(),
-        51 => ComponentType.ReadWrite<JsDynTag51>(),
-        52 => ComponentType.ReadWrite<JsDynTag52>(),
-        53 => ComponentType.ReadWrite<JsDynTag53>(),
-        54 => ComponentType.ReadWrite<JsDynTag54>(),
-        55 => ComponentType.ReadWrite<JsDynTag55>(),
-        56 => ComponentType.ReadWrite<JsDynTag56>(),
-        57 => ComponentType.ReadWrite<JsDynTag57>(),
-        58 => ComponentType.ReadWrite<JsDynTag58>(),
-        59 => ComponentType.ReadWrite<JsDynTag59>(),
-        60 => ComponentType.ReadWrite<JsDynTag60>(),
-        61 => ComponentType.ReadWrite<JsDynTag61>(),
-        62 => ComponentType.ReadWrite<JsDynTag62>(),
-        63 => ComponentType.ReadWrite<JsDynTag63>(),
-        _ => throw new System.InvalidOperationException($"Tag pool slot {slot} out of range"),
-      };
+      if (slot < 0 || slot >= MaxSlots)
+        throw new System.InvalidOperationException($"Tag pool slot {slot} out of range");
+      return s_tagTypes[slot];
     }
-    // @formatter:on
 
     #endregion
   }

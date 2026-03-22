@@ -45,6 +45,20 @@ namespace UnityJS.Runtime
       return s_protosSet ? QJS.JS_NewObjectProto(ctx, proto) : QJS.JS_NewObject(ctx);
     }
 
+    static float ReadComponent(JSContext ctx, JSValue obj, byte* prop)
+    {
+      var v = QJS.JS_GetPropertyStr(ctx, obj, prop);
+      float result = 0;
+      if (QJS.IsNumber(v))
+      {
+        double d;
+        QJS.JS_ToFloat64(ctx, &d, v);
+        result = (float)d;
+      }
+      QJS.JS_FreeValue(ctx, v);
+      return result;
+    }
+
     public static JSValue Float2ToJsObject(JSContext ctx, float2 value)
     {
       var obj = NewObjectWithProto(ctx, s_float2Proto);
@@ -62,33 +76,8 @@ namespace UnityJS.Runtime
 
     public static float2 JsObjectToFloat2(JSContext ctx, JSValue val)
     {
-      var result = float2.zero;
-      fixed (
-        byte* px = s_x,
-          py = s_y
-      )
-      {
-        double d;
-        var vx = QJS.JS_GetPropertyStr(ctx, val, px);
-        if (QJS.IsNumber(vx))
-        {
-          QJS.JS_ToFloat64(ctx, &d, vx);
-          result.x = (float)d;
-        }
-
-        QJS.JS_FreeValue(ctx, vx);
-
-        var vy = QJS.JS_GetPropertyStr(ctx, val, py);
-        if (QJS.IsNumber(vy))
-        {
-          QJS.JS_ToFloat64(ctx, &d, vy);
-          result.y = (float)d;
-        }
-
-        QJS.JS_FreeValue(ctx, vy);
-      }
-
-      return result;
+      fixed (byte* px = s_x, py = s_y)
+        return new float2(ReadComponent(ctx, val, px), ReadComponent(ctx, val, py));
     }
 
     public static JSValue Float3ToJsObject(JSContext ctx, float3 value)
@@ -110,43 +99,12 @@ namespace UnityJS.Runtime
 
     public static float3 JsObjectToFloat3(JSContext ctx, JSValue val)
     {
-      var result = float3.zero;
-      fixed (
-        byte* px = s_x,
-          py = s_y,
-          pz = s_z
-      )
-      {
-        double d;
-        var vx = QJS.JS_GetPropertyStr(ctx, val, px);
-        if (QJS.IsNumber(vx))
-        {
-          QJS.JS_ToFloat64(ctx, &d, vx);
-          result.x = (float)d;
-        }
-
-        QJS.JS_FreeValue(ctx, vx);
-
-        var vy = QJS.JS_GetPropertyStr(ctx, val, py);
-        if (QJS.IsNumber(vy))
-        {
-          QJS.JS_ToFloat64(ctx, &d, vy);
-          result.y = (float)d;
-        }
-
-        QJS.JS_FreeValue(ctx, vy);
-
-        var vz = QJS.JS_GetPropertyStr(ctx, val, pz);
-        if (QJS.IsNumber(vz))
-        {
-          QJS.JS_ToFloat64(ctx, &d, vz);
-          result.z = (float)d;
-        }
-
-        QJS.JS_FreeValue(ctx, vz);
-      }
-
-      return result;
+      fixed (byte* px = s_x, py = s_y, pz = s_z)
+        return new float3(
+          ReadComponent(ctx, val, px),
+          ReadComponent(ctx, val, py),
+          ReadComponent(ctx, val, pz)
+        );
     }
 
     public static JSValue Float4ToJsObject(JSContext ctx, float4 value)
@@ -170,53 +128,13 @@ namespace UnityJS.Runtime
 
     public static float4 JsObjectToFloat4(JSContext ctx, JSValue val)
     {
-      var result = float4.zero;
-      fixed (
-        byte* px = s_x,
-          py = s_y,
-          pz = s_z,
-          pw = s_w
-      )
-      {
-        double d;
-        var vx = QJS.JS_GetPropertyStr(ctx, val, px);
-        if (QJS.IsNumber(vx))
-        {
-          QJS.JS_ToFloat64(ctx, &d, vx);
-          result.x = (float)d;
-        }
-
-        QJS.JS_FreeValue(ctx, vx);
-
-        var vy = QJS.JS_GetPropertyStr(ctx, val, py);
-        if (QJS.IsNumber(vy))
-        {
-          QJS.JS_ToFloat64(ctx, &d, vy);
-          result.y = (float)d;
-        }
-
-        QJS.JS_FreeValue(ctx, vy);
-
-        var vz = QJS.JS_GetPropertyStr(ctx, val, pz);
-        if (QJS.IsNumber(vz))
-        {
-          QJS.JS_ToFloat64(ctx, &d, vz);
-          result.z = (float)d;
-        }
-
-        QJS.JS_FreeValue(ctx, vz);
-
-        var vw = QJS.JS_GetPropertyStr(ctx, val, pw);
-        if (QJS.IsNumber(vw))
-        {
-          QJS.JS_ToFloat64(ctx, &d, vw);
-          result.w = (float)d;
-        }
-
-        QJS.JS_FreeValue(ctx, vw);
-      }
-
-      return result;
+      fixed (byte* px = s_x, py = s_y, pz = s_z, pw = s_w)
+        return new float4(
+          ReadComponent(ctx, val, px),
+          ReadComponent(ctx, val, py),
+          ReadComponent(ctx, val, pz),
+          ReadComponent(ctx, val, pw)
+        );
     }
 
     public static JSValue QuaternionToJsObject(JSContext ctx, quaternion value)
@@ -240,53 +158,13 @@ namespace UnityJS.Runtime
 
     public static quaternion JsObjectToQuaternion(JSContext ctx, JSValue val)
     {
-      var result = quaternion.identity;
-      fixed (
-        byte* px = s_x,
-          py = s_y,
-          pz = s_z,
-          pw = s_w
-      )
-      {
-        double d;
-        var vx = QJS.JS_GetPropertyStr(ctx, val, px);
-        if (QJS.IsNumber(vx))
-        {
-          QJS.JS_ToFloat64(ctx, &d, vx);
-          result.value.x = (float)d;
-        }
-
-        QJS.JS_FreeValue(ctx, vx);
-
-        var vy = QJS.JS_GetPropertyStr(ctx, val, py);
-        if (QJS.IsNumber(vy))
-        {
-          QJS.JS_ToFloat64(ctx, &d, vy);
-          result.value.y = (float)d;
-        }
-
-        QJS.JS_FreeValue(ctx, vy);
-
-        var vz = QJS.JS_GetPropertyStr(ctx, val, pz);
-        if (QJS.IsNumber(vz))
-        {
-          QJS.JS_ToFloat64(ctx, &d, vz);
-          result.value.z = (float)d;
-        }
-
-        QJS.JS_FreeValue(ctx, vz);
-
-        var vw = QJS.JS_GetPropertyStr(ctx, val, pw);
-        if (QJS.IsNumber(vw))
-        {
-          QJS.JS_ToFloat64(ctx, &d, vw);
-          result.value.w = (float)d;
-        }
-
-        QJS.JS_FreeValue(ctx, vw);
-      }
-
-      return result;
+      fixed (byte* px = s_x, py = s_y, pz = s_z, pw = s_w)
+        return new quaternion(
+          ReadComponent(ctx, val, px),
+          ReadComponent(ctx, val, py),
+          ReadComponent(ctx, val, pz),
+          ReadComponent(ctx, val, pw)
+        );
     }
 
     public static float3 QuaternionToEuler(quaternion q)
