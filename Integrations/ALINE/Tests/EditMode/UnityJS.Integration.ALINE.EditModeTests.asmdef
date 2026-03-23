@@ -6,12 +6,14 @@
     "UnityJS.Runtime",
     "UnityJS.Entities",
     "UnityJS.Integration.ALINE",
+    "Unity.Entities",
     "Unity.Mathematics",
     "Unity.Collections",
     "ALINE",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner",
-    "UnityJS.Integrations.Editor"
+    "UnityJS.Integrations.Editor",
+    "UnityJS.Entities.EditModeTests"
   ],
   "includePlatforms": [
     "Editor"
