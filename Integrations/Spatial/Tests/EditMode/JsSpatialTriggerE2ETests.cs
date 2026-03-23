@@ -158,11 +158,13 @@ namespace UnityJS.Integration.Spatial.EditModeTests
       // ECB playback → entity gets SpatialTrigger
       // SpatialQuerySystem → rebuild KDTree with new agent
       // SpatialTriggerSystem (FixedStep) → detect overlaps
-      for (var i = 0; i < 16; i++)
+      // Extra budget: when many system scripts are loaded (e2e probes),
+      // init takes more frames.
+      for (var i = 0; i < 24; i++)
         yield return null;
-      for (var i = 0; i < 8; i++)
+      for (var i = 0; i < 12; i++)
         yield return new WaitForFixedUpdate();
-      for (var i = 0; i < 4; i++)
+      for (var i = 0; i < 8; i++)
         yield return null;
     }
 
