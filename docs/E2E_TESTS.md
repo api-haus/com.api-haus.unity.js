@@ -384,6 +384,79 @@ No randomness — waypoints are deterministic so we can predict exact behavior.
 
 ---
 
+---
+
+# Part C: Blind Spot Tests (from audit)
+
+These address gaps found by the test quality audit — features with zero coverage that could break silently during refactoring.
+
+---
+
+## B1. Property Overrides (`PropertyOverridesE2ETests.cs`)
+
+**Purpose**: Proves `propertiesJson` parameter on `SceneFixture.Spawn()` actually applies values to component instances. This is the Inspector-equivalent workflow — setting speed/radius/strength from the editor.
+
+**Fixture**: reuses `tests/components/e2e_wanderer.ts` (has public `speed = 3` default)
+
+| Test | Input | Output | Assertion |
+|------|-------|--------|-----------|
+| `Override_ChangesDefaultValue` | `Spawn("e2e_wanderer", propertiesJson: "{\"speed\":10}")` | `_e2e_wander[eid].speed` | `== 10` (not default 3) |
+| `Override_MultipleProperties` | `"{\"speed\":7,\"wanderRadius\":20}"` | both fields | `speed==7, wanderRadius==20` |
+| `NoOverride_UsesDefault` | `Spawn("e2e_wanderer")` (no json) | `_e2e_wander[eid].speed` | `== 3` (default) |
+
+---
+
+## B2. Query withNone Filter (`QueryFilterE2ETests.cs`)
+
+**Purpose**: Proves `ecs.query().withAll(A).withNone(B).build()` correctly excludes entities with component B.
+
+**Fixture**: `tests/systems/e2e_query_filter_probe.ts`
+
+System that defines a JS component `E2EDisabled`, queries `withAll(LocalTransform).withNone(E2EDisabled)`, counts matches.
+
+| Test | Input | Output | Assertion |
+|------|-------|--------|-----------|
+| `WithNone_ExcludesTaggedEntities` | 5 entities, tag 2 with `E2EDisabled` | `_e2e_qf.matchCount` | `== 3` (5 - 2 tagged) |
+| `WithNone_AllTagged_ReturnsZero` | 3 entities, all tagged | `_e2e_qf.matchCount` | `== 0` |
+| `WithNone_NoneTagged_ReturnsAll` | 3 entities, none tagged | `_e2e_qf.matchCount` | `== 3` |
+
+---
+
+## B3. Assertion Tightening (existing tests)
+
+Strengthen weak assertions in existing tests. No new fixtures needed.
+
+| Test | Current Assertion | Tightened Assertion |
+|------|------------------|---------------------|
+| `WanderingSlimes.AllSlimes_MoveFromOrigin` | `> 0.5f` | `> 1.5f` (speed=3, 5s, min path 4+ units from origin) |
+| `CharacterMovement.Character_MovesForward` | `> expected * 0.7f` | `> expected * 0.8f AND < expected * 1.2f` |
+| `CharacterMovement.Character_TotalDistance` | `> expected - 2.0` | also `< expected + 2.0` (both bounds) |
+| `EntityOps.Create_WithPosition` | fallback skip | remove fallback, fail if accessor doesn't work |
+| `ComponentAccess.Get_ReturnsData` | reads `__js_comp` directly | use `ecs.get()` API if possible, or keep with explicit comment |
+
+---
+
+## B4. State Isolation Fix (SceneFixture)
+
+Add global cleanup to `SceneFixture.Dispose()` — clear all `_e2e_*` globals to prevent cross-test state bleed.
+
+---
+
+## B5. Fixture Error Reporting
+
+Update all TS fixtures to report errors explicitly instead of silent `return`:
+```typescript
+// BAD: silent skip
+if (!lt) return
+
+// GOOD: explicit error in global
+if (!lt) { _g._e2e_xxx[this.entity] = { error: 'LocalTransform missing' }; return }
+```
+
+Then C# tests can assert `!error` before checking behavior.
+
+---
+
 ## Implementation Order (Updated)
 
 Tests will be developed one at a time, in this order:

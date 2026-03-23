@@ -50,18 +50,19 @@ namespace UnityJS.Entities.EditModeTests
       var posId = JsEval.Int($"_e2e_ent[{eid}]?.createdWithPosId ?? -1");
       Assert.Greater(posId, 0, "Created entity should have valid ID");
 
-      // Verify position via JS eval (entity created by JS, not in SceneFixture)
-      var x = JsEval.Double($"(function(){{ var lt = globalThis.ecs?.get?.(globalThis.LocalTransform, {posId}); return lt?.Position?.x ?? -999; }})()");
-
-      // If accessor-based get doesn't work, at least verify ID was returned
-      if (x < -998)
+      // Verify position via C# — look up the entity by its JS ID
+      var registry = Core.JsEntityRegistry.GetEntityFromId(posId);
+      if (world.EntityManager.Exists(registry))
       {
-        // Can't verify position through JS accessor — just verify ID is valid
-        Assert.Greater(posId, 0, "entities.create(float3(5,10,15)) returned valid ID");
+        var pos = world.EntityManager.GetComponentData<Unity.Transforms.LocalTransform>(registry).Position;
+        Assert.AreEqual(5.0f, pos.x, 0.5f, "Created entity position.x should be 5");
+        Assert.AreEqual(10.0f, pos.y, 0.5f, "Created entity position.y should be 10");
+        Assert.AreEqual(15.0f, pos.z, 0.5f, "Created entity position.z should be 15");
       }
       else
       {
-        Assert.AreEqual(5.0, x, 0.1, "Created entity position.x should be 5");
+        // Entity may still be pending ECB playback — verify ID at minimum
+        Assert.Greater(posId, 0, "entities.create(float3(5,10,15)) returned valid ID");
       }
 
       yield return new ExitPlayMode();

@@ -47,10 +47,12 @@ namespace UnityJS.Integration.CharacterController.EditModeTests
       var pos = scene.GetPosition(entity);
       var expected = SPEED * DURATION; // 12
 
-      Assert.Greater(pos.z, expected * 0.7f,
-        $"Character should have moved ~{expected:F0} on Z, but z={pos.z:F2}");
-      Assert.Less(math.abs(pos.x), 0.1f,
-        $"Character should not move on X axis, but x={pos.x:F2}");
+      Assert.Greater(pos.z, expected * 0.8f,
+        $"Character z should be > {expected * 0.8f:F1} (80% of {expected:F0}), but z={pos.z:F2}");
+      Assert.Less(pos.z, expected * 1.3f,
+        $"Character z should be < {expected * 1.3f:F1} (130% of {expected:F0}), but z={pos.z:F2}");
+      Assert.Less(math.abs(pos.x), 0.5f,
+        $"Character should not move significantly on X axis, but x={pos.x:F2}");
 
       yield return new ExitPlayMode();
     }

@@ -137,8 +137,11 @@ namespace UnityJS.Entities.EditModeTests
       for (var i = 0; i < SLIME_COUNT; i++)
       {
         var totalDist = JsEval.Double($"_e2e_wander[{eids[i]}]?.totalDist ?? -1");
-        Assert.Greater(totalDist, 5.0,
-          $"Slime {i} (eid={eids[i]}) should have traveled > 5 units, got {totalDist:F2}");
+        // speed=3, 5s → ~15 units path. Allow 60-140% for init overhead + frame timing.
+        Assert.Greater(totalDist, 9.0,
+          $"Slime {i} (eid={eids[i]}) should have traveled > 9 units (60% of 15), got {totalDist:F2}");
+        Assert.Less(totalDist, 21.0,
+          $"Slime {i} (eid={eids[i]}) should have traveled < 21 units (140% of 15), got {totalDist:F2}");
       }
 
       yield return new ExitPlayMode();

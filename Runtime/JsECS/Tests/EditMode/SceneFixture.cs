@@ -215,6 +215,15 @@ namespace UnityJS.Entities.EditModeTests
       if (m_Disposed) return;
       m_Disposed = true;
 
+      // Clean up _e2e_* globals to prevent cross-test state bleed
+      var vm = Runtime.JsRuntimeManager.Instance;
+      if (vm != null && vm.IsValid)
+      {
+        var error = Runtime.JsEvalUtility.EvalVoid(
+          "for(var k in globalThis){if(k.startsWith('_e2e'))delete globalThis[k]}");
+        // Ignore errors — VM may be in a bad state during teardown
+      }
+
       // World may already be destroyed (e.g. after ExitPlayMode) — safe to skip
       if (m_World.IsCreated)
       {
