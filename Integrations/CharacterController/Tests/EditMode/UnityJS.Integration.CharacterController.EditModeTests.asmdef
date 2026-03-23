@@ -14,7 +14,8 @@
     "Unity.CharacterController",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner",
-    "UnityJS.Integrations.Editor"
+    "UnityJS.Integrations.Editor",
+    "UnityJS.Entities.EditModeTests"
   ],
   "includePlatforms": [
     "Editor"

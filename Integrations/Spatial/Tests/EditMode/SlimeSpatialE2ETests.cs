@@ -1,6 +1,7 @@
-namespace UnityJS.Entities.EditModeTests
+namespace UnityJS.Integration.Spatial.EditModeTests
 {
   using System.Collections;
+  using Entities.EditModeTests;
   using NUnit.Framework;
   using Unity.Entities;
   using Unity.Mathematics;

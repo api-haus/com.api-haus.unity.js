@@ -15,7 +15,8 @@
     "Unity.Burst",
     "Unity.Physics",
     "UnityEngine.TestRunner",
-    "UnityEditor.TestRunner"
+    "UnityEditor.TestRunner",
+    "UnityJS.Entities.EditModeTests"
   ],
   "includePlatforms": [
     "Editor"
