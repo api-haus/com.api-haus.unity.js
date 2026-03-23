@@ -14,7 +14,7 @@ namespace UnityJS.Integration.CharacterController.EditModeTests
   /// </summary>
   public class CharacterMovementE2ETests
   {
-    const string SCRIPT = "tests/components/e2e_character";
+    const string SCRIPT = "components/e2e_character";
     const int INIT_FRAMES = 5;
     const float DURATION = 3f;
     const float SPEED = 4f;

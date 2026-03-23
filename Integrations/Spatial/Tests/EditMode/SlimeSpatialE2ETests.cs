@@ -51,7 +51,7 @@ namespace UnityJS.Integration.Spatial.EditModeTests
       for (var i = 0; i < SLIME_COUNT; i++)
       {
         var slime = scene.Spawn(
-          new[] { "tests/components/e2e_wanderer", "tests/components/e2e_spatial_goo" },
+          new[] { "components/e2e_wanderer", "components/e2e_spatial_goo" },
           float3.zero);
         slimeEids[i] = scene.GetEntityId(slime);
       }
@@ -63,7 +63,7 @@ namespace UnityJS.Integration.Spatial.EditModeTests
       for (var z = -1; z <= 2; z++)
       {
         var body = scene.Spawn(
-          "tests/components/e2e_body_tracker",
+          "components/e2e_body_tracker",
           new float3(x * 1.5f, 0, z * 1.5f));
         bodyEids[idx++] = scene.GetEntityId(body);
       }
@@ -106,12 +106,12 @@ namespace UnityJS.Integration.Spatial.EditModeTests
       for (var i = 0; i < SLIME_COUNT; i++)
       {
         slimes[i] = scene.Spawn(
-          new[] { "tests/components/e2e_wanderer", "tests/components/e2e_spatial_goo" },
+          new[] { "components/e2e_wanderer", "components/e2e_spatial_goo" },
           float3.zero);
       }
 
       for (var i = 0; i < 4; i++)
-        scene.Spawn("tests/components/e2e_body_tracker", new float3(i, 0, 0));
+        scene.Spawn("components/e2e_body_tracker", new float3(i, 0, 0));
 
       yield return WaitForSpatialStabilization();
       Assert.IsTrue(scene.AllFulfilled(), "All scripts must be fulfilled");
@@ -144,12 +144,12 @@ namespace UnityJS.Integration.Spatial.EditModeTests
 
       // Single slime at origin with goo (radius=3)
       var slime = scene.Spawn(
-        new[] { "tests/components/e2e_wanderer", "tests/components/e2e_spatial_goo" },
+        new[] { "components/e2e_wanderer", "components/e2e_spatial_goo" },
         float3.zero);
       var slimeEid = scene.GetEntityId(slime);
 
       // Place body right at origin — inside trigger radius from frame 1
-      scene.Spawn("tests/components/e2e_body_tracker", float3.zero);
+      scene.Spawn("components/e2e_body_tracker", float3.zero);
 
       yield return WaitForSpatialStabilization();
       Assert.IsTrue(scene.AllFulfilled(), "All scripts must be fulfilled");

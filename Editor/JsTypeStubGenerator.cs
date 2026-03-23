@@ -123,6 +123,7 @@ namespace UnityJS.Editor
       {
         // Include fixture and test .ts files from the package
         var escaped = packageIncludePath.Replace("\\", "/");
+        sb.AppendLine($"    ,\"{escaped}/Fixtures~/**/*.ts\"");
         sb.AppendLine($"    ,\"{escaped}/Integrations/**/Fixtures~/**/*.ts\"");
         sb.AppendLine($"    ,\"{escaped}/tests~/**/*.ts\"");
       }

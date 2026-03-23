@@ -13,7 +13,7 @@ namespace UnityJS.Integration.InputSystem.EditModeTests
   /// </summary>
   public class InputBridgeE2ETests
   {
-    const string SCRIPT = "tests/components/e2e_input_probe";
+    const string SCRIPT = "components/e2e_input_probe";
     const int INIT_FRAMES = 10;
 
     [UnityTest]

@@ -12,7 +12,7 @@ namespace UnityJS.Entities.EditModeTests
   /// </summary>
   public class PropertyOverridesE2ETests
   {
-    const string SCRIPT = "tests/components/e2e_wanderer";
+    const string SCRIPT = "components/e2e_wanderer";
     const int INIT_FRAMES = 12;
 
     [UnityTest]

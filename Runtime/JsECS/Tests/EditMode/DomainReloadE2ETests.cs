@@ -23,7 +23,7 @@ namespace UnityJS.Entities.EditModeTests
       var world = World.DefaultGameObjectInjectionWorld;
       using (var scene = new SceneFixture(world))
       {
-        scene.Spawn("tests/components/lifecycle_probe");
+        scene.Spawn("components/lifecycle_probe");
         for (var i = 0; i < INIT_FRAMES; i++) yield return null;
         Assert.IsTrue(scene.AllFulfilled(), "Cycle 1: script must be fulfilled");
       }
@@ -34,7 +34,7 @@ namespace UnityJS.Entities.EditModeTests
       var world2 = World.DefaultGameObjectInjectionWorld;
       using (var scene2 = new SceneFixture(world2))
       {
-        scene2.Spawn("tests/components/lifecycle_probe");
+        scene2.Spawn("components/lifecycle_probe");
         for (var i = 0; i < INIT_FRAMES; i++) yield return null;
         Assert.IsTrue(scene2.AllFulfilled(), "Cycle 2: script must be fulfilled");
       }
@@ -48,7 +48,7 @@ namespace UnityJS.Entities.EditModeTests
       var world = World.DefaultGameObjectInjectionWorld;
       using (var scene = new SceneFixture(world))
       {
-        scene.Spawn("tests/components/lifecycle_probe");
+        scene.Spawn("components/lifecycle_probe");
         for (var i = 0; i < INIT_FRAMES; i++) yield return null;
       }
       yield return new ExitPlayMode();
@@ -58,7 +58,7 @@ namespace UnityJS.Entities.EditModeTests
       var world2 = World.DefaultGameObjectInjectionWorld;
       using (var scene2 = new SceneFixture(world2))
       {
-        scene2.Spawn("tests/components/lifecycle_probe");
+        scene2.Spawn("components/lifecycle_probe");
         for (var i = 0; i < INIT_FRAMES; i++) yield return null;
         Assert.IsTrue(scene2.AllFulfilled(), "Script must be fulfilled after domain reload");
 

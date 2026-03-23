@@ -13,7 +13,7 @@ namespace UnityJS.Entities.EditModeTests
   /// </summary>
   public class WanderingSlimesE2ETests
   {
-    const string SCRIPT = "tests/components/e2e_wanderer";
+    const string SCRIPT = "components/e2e_wanderer";
     const int SLIME_COUNT = 10;
     const int INIT_FRAMES = 5;
 

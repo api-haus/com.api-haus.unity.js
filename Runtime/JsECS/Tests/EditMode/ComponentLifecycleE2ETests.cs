@@ -12,7 +12,7 @@ namespace UnityJS.Entities.EditModeTests
   /// </summary>
   public class ComponentLifecycleE2ETests
   {
-    const string SCRIPT_NAME = "tests/components/lifecycle_probe";
+    const string SCRIPT_NAME = "components/lifecycle_probe";
     const int INIT_FRAMES = 5;
 
     [UnityTest]

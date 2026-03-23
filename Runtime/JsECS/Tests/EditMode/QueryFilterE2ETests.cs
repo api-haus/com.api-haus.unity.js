@@ -26,6 +26,9 @@ namespace UnityJS.Entities.EditModeTests
       var world = World.DefaultGameObjectInjectionWorld;
       using var scene = new SceneFixture(world);
 
+      // Activate the query filter probe
+      JsEval.Void("_e2e_qf_active = true");
+
       // Spawn 5 entities
       var eids = new int[5];
       for (var i = 0; i < 5; i++)

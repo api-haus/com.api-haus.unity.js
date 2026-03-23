@@ -12,7 +12,7 @@ namespace UnityJS.Entities.EditModeTests
   /// </summary>
   public class EntityOperationsE2ETests
   {
-    const string SCRIPT = "tests/components/e2e_entity_ops";
+    const string SCRIPT = "components/e2e_entity_ops";
     const int INIT_FRAMES = 12;
 
     [UnityTest]

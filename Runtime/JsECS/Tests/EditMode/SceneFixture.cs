@@ -2,6 +2,7 @@ namespace UnityJS.Entities.EditModeTests
 {
   using System;
   using System.Collections.Generic;
+  using System.IO;
   using Components;
   using Core;
   using Runtime;
@@ -26,15 +27,86 @@ namespace UnityJS.Entities.EditModeTests
   /// </summary>
   public sealed class SceneFixture : IDisposable
   {
+    const string PACKAGE_NAME = "com.api-haus.unity.js";
+
     readonly World m_World;
     readonly EntityManager m_Em;
     readonly List<Entity> m_Entities = new();
     bool m_Disposed;
+    bool m_FixturesRegistered;
 
     public SceneFixture(World world)
     {
       m_World = world ?? throw new ArgumentNullException(nameof(world));
       m_Em = world.EntityManager;
+      RegisterFixturesSearchPath();
+    }
+
+    /// <summary>
+    /// Resolve the package's Fixtures~ directory and register it as a script search path.
+    /// Works for both embedded packages (Packages/com.api-haus.unity.js/) and
+    /// resolved packages (Library/PackageCache/).
+    /// </summary>
+    void RegisterFixturesSearchPath()
+    {
+      var fixturesPath = GetPackageFixturesPath();
+      if (fixturesPath != null && Directory.Exists(fixturesPath))
+      {
+        JsScriptSearchPaths.AddSearchPath(fixturesPath, 0);
+        m_FixturesRegistered = true;
+      }
+    }
+
+    /// <summary>
+    /// Get the absolute path to the package's Fixtures~ directory.
+    /// Returns the TscBuild output path (compiled JS) for runtime,
+    /// or the source path for TS file access (hot reload tests).
+    /// </summary>
+    public static string GetPackageFixturesPath()
+    {
+      // TscBuild output: Library/TscBuild/Packages/com.api-haus.unity.js/Fixtures~
+      // This is where compiled .js files live — the runtime loads these.
+      var tscBuild = Path.GetFullPath(Path.Combine(
+        "Library", "TscBuild", "Packages", PACKAGE_NAME, "Fixtures~"));
+      if (Directory.Exists(tscBuild))
+        return tscBuild;
+
+      // Fallback: source directory (works if TS files have been compiled in-place)
+      var embedded = Path.GetFullPath(Path.Combine("Packages", PACKAGE_NAME, "Fixtures~"));
+      if (Directory.Exists(embedded))
+        return embedded;
+
+#if UNITY_EDITOR
+      var info = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(SceneFixture).Assembly);
+      if (info != null)
+      {
+        var resolved = Path.Combine(info.resolvedPath, "Fixtures~");
+        if (Directory.Exists(resolved))
+          return resolved;
+      }
+#endif
+      return null;
+    }
+
+    /// <summary>
+    /// Get the source TS fixtures path (for hot reload tests that mutate files).
+    /// </summary>
+    public static string GetPackageFixturesSourcePath()
+    {
+      var embedded = Path.GetFullPath(Path.Combine("Packages", PACKAGE_NAME, "Fixtures~"));
+      if (Directory.Exists(embedded))
+        return embedded;
+
+#if UNITY_EDITOR
+      var info = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(SceneFixture).Assembly);
+      if (info != null)
+      {
+        var resolved = Path.Combine(info.resolvedPath, "Fixtures~");
+        if (Directory.Exists(resolved))
+          return resolved;
+      }
+#endif
+      return null;
     }
 
     /// <summary>All entities created by this fixture.</summary>
@@ -219,9 +291,17 @@ namespace UnityJS.Entities.EditModeTests
       var vm = Runtime.JsRuntimeManager.Instance;
       if (vm != null && vm.IsValid)
       {
-        var error = Runtime.JsEvalUtility.EvalVoid(
+        Runtime.JsEvalUtility.EvalVoid(
           "for(var k in globalThis){if(k.startsWith('_e2e'))delete globalThis[k]}");
-        // Ignore errors — VM may be in a bad state during teardown
+      }
+
+      // Unregister fixtures search path
+      if (m_FixturesRegistered)
+      {
+        var path = GetPackageFixturesPath();
+        if (path != null)
+          JsScriptSearchPaths.RemoveSearchPath(path);
+        m_FixturesRegistered = false;
       }
 
       // World may already be destroyed (e.g. after ExitPlayMode) — safe to skip

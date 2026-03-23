@@ -16,11 +16,19 @@ namespace UnityJS.Entities.EditModeTests
   /// </summary>
   public class HotReloadE2ETests
   {
-    const string SCRIPT = "tests/components/e2e_hot_reload_probe";
+    const string SCRIPT = "components/e2e_hot_reload_probe";
     const int INIT_FRAMES = 12;
 
-    static readonly string s_tsPath = Path.Combine(
-      Application.streamingAssetsPath, "unity.js", "tests", "components", "e2e_hot_reload_probe.ts");
+    static string s_tsPath
+    {
+      get
+      {
+        var fixturesPath = SceneFixture.GetPackageFixturesSourcePath();
+        return fixturesPath != null
+          ? Path.Combine(fixturesPath, "components", "e2e_hot_reload_probe.ts")
+          : Path.Combine(Application.streamingAssetsPath, "unity.js", "components", "e2e_hot_reload_probe.ts");
+      }
+    }
 
     string m_OriginalContent;
 
@@ -69,7 +77,7 @@ namespace UnityJS.Entities.EditModeTests
       // Recompile and trigger hot reload
       TscCompiler.Instance?.Recompile();
       var vm = JsRuntimeManager.Instance;
-      vm?.SimulateHotReload("tests/components/e2e_hot_reload_probe");
+      vm?.SimulateHotReload("components/e2e_hot_reload_probe");
 
       // Spawn a new entity with the reloaded script
       var entity2 = scene.Spawn(SCRIPT);
@@ -103,7 +111,7 @@ namespace UnityJS.Entities.EditModeTests
         File.WriteAllText(s_tsPath, mutated);
         TscCompiler.Instance?.Recompile();
         JsRuntimeManager.Instance?.SimulateHotReload(
-          "tests/components/e2e_hot_reload_probe");
+          "components/e2e_hot_reload_probe");
         yield return null;
       }
 

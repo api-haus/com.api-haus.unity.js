@@ -22,7 +22,7 @@ namespace UnityJS.Entities.EditModeTests
       using var scene = new SceneFixture(world);
 
       var entity = scene.Spawn(
-        new[] { "tests/components/e2e_multi_a", "tests/components/e2e_multi_b" });
+        new[] { "components/e2e_multi_a", "components/e2e_multi_b" });
       var eid = scene.GetEntityId(entity);
 
       for (var i = 0; i < INIT_FRAMES; i++) yield return null;
@@ -42,7 +42,7 @@ namespace UnityJS.Entities.EditModeTests
       using var scene = new SceneFixture(world);
 
       var entity = scene.Spawn(
-        new[] { "tests/components/e2e_multi_a", "tests/components/e2e_multi_b" });
+        new[] { "components/e2e_multi_a", "components/e2e_multi_b" });
       var eid = scene.GetEntityId(entity);
 
       for (var i = 0; i < INIT_FRAMES; i++) yield return null;
@@ -67,7 +67,7 @@ namespace UnityJS.Entities.EditModeTests
       using var scene = new SceneFixture(world);
 
       var entity = scene.Spawn(
-        new[] { "tests/components/e2e_multi_a", "tests/components/e2e_multi_b" });
+        new[] { "components/e2e_multi_a", "components/e2e_multi_b" });
       var eid = scene.GetEntityId(entity);
 
       for (var i = 0; i < INIT_FRAMES + 3; i++) yield return null;

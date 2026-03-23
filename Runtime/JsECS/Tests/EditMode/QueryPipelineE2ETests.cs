@@ -25,7 +25,7 @@ namespace UnityJS.Entities.EditModeTests
       using var scene = new SceneFixture(world);
 
       // e2e_mover component moves entity by (1,0,0)*dt via ecs.get() write-back
-      var entity = scene.Spawn("tests/components/e2e_mover", float3.zero);
+      var entity = scene.Spawn("components/e2e_mover", float3.zero);
 
       for (var i = 0; i < INIT_FRAMES; i++)
         yield return null;
@@ -65,7 +65,7 @@ namespace UnityJS.Entities.EditModeTests
       const int count = 3;
       var entities = new Entity[count];
       for (var i = 0; i < count; i++)
-        entities[i] = scene.Spawn("tests/components/e2e_wanderer", float3.zero);
+        entities[i] = scene.Spawn("components/e2e_wanderer", float3.zero);
 
       for (var i = 0; i < INIT_FRAMES; i++)
         yield return null;

@@ -13,7 +13,7 @@ namespace UnityJS.Entities.EditModeTests
   /// </summary>
   public class LogBridgeE2ETests
   {
-    const string SCRIPT = "tests/components/e2e_log_probe";
+    const string SCRIPT = "components/e2e_log_probe";
     const int INIT_FRAMES = 10;
 
     [UnityTest]

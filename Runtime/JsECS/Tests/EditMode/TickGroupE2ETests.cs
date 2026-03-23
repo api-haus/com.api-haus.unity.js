@@ -13,7 +13,7 @@ namespace UnityJS.Entities.EditModeTests
   /// </summary>
   public class TickGroupE2ETests
   {
-    const string SCRIPT = "tests/components/e2e_tick_group_probe";
+    const string SCRIPT = "components/e2e_tick_group_probe";
     const int INIT_FRAMES = 10;
 
     [UnityTest]
