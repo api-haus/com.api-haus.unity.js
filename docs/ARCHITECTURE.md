@@ -627,6 +627,12 @@ These are the rules that, when violated, cause the failures cataloged in the roo
 | `EntityManager.CreateEntityQuery()` never in P/Invoke | Query matches zero entities | Defer via `PendingQueries → FlushPendingQueries()` |
 | `TscCompiler.CleanOutDir()` must not run while systems are loading | TDZ errors (scripts load from empty dir) | Synchronous compile, no background cleanup during play mode |
 
+### Known Bugs
+
+| Bug | Root Cause | Test | Fix |
+|-----|-----------|------|-----|
+| `withNone()` silently ignores JS-defined components | `JsComponentRegistry.TryGetComponentType()` only checks C#-registered components, not `JsComponentStore.NameToSlot`. JS component names are dropped from the none-list in `JsQueryBridge.ReadJsComponentArray()`. | `QueryFilterE2ETests.WithNone_ExcludesTaggedEntities` (FAILING) | Add `JsComponentStore` fallback in `TryGetComponentType` returning `JsDynTag[slot]` |
+
 ---
 
 ## TypeScript Type System
