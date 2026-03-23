@@ -57,6 +57,13 @@ namespace UnityJS.Runtime
         // Also register the mirrored StreamingAssets subtree for system discovery (relative names like "systems/character_input")
         var tscBuildScripts = Path.Combine(tscBuildRoot, "Assets", "StreamingAssets", "unity.js");
         RegisterPathAsSource(tscBuildScripts, "tsc-build-scripts", 45);
+
+        // Register package Fixtures~ (compiled JS) for E2E test fixtures
+        var packageFixtures = Path.GetFullPath(Path.Combine(
+          Application.dataPath, "..", "Library", "TscBuild",
+          "Packages", "com.api-haus.unity.js", "Fixtures~"));
+        if (Directory.Exists(packageFixtures))
+          RegisterPathAsSource(packageFixtures, "package-fixtures", 40);
 #endif
 
         s_initialized = true;
