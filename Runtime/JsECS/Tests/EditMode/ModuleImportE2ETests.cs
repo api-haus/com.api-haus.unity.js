@@ -5,16 +5,12 @@ namespace UnityJS.Entities.EditModeTests
   using Unity.Entities;
   using UnityEngine.TestTools;
 
-  /// <summary>
-  /// E2E tests for ES module imports (unity.js/ecs, unity.js/math, unity.js/types).
-  /// Uses e2e_import_probe.ts system that imports and verifies module exports.
-  /// </summary>
   public class ModuleImportE2ETests
   {
     const int INIT_FRAMES = 10;
 
     [UnityTest]
-    public IEnumerator BuiltinModule_EcsImportWorks()
+    public IEnumerator BuiltinModule_EcsQueryCallable()
     {
       yield return new EnterPlayMode();
       var world = World.DefaultGameObjectInjectionWorld;
@@ -22,12 +18,15 @@ namespace UnityJS.Entities.EditModeTests
       scene.SpawnBare();
       for (var i = 0; i < INIT_FRAMES; i++) yield return null;
 
-      Assert.IsTrue(JsEval.Bool("_e2e_import?.hasQuery === true"), "ecs.query should be a function");
+      Assert.IsTrue(JsEval.Bool("_e2e_import?.hasQuery === true"), "ecs.query must be a function");
+      Assert.IsTrue(JsEval.Bool("_e2e_import?.queryHasWithAll === true"),
+        "ecs.query() must return builder with withAll method");
+
       yield return new ExitPlayMode();
     }
 
     [UnityTest]
-    public IEnumerator BuiltinModule_MathImportWorks()
+    public IEnumerator BuiltinModule_MathCallable()
     {
       yield return new EnterPlayMode();
       var world = World.DefaultGameObjectInjectionWorld;
@@ -35,13 +34,14 @@ namespace UnityJS.Entities.EditModeTests
       scene.SpawnBare();
       for (var i = 0; i < INIT_FRAMES; i++) yield return null;
 
-      Assert.IsTrue(JsEval.Bool("_e2e_import?.hasSin === true"), "math.sin should be a function");
-      Assert.AreEqual(0.0, JsEval.Double("_e2e_import?.mathResult ?? -999"), 1e-5, "math.sin(0) = 0");
+      Assert.AreEqual(0.0, JsEval.Double("_e2e_import?.mathResult ?? -999"), 1e-5,
+        "math.sin(0) must return 0");
+
       yield return new ExitPlayMode();
     }
 
     [UnityTest]
-    public IEnumerator BuiltinModule_TypesImportWorks()
+    public IEnumerator BuiltinModule_Float3Constructable()
     {
       yield return new EnterPlayMode();
       var world = World.DefaultGameObjectInjectionWorld;
@@ -49,7 +49,10 @@ namespace UnityJS.Entities.EditModeTests
       scene.SpawnBare();
       for (var i = 0; i < INIT_FRAMES; i++) yield return null;
 
-      Assert.IsTrue(JsEval.Bool("_e2e_import?.hasFloat3 === true"), "float3 should be a function");
+      Assert.AreEqual(1.0, JsEval.Double("_e2e_import?.float3X ?? -999"), 1e-5, "float3(1,2,3).x = 1");
+      Assert.AreEqual(2.0, JsEval.Double("_e2e_import?.float3Y ?? -999"), 1e-5, "float3(1,2,3).y = 2");
+      Assert.AreEqual(3.0, JsEval.Double("_e2e_import?.float3Z ?? -999"), 1e-5, "float3(1,2,3).z = 3");
+
       yield return new ExitPlayMode();
     }
   }

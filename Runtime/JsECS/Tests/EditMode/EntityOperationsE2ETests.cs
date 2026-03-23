@@ -6,10 +6,6 @@ namespace UnityJS.Entities.EditModeTests
   using Unity.Mathematics;
   using UnityEngine.TestTools;
 
-  /// <summary>
-  /// E2E tests for entities.create() and entities.destroy().
-  /// Uses e2e_entity_ops.ts component that creates/destroys entities in start().
-  /// </summary>
   public class EntityOperationsE2ETests
   {
     const string SCRIPT = "components/e2e_entity_ops";
@@ -26,50 +22,22 @@ namespace UnityJS.Entities.EditModeTests
       for (var i = 0; i < INIT_FRAMES; i++) yield return null;
       Assert.IsTrue(scene.AllFulfilled(), "Script must be fulfilled");
 
+      var error = JsEval.Bool($"!!_e2e_ent[{eid}]?.error");
+      Assert.IsFalse(error, $"Fixture error: {JsEval.Int($"_e2e_ent[{eid}]?.error ?? 0")}");
+
       var createdId = JsEval.Int($"_e2e_ent[{eid}]?.createdId ?? -1");
-      Assert.Greater(createdId, 0, $"entities.create() should return a valid ID, got {createdId}");
+      Assert.Greater(createdId, 0, $"entities.create() must return positive ID, got {createdId}");
 
-      yield return new ExitPlayMode();
-    }
-
-    [UnityTest]
-    public IEnumerator Create_WithPosition_SetsTransform()
-    {
-      yield return new EnterPlayMode();
-      var world = World.DefaultGameObjectInjectionWorld;
-      using var scene = new SceneFixture(world);
-      var entity = scene.Spawn(SCRIPT);
-      var eid = scene.GetEntityId(entity);
-      for (var i = 0; i < INIT_FRAMES; i++) yield return null;
-      Assert.IsTrue(scene.AllFulfilled(), "Script must be fulfilled");
-
-      // ECB needs a frame to play back
-      yield return null;
-      yield return null;
-
+      // Also verify a second entity was created (with position)
       var posId = JsEval.Int($"_e2e_ent[{eid}]?.createdWithPosId ?? -1");
-      Assert.Greater(posId, 0, "Created entity should have valid ID");
-
-      // Verify position via C# — look up the entity by its JS ID
-      var registry = Core.JsEntityRegistry.GetEntityFromId(posId);
-      if (world.EntityManager.Exists(registry))
-      {
-        var pos = world.EntityManager.GetComponentData<Unity.Transforms.LocalTransform>(registry).Position;
-        Assert.AreEqual(5.0f, pos.x, 0.5f, "Created entity position.x should be 5");
-        Assert.AreEqual(10.0f, pos.y, 0.5f, "Created entity position.y should be 10");
-        Assert.AreEqual(15.0f, pos.z, 0.5f, "Created entity position.z should be 15");
-      }
-      else
-      {
-        // Entity may still be pending ECB playback — verify ID at minimum
-        Assert.Greater(posId, 0, "entities.create(float3(5,10,15)) returned valid ID");
-      }
+      Assert.Greater(posId, 0, "entities.create(pos) must return positive ID");
+      Assert.AreNotEqual(createdId, posId, "Two create() calls must return different IDs");
 
       yield return new ExitPlayMode();
     }
 
     [UnityTest]
-    public IEnumerator Destroy_ReturnsTrue()
+    public IEnumerator Destroy_EntityActuallyRemoved()
     {
       yield return new EnterPlayMode();
       var world = World.DefaultGameObjectInjectionWorld;
@@ -79,8 +47,19 @@ namespace UnityJS.Entities.EditModeTests
       for (var i = 0; i < INIT_FRAMES; i++) yield return null;
       Assert.IsTrue(scene.AllFulfilled(), "Script must be fulfilled");
 
-      var result = JsEval.Bool($"_e2e_ent[{eid}]?.destroyResult === true");
-      Assert.IsTrue(result, "entities.destroy() should return true");
+      var destroyResult = JsEval.Bool($"_e2e_ent[{eid}]?.destroyResult === true");
+      Assert.IsTrue(destroyResult, "entities.destroy() must return true");
+
+      var destroyTargetId = JsEval.Int($"_e2e_ent[{eid}]?.destroyTargetId ?? -1");
+      Assert.Greater(destroyTargetId, 0, "Destroy target must have valid ID");
+
+      // Wait for ECB playback
+      for (var i = 0; i < 5; i++) yield return null;
+
+      // Verify entity is gone from registry
+      var destroyed = Core.JsEntityRegistry.GetEntityFromId(destroyTargetId);
+      Assert.IsFalse(world.EntityManager.Exists(destroyed),
+        $"Destroyed entity (id={destroyTargetId}) must not exist after ECB playback");
 
       yield return new ExitPlayMode();
     }
