@@ -1,0 +1,122 @@
+namespace UnityJS.Entities.EditModeTests
+{
+  using System.Collections;
+  using System.IO;
+  using NUnit.Framework;
+  using Unity.Entities;
+  using Unity.Mathematics;
+  using UnityEngine;
+  using UnityEngine.TestTools;
+  using UnityJS.Editor;
+  using UnityJS.Runtime;
+
+  /// <summary>
+  /// E2E test for hot reload. Mutates a TS fixture, recompiles, verifies
+  /// new version loads without crashing. Restores original file in teardown.
+  /// </summary>
+  public class HotReloadE2ETests
+  {
+    const string SCRIPT = "tests/components/e2e_hot_reload_probe";
+    const int INIT_FRAMES = 12;
+
+    static readonly string s_tsPath = Path.Combine(
+      Application.streamingAssetsPath, "unity.js", "tests", "components", "e2e_hot_reload_probe.ts");
+
+    string m_OriginalContent;
+
+    [UnitySetUp]
+    public IEnumerator SetUp()
+    {
+      m_OriginalContent = File.ReadAllText(s_tsPath);
+      yield break;
+    }
+
+    [UnityTearDown]
+    public IEnumerator TearDown()
+    {
+      // Always restore original file
+      if (m_OriginalContent != null)
+      {
+        File.WriteAllText(s_tsPath, m_OriginalContent);
+        TscCompiler.Instance?.Recompile();
+      }
+      yield break;
+    }
+
+    [UnityTest]
+    public IEnumerator Reload_UpdatesVersion()
+    {
+      yield return new EnterPlayMode();
+
+      var world = World.DefaultGameObjectInjectionWorld;
+      using var scene = new SceneFixture(world);
+
+      // Spawn with version 1
+      var entity = scene.Spawn(SCRIPT);
+      var eid = scene.GetEntityId(entity);
+
+      for (var i = 0; i < INIT_FRAMES; i++) yield return null;
+      Assert.IsTrue(scene.AllFulfilled(), "Script must be fulfilled");
+
+      var v1 = JsEval.Int($"_e2e_hot[{eid}]?.version ?? -1");
+      Assert.AreEqual(1, v1, "Initial version should be 1");
+
+      // Mutate the TS file: change VERSION = 1 → VERSION = 2
+      var mutated = m_OriginalContent.Replace("const VERSION = 1", "const VERSION = 2");
+      Assert.AreNotEqual(m_OriginalContent, mutated, "Mutation must change the file");
+      File.WriteAllText(s_tsPath, mutated);
+
+      // Recompile and trigger hot reload
+      TscCompiler.Instance?.Recompile();
+      var vm = JsRuntimeManager.Instance;
+      vm?.SimulateHotReload("tests/components/e2e_hot_reload_probe");
+
+      // Spawn a new entity with the reloaded script
+      var entity2 = scene.Spawn(SCRIPT);
+      var eid2 = scene.GetEntityId(entity2);
+
+      for (var i = 0; i < INIT_FRAMES; i++) yield return null;
+
+      var v2 = JsEval.Int($"_e2e_hot[{eid2}]?.version ?? -1");
+      Assert.AreEqual(2, v2, "Reloaded version should be 2");
+
+      yield return new ExitPlayMode();
+    }
+
+    [UnityTest]
+    public IEnumerator Reload_NoExceptions()
+    {
+      yield return new EnterPlayMode();
+
+      var world = World.DefaultGameObjectInjectionWorld;
+      using var scene = new SceneFixture(world);
+      scene.Spawn(SCRIPT);
+
+      for (var i = 0; i < INIT_FRAMES; i++) yield return null;
+      Assert.IsTrue(scene.AllFulfilled(), "Script must be fulfilled");
+
+      // Mutate and reload 3 times rapidly
+      for (var round = 2; round <= 4; round++)
+      {
+        var mutated = m_OriginalContent.Replace(
+          "const VERSION = 1", $"const VERSION = {round}");
+        File.WriteAllText(s_tsPath, mutated);
+        TscCompiler.Instance?.Recompile();
+        JsRuntimeManager.Instance?.SimulateHotReload(
+          "tests/components/e2e_hot_reload_probe");
+        yield return null;
+      }
+
+      // Restore original
+      File.WriteAllText(s_tsPath, m_OriginalContent);
+      TscCompiler.Instance?.Recompile();
+
+      var vm = JsRuntimeManager.Instance;
+      Assert.IsNotNull(vm, "VM must survive rapid reloads");
+      Assert.IsEmpty(vm.CapturedExceptions,
+        $"No JS exceptions after rapid reloads: {string.Join("\n", vm.CapturedExceptions)}");
+
+      yield return new ExitPlayMode();
+    }
+  }
+}
