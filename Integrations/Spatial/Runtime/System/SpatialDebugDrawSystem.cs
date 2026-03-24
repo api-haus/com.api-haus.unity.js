@@ -1,4 +1,5 @@
 using Drawing;
+using StoredPrefs;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -11,8 +12,16 @@ namespace MiniSpatial
   [UpdateAfter(typeof(SpatialTriggerSystem))]
   public partial struct SpatialDebugDrawSystem : ISystem
   {
+    static readonly FixedString32Bytes k_Key = "debug.spatial";
+
     public void OnUpdate(ref SystemState state)
     {
+      if (!PrefsStore.IsCreated || !PrefsStore.IsSet(in k_Key))
+      {
+        SpatialQueryDebug.Clear();
+        return;
+      }
+
       var fixedDt = SystemAPI.Time.DeltaTime;
       using var _ = Draw.ingame.WithDuration(fixedDt);
 

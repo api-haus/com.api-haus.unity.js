@@ -1,16 +1,10 @@
 {
-  "name": "MiniSpatial",
-  "rootNamespace": "MiniSpatial",
+  "name": "StoredPrefs",
+  "rootNamespace": "StoredPrefs",
   "references": [
-    "Unity.Entities",
-    "Unity.Entities.Hybrid",
-    "Unity.Mathematics",
     "Unity.Burst",
     "Unity.Collections",
-    "Unity.Transforms",
-    "Unity.Physics",
-    "ALINE",
-    "StoredPrefs"
+    "Unity.Mathematics"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

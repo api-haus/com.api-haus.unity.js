@@ -16,6 +16,9 @@ namespace UnityJS.Runtime
     /// <summary>Return names of available system scripts (no extension, no path prefix).</summary>
     IReadOnlyList<string> DiscoverSystems();
 
+    /// <summary>Return names of available standalone scripts (no extension, no path prefix).</summary>
+    IReadOnlyList<string> DiscoverScripts();
+
     /// <summary>
     /// Try to read a script by name (no extension).
     /// Tries both root-level and systems/ subfolder.

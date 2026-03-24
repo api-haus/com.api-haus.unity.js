@@ -24,13 +24,17 @@ namespace UnityJS.Runtime
       m_Priority = priority;
     }
 
-    public IReadOnlyList<string> DiscoverSystems()
+    public IReadOnlyList<string> DiscoverSystems() => DiscoverInFolder("systems");
+
+    public IReadOnlyList<string> DiscoverScripts() => DiscoverInFolder("scripts");
+
+    IReadOnlyList<string> DiscoverInFolder(string folder)
     {
-      var systemsDir = Path.Combine(m_BasePath, "systems");
-      if (!Directory.Exists(systemsDir))
+      var dir = Path.Combine(m_BasePath, folder);
+      if (!Directory.Exists(dir))
         return Array.Empty<string>();
 
-      var files = Directory.GetFiles(systemsDir, "*.js", SearchOption.AllDirectories);
+      var files = Directory.GetFiles(dir, "*.js", SearchOption.AllDirectories);
       var names = new List<string>(files.Length);
       foreach (var file in files)
         names.Add(Path.GetFileNameWithoutExtension(file));
@@ -60,6 +64,15 @@ namespace UnityJS.Runtime
       {
         source = File.ReadAllText(systemsPath);
         resolvedId = Path.GetFullPath(systemsPath);
+        return true;
+      }
+
+      // Try under scripts/: {basePath}/scripts/{scriptName}.js
+      var scriptsPath = Path.Combine(m_BasePath, "scripts", scriptName + ".js");
+      if (File.Exists(scriptsPath))
+      {
+        source = File.ReadAllText(scriptsPath);
+        resolvedId = Path.GetFullPath(scriptsPath);
         return true;
       }
 

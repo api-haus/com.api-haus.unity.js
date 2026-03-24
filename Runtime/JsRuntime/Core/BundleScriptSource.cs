@@ -36,13 +36,17 @@ namespace UnityJS.Runtime
       m_Scripts.Remove(name);
     }
 
-    public IReadOnlyList<string> DiscoverSystems()
+    public IReadOnlyList<string> DiscoverSystems() => DiscoverInPrefix("systems/");
+
+    public IReadOnlyList<string> DiscoverScripts() => DiscoverInPrefix("scripts/");
+
+    IReadOnlyList<string> DiscoverInPrefix(string prefix)
     {
-      var systems = new List<string>();
+      var result = new List<string>();
       foreach (var key in m_Scripts.Keys)
-        if (key.StartsWith("systems/", StringComparison.Ordinal))
-          systems.Add(key.Substring("systems/".Length));
-      return systems;
+        if (key.StartsWith(prefix, StringComparison.Ordinal))
+          result.Add(key.Substring(prefix.Length));
+      return result;
     }
 
     public bool TryReadScript(string scriptName, out string source, out string resolvedId)
@@ -65,6 +69,14 @@ namespace UnityJS.Runtime
       if (m_Scripts.TryGetValue(systemsKey, out source))
       {
         resolvedId = $"bundle://{m_SourceId}/{systemsKey}.js";
+        return true;
+      }
+
+      // Try with scripts/ prefix
+      var scriptsKey = "scripts/" + scriptName;
+      if (m_Scripts.TryGetValue(scriptsKey, out source))
+      {
+        resolvedId = $"bundle://{m_SourceId}/{scriptsKey}.js";
         return true;
       }
 

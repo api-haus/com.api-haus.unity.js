@@ -39,6 +39,19 @@ namespace UnityJS.Entities.Systems
         LoadSystem(ref data, vm, systemName, fsName, code, resolvedId);
       }
 
+      // Discover and load standalone scripts (scripts/ folder — run once at load time)
+      var scripts = JsScriptSourceRegistry.DiscoverAllScripts();
+      foreach (var (scriptName, scriptSource) in scripts)
+      {
+        var scriptId = "script:" + scriptName;
+        if (vm.HasScript(scriptId))
+          continue;
+        if (!scriptSource.TryReadScript("scripts/" + scriptName, out var code, out var resolvedId))
+          continue;
+        if (!vm.ReloadScript(scriptId, code, resolvedId))
+          Log.Error("[JsSystemDiscovery] Failed to load script '{0}'", scriptName);
+      }
+
       manifest.initialized = true;
     }
 

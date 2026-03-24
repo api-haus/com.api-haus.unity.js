@@ -564,6 +564,10 @@ interface Query<T extends any[]> {
 /** State passed to onUpdate each tick. */
 interface UpdateState { deltaTime: number; elapsedTime: number; }
 
+// ── Tweak Commands ─────────────────────────────────────
+
+declare function param<T extends string | number>(name: string, constraint: T[] | { min: T; max: T; step?: T }, description?: string): void;
+
 // ── Spatial Shapes ──────────────────────────────────────
 
 interface SpatialShapeObj {

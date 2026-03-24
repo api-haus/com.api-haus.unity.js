@@ -5,11 +5,13 @@
     "UnityJS.Entities",
     "UnityJS.QJS",
     "UnityJS.Runtime",
-    "QFSW.QC"
+    "QFSW.QC",
+    "StoredPrefs",
+    "Unity.Collections"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
-  "allowUnsafeCode": false,
+  "allowUnsafeCode": true,
   "overrideReferences": false,
   "precompiledReferences": [],
   "autoReferenced": false,

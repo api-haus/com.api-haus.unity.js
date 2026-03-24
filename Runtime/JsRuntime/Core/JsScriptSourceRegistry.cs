@@ -101,6 +101,29 @@ namespace UnityJS.Runtime
     }
 
     /// <summary>
+    /// Discovers all standalone scripts across all sources.
+    /// First source to provide a name wins (lower priority overrides higher).
+    /// </summary>
+    public static List<(string name, IJsScriptSource source)> DiscoverAllScripts()
+    {
+      var result = new List<(string, IJsScriptSource)>();
+      var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+      lock (s_lock)
+      {
+        foreach (var source in s_sources)
+        {
+          var scripts = source.DiscoverScripts();
+          foreach (var name in scripts)
+            if (seen.Add(name))
+              result.Add((name, source));
+        }
+      }
+
+      return result;
+    }
+
+    /// <summary>
     /// Tries sources in priority order to read a script by name.
     /// </summary>
     public static bool TryReadScript(string scriptName, out string source, out string resolvedId)

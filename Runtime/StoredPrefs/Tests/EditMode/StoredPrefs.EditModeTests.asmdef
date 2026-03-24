@@ -1,20 +1,13 @@
 {
-  "name": "UnityJS.Integration.QuantumConsole.EditModeTests",
-  "rootNamespace": "UnityJS.Integration.QuantumConsole.EditModeTests",
+  "name": "StoredPrefs.EditModeTests",
+  "rootNamespace": "StoredPrefs.EditModeTests",
   "references": [
-    "UnityJS.QJS",
-    "UnityJS.Runtime",
-    "UnityJS.Entities",
-    "UnityJS.Integration.QuantumConsole",
-    "UnityJS.Entities.EditModeTests",
-    "QFSW.QC",
     "StoredPrefs",
     "Unity.Collections",
-    "Unity.Entities",
     "Unity.Mathematics",
+    "Unity.Burst",
     "UnityEngine.TestRunner",
-    "UnityEditor.TestRunner",
-    "UnityJS.Integrations.Editor"
+    "UnityEditor.TestRunner"
   ],
   "includePlatforms": [
     "Editor"
