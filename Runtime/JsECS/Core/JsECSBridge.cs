@@ -79,20 +79,12 @@ namespace UnityJS.Entities.Core
 
   /// <summary>
   /// Coordinates JS-to-ECS bridge functions.
-  /// Static state required for Burst-compatible [MonoPInvokeCallback] methods.
+  /// Delegates to JsBurstContext, JsEventContext for state management.
   /// Domain-specific functions are organized in partial classes under Bridge/.
   /// </summary>
   public static partial class JsECSBridge
   {
     static JsBridgeState B => Runtime.JsRuntimeManager.Instance?.BridgeState as JsBridgeState;
-
-    struct BurstContextMarker { }
-
-    struct NextEntityIdMarker { }
-
-    struct EventContextMarker { }
-
-    struct PendingEntitiesMarker { }
 
     static World s_world;
     static EntityManager s_entityManager;
@@ -111,26 +103,6 @@ namespace UnityJS.Entities.Core
       s_initialized = false;
     }
 
-    /// <summary>
-    /// Tracks entities created in the current frame before ECB playback.
-    /// </summary>
-    static readonly SharedStatic<UnsafeHashMap<int, Entity>> s_pendingEntities = SharedStatic<
-      UnsafeHashMap<int, Entity>
-    >.GetOrCreate<PendingEntitiesMarker, UnsafeHashMap<int, Entity>>();
-
-    static readonly SharedStatic<BurstBridgeContext> s_burstContext =
-      SharedStatic<BurstBridgeContext>.GetOrCreate<BurstContextMarker, BurstBridgeContext>();
-
-    public static bool IsBurstContextValid => s_burstContext.Data.isValid;
-
-    static readonly SharedStatic<int> s_nextEntityId =
-      SharedStatic<int>.GetOrCreate<NextEntityIdMarker>();
-
-    static readonly SharedStatic<JsEventContextData> s_eventContext =
-      SharedStatic<JsEventContextData>.GetOrCreate<EventContextMarker, JsEventContextData>();
-
-    public static ref JsEventContextData EventContext => ref s_eventContext.Data;
-
     public static void Initialize(World world)
     {
       if (s_initialized)
@@ -142,17 +114,9 @@ namespace UnityJS.Entities.Core
 
       s_world = world;
       s_entityManager = world.EntityManager;
-      s_nextEntityId.Data = 1;
 
-      s_pendingEntities.Data = new UnsafeHashMap<int, Entity>(32, Allocator.Persistent);
-
-      s_eventContext.Data = new JsEventContextData
-      {
-        pendingEvents = new UnsafeList<PendingEventDispatch>(64, Allocator.Persistent),
-        eventBuffer = new UnsafeList<JsEvent>(128, Allocator.Persistent),
-        entitiesToClear = new UnsafeList<Entity>(64, Allocator.Persistent),
-        isValid = true,
-      };
+      JsBurstContext.Initialize();
+      JsEventContext.Initialize();
 
       if (s_playerQueryInitialized)
         s_playerQuery.Dispose();
@@ -164,22 +128,8 @@ namespace UnityJS.Entities.Core
 
     public static void Shutdown()
     {
-      s_burstContext.Data = default;
-
-      if (s_pendingEntities.Data.IsCreated)
-        s_pendingEntities.Data.Dispose();
-
-      ref var eventCtx = ref s_eventContext.Data;
-      if (eventCtx.isValid)
-      {
-        if (eventCtx.pendingEvents.IsCreated)
-          eventCtx.pendingEvents.Dispose();
-        if (eventCtx.eventBuffer.IsCreated)
-          eventCtx.eventBuffer.Dispose();
-        if (eventCtx.entitiesToClear.IsCreated)
-          eventCtx.entitiesToClear.Dispose();
-        eventCtx = default;
-      }
+      JsBurstContext.Shutdown();
+      JsEventContext.Shutdown();
 
       if (s_playerQueryInitialized)
       {
@@ -194,9 +144,8 @@ namespace UnityJS.Entities.Core
       s_initialized = false;
     }
 
-    /// <summary>
-    /// Updates the Burst-compatible context with current frame data.
-    /// </summary>
+    // ── Forwarding methods (keep API stable for callers not yet migrated) ──
+
     public static void UpdateBurstContext(
       EntityCommandBuffer ecb,
       float deltaTime,
@@ -206,68 +155,46 @@ namespace UnityJS.Entities.Core
     {
       if (!s_initialized)
       {
-        s_burstContext.Data = default;
+        JsBurstContext.Clear();
         return;
       }
 
-      if (!JsEntityRegistry.IsCreated)
-      {
-        s_burstContext.Data = default;
-        return;
-      }
-
-      if (s_pendingEntities.Data.IsCreated)
-        s_pendingEntities.Data.Clear();
-
-      s_burstContext.Data = new BurstBridgeContext
-      {
-        ecb = ecb,
-        deltaTime = deltaTime,
-        entityIdMap = JsEntityRegistry.EntityIdMap,
-        transformLookup = transformLookup,
-        scriptBufferLookup = scriptBufferLookup,
-        isValid = true,
-      };
+      JsBurstContext.Update(ecb, deltaTime, transformLookup, scriptBufferLookup);
     }
 
-    internal static void AddPendingEntity(int entityId, Entity entity)
-    {
-      if (s_pendingEntities.Data.IsCreated)
-        s_pendingEntities.Data.TryAdd(entityId, entity);
-    }
+    public static bool IsBurstContextValid => JsBurstContext.IsValid;
 
-    internal static Entity GetPendingEntity(int entityId)
-    {
-      if (
-        s_pendingEntities.Data.IsCreated
-        && s_pendingEntities.Data.TryGetValue(entityId, out var entity)
-      )
-        return entity;
-      return Entity.Null;
-    }
+    public static bool TryGetBurstContextECB(out EntityCommandBuffer ecb) =>
+      JsBurstContext.TryGetECB(out ecb);
 
-    public static bool IsPendingEntity(int entityId)
-    {
-      return s_pendingEntities.Data.IsCreated && s_pendingEntities.Data.ContainsKey(entityId);
-    }
+    public static void ClearBurstContext() => JsBurstContext.Clear();
 
-    public static bool TryGetBurstContextECB(out EntityCommandBuffer ecb)
-    {
-      ref var ctx = ref s_burstContext.Data;
-      if (ctx.isValid)
-      {
-        ecb = ctx.ecb;
-        return true;
-      }
+    public static Entity GetEntityFromIdBurst(int entityId) =>
+      JsBurstContext.GetEntityFromId(entityId);
 
-      ecb = default;
-      return false;
-    }
+    internal static bool TryGetTransformBurst(Entity entity, out LocalTransform transform) =>
+      JsBurstContext.TryGetTransform(entity, out transform);
 
-    public static void ClearBurstContext()
-    {
-      s_burstContext.Data = default;
-    }
+    internal static bool TrySetTransformBurst(Entity entity, LocalTransform transform) =>
+      JsBurstContext.TrySetTransform(entity, transform);
+
+    internal static bool HasScriptBurst(Entity entity, FixedString64Bytes scriptName) =>
+      JsBurstContext.HasScript(entity, scriptName);
+
+    internal static int AllocateEntityId() => JsBurstContext.AllocateEntityId();
+
+    public static void SyncNextEntityId(int nextId) => JsBurstContext.SyncNextEntityId(nextId);
+
+    internal static void AddPendingEntity(int entityId, Entity entity) =>
+      JsBurstContext.AddPendingEntity(entityId, entity);
+
+    internal static Entity GetPendingEntity(int entityId) =>
+      JsBurstContext.GetPendingEntity(entityId);
+
+    public static bool IsPendingEntity(int entityId) =>
+      JsBurstContext.IsPendingEntity(entityId);
+
+    // ── Registration ──
 
     public static void RegisterFunctions(JSContext ctx)
     {
@@ -444,157 +371,6 @@ namespace UnityJS.Entities.Core
       }
 
       QJS.JS_FreeValue(ctx, global);
-    }
-
-    static bool ValidateEntity(Entity entity, ref BurstBridgeContext ctx)
-    {
-      return ctx.isValid && entity != Entity.Null && entity.Index >= 0;
-    }
-
-    /// <summary>
-    /// Burst-compatible entity lookup from entity ID.
-    /// </summary>
-    public static Entity GetEntityFromIdBurst(int entityId)
-    {
-      ref var ctx = ref s_burstContext.Data;
-      if (!ctx.isValid || entityId <= 0)
-        return Entity.Null;
-
-      if (ctx.entityIdMap.TryGetValue(entityId, out var entity) && entity != Entity.Null)
-        return entity;
-
-      return GetPendingEntity(entityId);
-    }
-
-    internal static bool TryGetTransformBurst(Entity entity, out LocalTransform transform)
-    {
-      ref var ctx = ref s_burstContext.Data;
-      transform = default;
-
-      if (!ValidateEntity(entity, ref ctx))
-        return false;
-
-      if (!ctx.transformLookup.HasComponent(entity))
-        return false;
-
-      transform = ctx.transformLookup[entity];
-      return true;
-    }
-
-    internal static bool TrySetTransformBurst(Entity entity, LocalTransform transform)
-    {
-      ref var ctx = ref s_burstContext.Data;
-
-      if (!ValidateEntity(entity, ref ctx))
-        return false;
-
-      if (!ctx.transformLookup.HasComponent(entity))
-        return false;
-
-      ctx.transformLookup[entity] = transform;
-      return true;
-    }
-
-    internal static int AllocateEntityId()
-    {
-      return Interlocked.Increment(ref s_nextEntityId.Data);
-    }
-
-    internal static bool HasScriptBurst(Entity entity, FixedString64Bytes scriptName)
-    {
-      ref var ctx = ref s_burstContext.Data;
-      if (!ValidateEntity(entity, ref ctx))
-        return false;
-
-      if (!ctx.scriptBufferLookup.HasBuffer(entity))
-        return false;
-
-      var scripts = ctx.scriptBufferLookup[entity];
-      for (var i = 0; i < scripts.Length; i++)
-        if (scripts[i].scriptName == scriptName)
-          return true;
-
-      return false;
-    }
-
-    public static void SyncNextEntityId(int nextId)
-    {
-      var current = s_nextEntityId.Data;
-      while (current < nextId)
-      {
-        var prev = Interlocked.CompareExchange(ref s_nextEntityId.Data, nextId, current);
-        if (prev == current)
-          break;
-        current = prev;
-      }
-    }
-
-    public static void ClearEventContext()
-    {
-      ref var ctx = ref s_eventContext.Data;
-      if (!ctx.isValid)
-        return;
-
-      ctx.pendingEvents.Clear();
-      ctx.eventBuffer.Clear();
-      ctx.entitiesToClear.Clear();
-    }
-
-    public static void AddEventDispatch(
-      Entity entity,
-      int scriptIndex,
-      FixedString64Bytes scriptName,
-      int entityIndex,
-      int stateRef,
-      int eventStartIndex,
-      int eventCount
-    )
-    {
-      ref var ctx = ref s_eventContext.Data;
-      if (!ctx.isValid)
-        return;
-
-      ctx.pendingEvents.Add(
-        new PendingEventDispatch
-        {
-          entity = entity,
-          scriptIndex = scriptIndex,
-          scriptName = scriptName,
-          entityIndex = entityIndex,
-          stateRef = stateRef,
-          eventStartIndex = eventStartIndex,
-          eventCount = eventCount,
-        }
-      );
-    }
-
-    public static int AddEvent(JsEvent evt)
-    {
-      ref var ctx = ref s_eventContext.Data;
-      if (!ctx.isValid)
-        return -1;
-
-      var index = ctx.eventBuffer.Length;
-      ctx.eventBuffer.Add(evt);
-      return index;
-    }
-
-    public static void AddEntityToClear(Entity entity)
-    {
-      ref var ctx = ref s_eventContext.Data;
-      if (!ctx.isValid)
-        return;
-
-      ctx.entitiesToClear.Add(entity);
-    }
-
-    public static JsEvent GetEvent(int index)
-    {
-      ref var ctx = ref s_eventContext.Data;
-      if (!ctx.isValid || index < 0 || index >= ctx.eventBuffer.Length)
-        return default;
-
-      return ctx.eventBuffer[index];
     }
   }
 }

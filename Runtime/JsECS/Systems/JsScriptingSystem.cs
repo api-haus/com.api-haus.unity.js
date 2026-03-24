@@ -206,8 +206,8 @@ namespace UnityJS.Entities.Systems
 
     void CollectPendingEvents()
     {
-      JsECSBridge.ClearEventContext();
-      ref var ctx = ref JsECSBridge.EventContext;
+      JsEventContext.Clear();
+      ref var ctx = ref JsEventContext.Data;
       if (!ctx.isValid)
         return;
 
@@ -218,11 +218,11 @@ namespace UnityJS.Entities.Systems
         if (events.Length == 0)
           continue;
 
-        JsECSBridge.AddEntityToClear(entity);
+        JsEventContext.AddEntityToClear(entity);
 
         var eventStartIndex = ctx.eventBuffer.Length;
         for (var i = 0; i < events.Length; i++)
-          JsECSBridge.AddEvent(events[i]);
+          JsEventContext.AddEvent(events[i]);
         var eventCount = events.Length;
 
         var scripts = EntityManager.GetBuffer<JsScript>(entity);
@@ -230,7 +230,7 @@ namespace UnityJS.Entities.Systems
         {
           var script = scripts[i];
           if (script.stateRef >= 0 && !script.disabled)
-            JsECSBridge.AddEventDispatch(
+            JsEventContext.AddDispatch(
               entity,
               i,
               script.scriptName,
@@ -247,7 +247,7 @@ namespace UnityJS.Entities.Systems
 
     void ClearEventBuffers()
     {
-      ref var ctx = ref JsECSBridge.EventContext;
+      ref var ctx = ref JsEventContext.Data;
       if (!ctx.isValid)
         return;
 
@@ -257,7 +257,7 @@ namespace UnityJS.Entities.Systems
 
     void DispatchCollectedEvents()
     {
-      ref var ctx = ref JsECSBridge.EventContext;
+      ref var ctx = ref JsEventContext.Data;
       if (!ctx.isValid)
         return;
 
@@ -275,7 +275,7 @@ namespace UnityJS.Entities.Systems
 
         for (var j = 0; j < dispatch.eventCount; j++)
         {
-          var evt = JsECSBridge.GetEvent(dispatch.eventStartIndex + j);
+          var evt = JsEventContext.GetEvent(dispatch.eventStartIndex + j);
           var eventName = m_Vm.Intern(evt.eventName);
           var sourceId = JsEntityRegistry.GetEntityIdFromEntity(evt.source, EntityManager);
           var targetId = JsEntityRegistry.GetEntityIdFromEntity(evt.target, EntityManager);

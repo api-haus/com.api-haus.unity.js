@@ -131,7 +131,7 @@ namespace UnityJS.Editor
             if (runnerHandle != SystemHandle.Null)
             {
               ref var sysState = ref world.Unmanaged.ResolveSystemStateRef(runnerHandle);
-              JsSystemRunner.ReloadSystem(ref sysState, systemName);
+              JsSystemDiscovery.ReloadSystem(ref sysState, systemName);
             }
           }
         }

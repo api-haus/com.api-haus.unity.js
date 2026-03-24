@@ -51,8 +51,8 @@ namespace UnityJS.Entities.Systems.Support
       m_Vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
       m_Vm.RegisterBridgeNow(JsComponentStore.Register);
 
-      m_Vm.LoadScriptFromString("__ecs_query_builder", JsSystemRunner.QueryBuilderSourceForTests);
-      m_Vm.LoadScriptFromString("__ecs_component_glue", JsSystemRunner.ComponentGlueSourceForTests);
+      m_Vm.LoadScriptFromString("__ecs_query_builder", JsEcsGlueSource.QueryBuilder);
+      m_Vm.LoadScriptFromString("__ecs_component_glue", JsEcsGlueSource.ComponentGlue);
 
       m_LastVm = m_Vm;
     }
@@ -83,10 +83,10 @@ namespace UnityJS.Entities.Systems.Support
         m_Vm.RegisterBridgeNow(JsQueryBridge.Register);
         m_Vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
         m_Vm.RegisterBridgeNow(JsComponentStore.Register);
-        m_Vm.LoadScriptFromString("__ecs_query_builder", JsSystemRunner.QueryBuilderSourceForTests);
+        m_Vm.LoadScriptFromString("__ecs_query_builder", JsEcsGlueSource.QueryBuilder);
         m_Vm.LoadScriptFromString(
           "__ecs_component_glue",
-          JsSystemRunner.ComponentGlueSourceForTests
+          JsEcsGlueSource.ComponentGlue
         );
 
         InvalidateStaleScripts();

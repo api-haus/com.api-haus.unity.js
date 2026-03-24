@@ -138,7 +138,7 @@ namespace UnityJS.Integrations.Editor
           if (handle != Unity.Entities.SystemHandle.Null)
           {
             ref var sysState = ref world.Unmanaged.ResolveSystemStateRef(handle);
-            Entities.Systems.JsSystemRunner.ForceRediscovery(ref sysState);
+            Entities.Systems.JsSystemDiscovery.ForceRediscovery(ref sysState);
           }
         }
       }
@@ -156,7 +156,7 @@ namespace UnityJS.Integrations.Editor
           if (handle != Unity.Entities.SystemHandle.Null)
           {
             ref var sysState = ref world.Unmanaged.ResolveSystemStateRef(handle);
-            Entities.Systems.JsSystemRunner.ForceRediscovery(ref sysState);
+            Entities.Systems.JsSystemDiscovery.ForceRediscovery(ref sysState);
           }
         }
       }

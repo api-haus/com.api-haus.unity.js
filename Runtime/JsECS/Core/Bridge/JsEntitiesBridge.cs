@@ -67,7 +67,7 @@ namespace UnityJS.Entities.Core
         }
       }
 
-      ref var bctx = ref s_burstContext.Data;
+      ref var bctx = ref JsBurstContext.Context;
       if (!bctx.isValid)
       {
         SetNull(outU, outTag);
@@ -106,7 +106,7 @@ namespace UnityJS.Entities.Core
         return;
       }
 
-      ref var bctx = ref s_burstContext.Data;
+      ref var bctx = ref JsBurstContext.Context;
       if (!bctx.isValid)
       {
         SetBool(outU, outTag, ctx, false);
@@ -149,7 +149,7 @@ namespace UnityJS.Entities.Core
         return;
       }
 
-      ref var bctx = ref s_burstContext.Data;
+      ref var bctx = ref JsBurstContext.Context;
       if (!bctx.isValid)
       {
         SetBool(outU, outTag, ctx, false);
@@ -236,7 +236,7 @@ namespace UnityJS.Entities.Core
         return;
       }
 
-      ref var bctx = ref s_burstContext.Data;
+      ref var bctx = ref JsBurstContext.Context;
       if (!bctx.isValid)
       {
         SetBool(outU, outTag, ctx, false);
