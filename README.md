@@ -215,7 +215,7 @@ static float3 Cross(float3 a, float3 b) => math.cross(a, b);
 
 ## Hot Reload
 
-TypeScript files are compiled by `tsc` and watched for changes. Edits to `.ts` files are picked up automatically during play mode — no restart needed.
+TypeScript files are transpiled at runtime by Sucrase (bundled into QuickJS). Edits to `.ts` files are picked up automatically during play mode via hot reload — no restart needed. Works in both editor and shipped builds.
 
 Type stubs are auto-generated to `Assets/StreamingAssets/unity.js/types/unity.d.ts` on domain reload. Regenerate manually via **Tools > JS > Generate Type Stubs**.
 
@@ -227,7 +227,7 @@ Packages/unity.js/
     QuickJS/           # QuickJS P/Invoke bindings (UnityJS.QJS)
     JsRuntime/         # Script loading, modules, search paths (UnityJS.Runtime)
     JsECS/             # ECS bridge, components, tick systems (UnityJS.Entities)
-  Editor/              # Type stub generator, tsc compiler, hot reload (UnityJS.Editor)
+  Editor/              # Type stub generator, file watcher, status bar (UnityJS.Editor)
     Integrations/      # Integration detector + E2E test harness
   Integrations/        # Optional integration assemblies
     Physics/           # Unity.Physics tick systems + component bridges

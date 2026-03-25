@@ -203,7 +203,7 @@ Component that returns a version number. Test mutates the file and verifies new 
 
 | Test | Input | Output | Assertion |
 |------|-------|--------|-----------|
-| `Reload_UpdatesBehavior` | Mutate fixture → recompile | `_e2e_hot.version` | `== 2` (was 1) |
+| `Reload_UpdatesBehavior` | Mutate fixture → hot reload | `_e2e_hot.version` | `== 2` (was 1) |
 | `Reload_PreservesEntityId` | Reload script | `this.entity` | same eid before and after |
 | `Reload_NoExceptions` | Reload 3 times rapidly | `vm.CapturedExceptions` | empty |
 

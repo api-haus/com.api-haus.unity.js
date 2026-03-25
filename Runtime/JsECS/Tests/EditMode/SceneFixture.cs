@@ -59,19 +59,10 @@ namespace UnityJS.Entities.EditModeTests
 
     /// <summary>
     /// Get the absolute path to the package's Fixtures~ directory.
-    /// Returns the TscBuild output path (compiled JS) for runtime,
-    /// or the source path for TS file access (hot reload tests).
+    /// .ts fixtures are transpiled on-demand by JsTranspiler at load time.
     /// </summary>
     public static string GetPackageFixturesPath()
     {
-      // TscBuild output: Library/TscBuild/Packages/com.api-haus.unity.js/Fixtures~
-      // This is where compiled .js files live — the runtime loads these.
-      var tscBuild = Path.GetFullPath(Path.Combine(
-        "Library", "TscBuild", "Packages", PACKAGE_NAME, "Fixtures~"));
-      if (Directory.Exists(tscBuild))
-        return tscBuild;
-
-      // Fallback: source directory (works if TS files have been compiled in-place)
       var embedded = Path.GetFullPath(Path.Combine("Packages", PACKAGE_NAME, "Fixtures~"));
       if (Directory.Exists(embedded))
         return embedded;

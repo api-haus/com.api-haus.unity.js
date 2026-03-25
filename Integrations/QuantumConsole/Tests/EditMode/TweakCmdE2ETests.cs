@@ -115,7 +115,7 @@ namespace UnityJS.Integration.QuantumConsole.EditModeTests
       Assert.That(reject, Does.Contain("must be one of"), "3 should be rejected by [0,1] constraint");
 
       // Hot reload: mutate script to expand constraint to [0, 1, 2, 3]
-      var jsPath = GetCompiledFixturePath("e2e_param_reload");
+      var jsPath = GetFixturePath("e2e_param_reload");
       var original = File.ReadAllText(jsPath);
       try
       {
@@ -162,7 +162,7 @@ namespace UnityJS.Integration.QuantumConsole.EditModeTests
       Assert.IsTrue(PrefsStore.TryGet(in key, out _), "e2e.reload.keep must be registered");
 
       // Reload same script unchanged
-      var jsPath = GetCompiledFixturePath("e2e_param_reload");
+      var jsPath = GetFixturePath("e2e_param_reload");
       var source = File.ReadAllText(jsPath);
       var vm = JsRuntimeManager.Instance;
       vm.ReloadScript("script:e2e_param_reload", source, jsPath);
@@ -180,14 +180,10 @@ namespace UnityJS.Integration.QuantumConsole.EditModeTests
       yield return new ExitPlayMode();
     }
 
-    static string GetCompiledFixturePath(string name)
+    static string GetFixturePath(string name)
     {
-      var tscBuild = Path.Combine("Library", "TscBuild",
-        "Packages", "com.api-haus.unity.js", "Fixtures~", "scripts", name + ".js");
-      if (File.Exists(tscBuild))
-        return Path.GetFullPath(tscBuild);
       return Path.GetFullPath(Path.Combine(
-        SceneFixture.GetPackageFixturesSourcePath(), "scripts", name + ".js"));
+        SceneFixture.GetPackageFixturesSourcePath(), "scripts", name + ".ts"));
     }
   }
 }

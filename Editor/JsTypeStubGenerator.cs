@@ -94,7 +94,7 @@ namespace UnityJS.Editor
       File.WriteAllText(dst, srcContent);
     }
 
-    // ── tsconfig.json generation ──
+    // ── tsconfig.json generation (IDE intellisense only, not used for compilation) ──
 
     static void GenerateTsconfig()
     {
@@ -108,9 +108,7 @@ namespace UnityJS.Editor
       sb.AppendLine("    \"module\": \"ES2020\",");
       sb.AppendLine("    \"moduleResolution\": \"node\",");
       sb.AppendLine("    \"rootDir\": \".\",");
-      sb.AppendLine("    \"outDir\": \"Library/TscBuild\",");
-      sb.AppendLine("    \"declaration\": false,");
-      sb.AppendLine("    \"sourceMap\": false,");
+      sb.AppendLine("    \"noEmit\": true,");
       sb.AppendLine("    \"skipLibCheck\": true,");
       sb.AppendLine("    \"types\": [],");
       sb.AppendLine("    \"lib\": [\"ES2020\"]");
@@ -121,7 +119,6 @@ namespace UnityJS.Editor
 
       if (packageIncludePath != null)
       {
-        // Include fixture and test .ts files from the package
         var escaped = packageIncludePath.Replace("\\", "/");
         sb.AppendLine($"    ,\"{escaped}/Fixtures~/**/*.ts\"");
         sb.AppendLine($"    ,\"{escaped}/Integrations/**/Fixtures~/**/*.ts\"");

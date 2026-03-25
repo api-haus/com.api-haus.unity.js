@@ -1,5 +1,7 @@
 # unity.js Architectural Refactoring Plan
 
+> **Update (2026-03-25):** The tsc compilation pipeline (TscCompiler, TscFileWatcher, TscBuildPreprocessor, Library/TscBuild) has been replaced by runtime Sucrase transpilation. `.ts` files are transpiled on-demand inside QuickJS — no Node.js or tsc required. This eliminates TDZ issue #4 below (CleanOutDir race) entirely.
+
 ## Context
 
 ### The Problem

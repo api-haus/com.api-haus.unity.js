@@ -155,54 +155,6 @@ namespace UnityJS.Editor.Tests
       );
     }
 
-    // ── tsc --noEmit validation ─────────────────────────────────
-
-    [Test]
-    public void GenerateContent_PassesTscNoEmit()
-    {
-      var projectRoot = System.IO.Path.GetFullPath(".");
-      var tscPath = System.IO.Path.Combine(projectRoot, "node_modules/.bin/tsc");
-
-      if (!System.IO.File.Exists(tscPath))
-      {
-        Assert.Inconclusive("tsc not found at " + tscPath + " — run npm install");
-        return;
-      }
-
-      var tsconfigPath = System.IO.Path.Combine(projectRoot, "tsconfig.json");
-      if (!System.IO.File.Exists(tsconfigPath))
-      {
-        Assert.Inconclusive("tsconfig.json not found at project root — domain reload should generate it");
-        return;
-      }
-
-      // Ensure the stub is up-to-date in Library/
-      var typesDir = System.IO.Path.Combine(projectRoot, "Library/unity.js/types");
-      if (!System.IO.Directory.Exists(typesDir))
-        System.IO.Directory.CreateDirectory(typesDir);
-      var stubPath = System.IO.Path.Combine(typesDir, "unity.d.ts");
-      System.IO.File.WriteAllText(stubPath, m_Content);
-
-      var psi = new System.Diagnostics.ProcessStartInfo
-      {
-        FileName = tscPath,
-        Arguments = "--noEmit --project " + projectRoot,
-        WorkingDirectory = projectRoot,
-        RedirectStandardOutput = true,
-        RedirectStandardError = true,
-        UseShellExecute = false,
-        CreateNoWindow = true,
-      };
-
-      using var proc = System.Diagnostics.Process.Start(psi);
-      var stdout = proc.StandardOutput.ReadToEnd();
-      var stderr = proc.StandardError.ReadToEnd();
-      proc.WaitForExit(30000);
-
-      var output = (stdout + "\n" + stderr).Trim();
-      Assert.AreEqual(0, proc.ExitCode, "tsc --noEmit failed:\n" + output);
-    }
-
     // ── Helpers ──────────────────────────────────────────────────
 
     static Type FindType(string fullName)
