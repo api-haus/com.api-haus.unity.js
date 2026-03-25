@@ -192,7 +192,9 @@ namespace UnityJS.Integration.Spatial.EditModeTests
         }
       }
 
-      JsSpatialTriggerBridge.DiscardAll();
+      var vm = JsRuntimeManager.Instance;
+      if (vm != null && vm.IsValid)
+        JsSpatialTriggerBridge.DiscardAll(vm.Context);
 
       foreach (var e in m_Entities)
         if (m_Em.Exists(e))

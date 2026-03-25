@@ -4,6 +4,7 @@
 #include "quickjs.h"
 #endif
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -13,7 +14,7 @@
 #define SHIM_API __attribute__((visibility("default")))
 #endif
 
-#define MAX_CALLBACKS 256
+#define MAX_CALLBACKS 4096
 
 typedef void (*ManagedCallback)(
     void *ctx,
@@ -27,6 +28,15 @@ typedef void (*ManagedCallback)(
 
 static ManagedCallback s_callbacks[MAX_CALLBACKS];
 static int s_count = 0;
+
+/* ── Module loader callback types (declared early for qjs_shim_reset) ── */
+
+typedef int (*ManagedNormalize)(void *ctx, const char *base, const char *name,
+                                char *out_buf, int out_buf_len);
+typedef int (*ManagedReadFile)(const char *name, char *out_buf, int out_buf_len);
+
+static ManagedNormalize s_normalize_cb;
+static ManagedReadFile s_read_file_cb;
 
 /* ── Module deduplication ── */
 
@@ -43,9 +53,24 @@ static JSModuleDef *find_module(const char *name)
     return NULL;
 }
 
+static void untrack_module(const char *name)
+{
+    for (int i = 0; i < s_module_count; i++) {
+        if (strcmp(s_modules[i].name, name) == 0) {
+            free(s_modules[i].name);
+            s_modules[i] = s_modules[--s_module_count];
+            return;
+        }
+    }
+}
+
 static void track_module(const char *name, JSModuleDef *def)
 {
-    if (s_module_count >= MAX_MODULES) return;
+    if (s_module_count >= MAX_MODULES) {
+        fprintf(stderr, "[qjs_shim] module cache overflow (%d), cannot track: %s\n",
+                MAX_MODULES, name);
+        return;
+    }
     s_modules[s_module_count].name = strdup(name);
     s_modules[s_module_count].def = def;
     s_module_count++;
@@ -68,6 +93,7 @@ SHIM_API JSValue qjs_shim_new_function(JSContext *ctx, ManagedCallback cb,
                                        const char *name, int length)
 {
     if (s_count >= MAX_CALLBACKS) {
+        fprintf(stderr, "[qjs_shim] callback overflow (%d)\n", MAX_CALLBACKS);
         return JS_UNDEFINED;
     }
     int id = s_count++;
@@ -82,16 +108,11 @@ SHIM_API void qjs_shim_reset(void)
     for (int i = 0; i < s_module_count; i++)
         free(s_modules[i].name);
     s_module_count = 0;
+    s_normalize_cb = NULL;
+    s_read_file_cb = NULL;
 }
 
 /* ── Module loader trampolines ── */
-
-typedef int (*ManagedNormalize)(void *ctx, const char *base, const char *name,
-                                char *out_buf, int out_buf_len);
-typedef int (*ManagedReadFile)(const char *name, char *out_buf, int out_buf_len);
-
-static ManagedNormalize s_normalize_cb;
-static ManagedReadFile s_read_file_cb;
 
 static char *normalize_trampoline(JSContext *ctx, const char *base,
                                    const char *name, void *opaque)
@@ -202,13 +223,16 @@ SHIM_API JSValue qjs_shim_eval_module(JSContext *ctx,
     track_module(filename, m);
 
     if (JS_ResolveModule(ctx, compiled) < 0) {
+        untrack_module(filename);
         JS_FreeValue(ctx, compiled);
         return JS_ThrowInternalError(ctx, "module resolve failed");
     }
 
     JSValue eval_result = JS_EvalFunction(ctx, compiled);
-    if (JS_IsException(eval_result))
+    if (JS_IsException(eval_result)) {
+        untrack_module(filename);
         return eval_result;
+    }
     JS_FreeValue(ctx, eval_result);
 
     return JS_GetModuleNamespace(ctx, m);

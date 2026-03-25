@@ -96,11 +96,11 @@ namespace UnityJS.Runtime
 
     public JsRuntimeManager(string basePath = null)
     {
-      if (s_shimDirty)
-      {
-        QJSShim.qjs_shim_reset();
-        s_shimDirty = false;
-      }
+      // Always reset — domain reload destroys managed state without calling
+      // Dispose(), so s_shimDirty may be false while the native shim still
+      // holds stale JSModuleDef* pointers from a freed JSRuntime.
+      QJSShim.qjs_shim_reset();
+      s_shimDirty = false;
 
       m_Runtime = QJS.JS_NewRuntime();
       m_Context = QJS.JS_NewContext(m_Runtime);
@@ -413,8 +413,37 @@ namespace UnityJS.Runtime
 
     // ── Dispose ──
 
+    readonly List<Action<JSContext>> m_PreDisposeCallbacks = new();
+
+    /// <summary>
+    /// Register a callback invoked during Dispose while JSContext is still alive.
+    /// Use for freeing JSValues held in static caches outside the Runtime assembly.
+    /// </summary>
+    public void RegisterPreDisposeCallback(Action<JSContext> callback)
+    {
+      m_PreDisposeCallbacks.Add(callback);
+    }
+
+    /// <summary>
+    /// Disposal order (context must be alive for JSValue cleanup):
+    /// 1. Pre-dispose callbacks — free JSValues in integration caches
+    /// 2. BridgeState.Dispose() — clear query/component/system caches (no JSValues)
+    /// 3. States.DisposeAll() — free entity state JSValues
+    /// 4. Modules.DisposeAll() — free module namespace JSValues
+    /// 5. JsModuleLoader.Uninstall() — clear stale context ref
+    /// 6. ClearVectorPrototypes(ctx) — free prototype JSValues
+    /// 7. JS_FreeContext — release context
+    /// 8. JS_FreeRuntime — release runtime
+    /// </summary>
     public void Dispose()
     {
+      if (!m_Context.IsNull)
+      {
+        foreach (var cb in m_PreDisposeCallbacks)
+          cb(m_Context);
+      }
+      m_PreDisposeCallbacks.Clear();
+
       BridgeState?.Dispose();
 
       m_StringCache.Clear();
@@ -425,6 +454,7 @@ namespace UnityJS.Runtime
       Modules.DisposeAll();
 
       JsBuiltinModules.ClearCache();
+      JsModuleLoader.Uninstall();
 
       if (!m_Context.IsNull)
       {

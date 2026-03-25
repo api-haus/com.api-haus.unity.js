@@ -14,6 +14,7 @@ namespace UnityJS.Entities.Systems.Support
     JsRuntimeManager m_Vm;
     JsRuntimeManager m_LastVm;
     bool m_WasPlaying;
+    bool m_LoggedFulfillment;
     EntityQuery m_ScriptQuery;
     ComponentLookup<LocalTransform> m_TransformLookup;
     BufferLookup<JsScript> m_ScriptBufferLookup;
@@ -77,6 +78,7 @@ namespace UnityJS.Entities.Systems.Support
         JsScriptSearchPaths.Initialize();
         InitializeVm(m_Vm, World);
         m_LastVm = m_Vm;
+        m_LoggedFulfillment = false;
         InvalidateStaleScripts();
       }
       m_WasPlaying = isPlaying;
@@ -219,6 +221,32 @@ namespace UnityJS.Entities.Systems.Support
       entities.Dispose();
       ecb.Playback(EntityManager);
       JsEntityRegistry.CommitPendingCreations(EntityManager);
+
+      // Log fulfillment summary once after first batch of scripts is loaded
+      if (!m_LoggedFulfillment && m_Vm != null && m_Vm.IsValid)
+      {
+        var fulfilled = 0;
+        var total = 0;
+        var allEntities = m_ScriptQuery.ToEntityArray(Allocator.Temp);
+        foreach (var e in allEntities)
+        {
+          if (!EntityManager.Exists(e)) continue;
+          var buf = EntityManager.GetBuffer<JsScript>(e);
+          for (var s = 0; s < buf.Length; s++)
+          {
+            if (buf[s].disabled) continue;
+            total++;
+            if (buf[s].stateRef >= 0) fulfilled++;
+          }
+        }
+        allEntities.Dispose();
+
+        if (total > 0 && fulfilled == total)
+        {
+          UnityEngine.Debug.Log($"[JsComponentInit] All scripts fulfilled: {fulfilled}/{total}");
+          m_LoggedFulfillment = true;
+        }
+      }
     }
 
     void InvalidateStaleScripts()

@@ -218,5 +218,10 @@ namespace UnityJS.Runtime
       s_readFileDelegate = ReadFile;
       QJSShim.qjs_shim_set_module_loader(ctx, s_normalizeDelegate, s_readFileDelegate);
     }
+
+    public static void Uninstall()
+    {
+      s_ctx = default;
+    }
   }
 }

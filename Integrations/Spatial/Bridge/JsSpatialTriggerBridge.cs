@@ -61,6 +61,8 @@ namespace UnityJS.Integration.Spatial
         var fn = QJSShim.qjs_shim_new_function(ctx, s_triggerCallback, p, 3);
         QJS.JS_SetPropertyStr(ctx, ns, p, fn);
       }
+
+      JsRuntimeManager.Instance?.RegisterPreDisposeCallback(DiscardAll);
     }
 
     #region Helpers
@@ -349,8 +351,13 @@ namespace UnityJS.Integration.Spatial
       }
     }
 
-    public static void DiscardAll()
+    public static void DiscardAll(JSContext ctx)
     {
+      foreach (var pair in s_callbacks)
+      {
+        var cb = pair.Value;
+        FreeCallbacks(ctx, ref cb);
+      }
       s_callbacks.Clear();
       s_pendingRemove.Clear();
     }
