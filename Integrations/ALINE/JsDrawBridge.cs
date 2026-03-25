@@ -35,11 +35,7 @@ namespace UnityJS.Integration.ALINE
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    internal static void AutoRegister()
-    {
-      UnityJS.Entities.Core.JsFunctionRegistry.Register("draw", RegisterDrawFunctions);
-      JsRuntimeManager.RegisterDomainReloadHook(ResetSession, AutoRegister);
-    }
+    internal static void AutoRegister() => UnityJS.Entities.Core.JsFunctionRegistry.Register("draw", RegisterDrawFunctions);
 
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
     static unsafe void Draw_SetColor(

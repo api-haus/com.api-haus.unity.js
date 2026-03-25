@@ -26,11 +26,7 @@ namespace UnityJS.Integration.Spatial
     static readonly byte[] s_halfExtents = Encoding.UTF8.GetBytes("halfExtents\0");
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    internal static void AutoRegister()
-    {
-      JsFunctionRegistry.Register("spatial", RegisterSpatialFunctions);
-      Runtime.JsRuntimeManager.RegisterDomainReloadHook(null, AutoRegister);
-    }
+    internal static void AutoRegister() => JsFunctionRegistry.Register("spatial", RegisterSpatialFunctions);
 
     static unsafe void RegisterSpatialFunctions(JSContext ctx, JSValue ns)
     {

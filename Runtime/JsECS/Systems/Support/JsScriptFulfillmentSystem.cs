@@ -13,6 +13,7 @@ namespace UnityJS.Entities.Systems.Support
   {
     JsRuntimeManager m_Vm;
     JsRuntimeManager m_LastVm;
+    bool m_WasPlaying;
     EntityQuery m_ScriptQuery;
     ComponentLookup<LocalTransform> m_TransformLookup;
     BufferLookup<JsScript> m_ScriptBufferLookup;
@@ -30,44 +31,53 @@ namespace UnityJS.Entities.Systems.Support
       JsEntityRegistry.Dispose();
     }
 
+    internal static void InitializeVm(JsRuntimeManager vm, World world)
+    {
+      vm.BridgeState ??= new JsBridgeState();
+      JsECSBridge.Initialize(world);
+      vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
+      vm.RegisterBridgeNow(JsQueryBridge.Register);
+      vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
+      vm.RegisterBridgeNow(JsComponentStore.Register);
+      vm.LoadScriptFromString("__ecs_query_builder", JsEcsGlueSource.QueryBuilder);
+      vm.LoadScriptFromString("__ecs_component_glue", JsEcsGlueSource.ComponentGlue);
+    }
+
     protected override void OnStartRunning()
     {
-      // Always start with a fresh VM. A surviving VM from a previous world
-      // (or from before domain reload) has a stale QuickJS module cache —
-      // synthetic modules (unity.js/ecs, unity.js/components) bind globals
-      // at eval time, so cached namespaces reference dead bridge objects.
       var existing = JsRuntimeManager.Instance;
-      if (existing != null && existing.IsValid)
+      var hadExisting = existing != null && existing.IsValid;
+      if (hadExisting)
         existing.Dispose();
 
       m_Vm = JsRuntimeManager.GetOrCreate();
-
-      // Create bridge state if not yet set (first system to touch the VM)
-      m_Vm.BridgeState ??= new JsBridgeState();
-
       JsScriptSearchPaths.Initialize();
-
-      // Ensure ECS bridge is initialized before we prime ECB context.
-      // Without this, UpdateBurstContext silently fails because s_initialized
-      // is false until JsSystemRunner (SimulationSystemGroup) calls it — too late.
-      JsECSBridge.Initialize(World);
-
-      // Register ALL bridges before any script evaluation — module imports
-      // (unity.js/ecs, unity.js/components) bind globals at eval time.
-      m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
-      m_Vm.RegisterBridgeNow(JsQueryBridge.Register);
-      m_Vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
-      m_Vm.RegisterBridgeNow(JsComponentStore.Register);
-
-      m_Vm.LoadScriptFromString("__ecs_query_builder", JsEcsGlueSource.QueryBuilder);
-      m_Vm.LoadScriptFromString("__ecs_component_glue", JsEcsGlueSource.ComponentGlue);
-
+      InitializeVm(m_Vm, World);
       m_LastVm = m_Vm;
+
+      UnityEngine.Debug.Log(
+        $"[JsComponentInit] OnStartRunning — v{JsRuntimeManager.InstanceVersion} " +
+        $"(disposedStale={hadExisting})");
     }
 
     protected override void OnUpdate()
     {
       JsEntityRegistry.BeginFrame(EntityManager);
+
+      // Detect edit → play transition: the VM's QuickJS module cache has
+      // stale synthetic module namespaces from edit mode. Dispose and
+      // recreate so play mode starts with a clean context.
+      var isPlaying = UnityEngine.Application.isPlaying;
+      if (isPlaying && !m_WasPlaying)
+      {
+        m_Vm?.Dispose();
+        m_Vm = JsRuntimeManager.GetOrCreate();
+        JsScriptSearchPaths.Initialize();
+        InitializeVm(m_Vm, World);
+        m_LastVm = m_Vm;
+        InvalidateStaleScripts();
+      }
+      m_WasPlaying = isPlaying;
 
       if (m_Vm == null || !m_Vm.IsValid)
       {
@@ -77,26 +87,10 @@ namespace UnityJS.Entities.Systems.Support
           return;
       }
 
-      // VM changed (domain reload destroyed the old one).
-      // Re-register bridges + glue on the new VM — OnStartRunning only ran
-      // on the old one. Scripts must import the glue-wrapped ecs.get (with
-      // auto-flush) not the raw bridge function.
       if (m_Vm != m_LastVm)
       {
         m_LastVm = m_Vm;
-
-        m_Vm.BridgeState ??= new JsBridgeState();
-        JsECSBridge.Initialize(World);
-        m_Vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
-        m_Vm.RegisterBridgeNow(JsQueryBridge.Register);
-        m_Vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
-        m_Vm.RegisterBridgeNow(JsComponentStore.Register);
-        m_Vm.LoadScriptFromString("__ecs_query_builder", JsEcsGlueSource.QueryBuilder);
-        m_Vm.LoadScriptFromString(
-          "__ecs_component_glue",
-          JsEcsGlueSource.ComponentGlue
-        );
-
+        InitializeVm(m_Vm, World);
         InvalidateStaleScripts();
       }
 

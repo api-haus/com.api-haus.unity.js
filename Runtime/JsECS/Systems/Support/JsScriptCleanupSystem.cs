@@ -14,7 +14,9 @@ namespace UnityJS.Entities.Systems.Support
 
     protected override void OnStartRunning()
     {
-      m_Vm = JsRuntimeManager.Instance ?? JsRuntimeManager.GetOrCreate();
+      m_Vm = JsRuntimeManager.Instance;
+      if (m_Vm == null || !m_Vm.IsValid)
+        return;
     }
 
     protected override void OnUpdate()

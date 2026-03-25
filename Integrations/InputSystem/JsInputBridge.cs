@@ -26,11 +26,7 @@ namespace UnityJS.Integration.InputSystem
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    internal static void AutoRegister()
-    {
-      UnityJS.Entities.Core.JsFunctionRegistry.Register("input", RegisterInputFunctions);
-      JsRuntimeManager.RegisterDomainReloadHook(ResetSession, AutoRegister);
-    }
+    internal static void AutoRegister() => UnityJS.Entities.Core.JsFunctionRegistry.Register("input", RegisterInputFunctions);
 
     public static void InitializeInputSystem(InputActionAsset inputActionAsset)
     {

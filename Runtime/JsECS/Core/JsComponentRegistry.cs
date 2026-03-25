@@ -33,22 +33,6 @@ namespace UnityJS.Entities.Core
       JsBuiltinModules.GlobalNamesProvider = GetGlobalNames;
     }
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void RegisterDomainReloadHooks()
-    {
-      Runtime.JsRuntimeManager.RegisterDomainReloadHook(
-        ResetEcsCore,
-        Generated.JsDomainReloadSimulator.ReRegisterAll);
-    }
-
-    /// <summary>Resets all ECS core statics — called by SimulateDomainReload.</summary>
-    static void ResetEcsCore()
-    {
-      ResetSession();
-      JsFunctionRegistry.ResetSession();
-      JsECSBridge.ResetSession();
-    }
-
     public static void Register(string jsName, ComponentType componentType)
     {
       s_components[jsName] = componentType;

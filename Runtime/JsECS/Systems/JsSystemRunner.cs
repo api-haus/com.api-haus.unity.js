@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("UnityJS.Entities.PlayModeTests")]
-[assembly: InternalsVisibleTo("UnityJS.Entities.EditModeTests")]
 [assembly: InternalsVisibleTo("Project.Tests.PlayMode")]
 
 namespace UnityJS.Entities.Systems
@@ -138,22 +137,12 @@ namespace UnityJS.Entities.Systems
       data.BridgesRegistered = false;
       data.LastVmVersion = currentVersion;
 
-      vm.BridgeState ??= new JsBridgeState();
-
       if (!vm.HasScript("__ecs_component_glue"))
-      {
-        vm.RegisterBridgeNow(JsECSBridge.RegisterFunctions);
-        vm.RegisterBridgeNow(JsQueryBridge.Register);
-        vm.RegisterBridgeNow(JsComponentRegistry.RegisterAllBridges);
-        vm.RegisterBridgeNow(JsComponentStore.Register);
-        vm.LoadScriptFromString("__ecs_query_builder", JsEcsGlueSource.QueryBuilder);
-        vm.LoadScriptFromString("__ecs_component_glue", JsEcsGlueSource.ComponentGlue);
-      }
+        Support.JsComponentInitSystem.InitializeVm(vm, state.World);
 
       vm.RegisterBridgeNow(JsSystemBridge.Register);
       data.BridgesRegistered = true;
 
-      JsECSBridge.Initialize(state.World);
       JsEntityRegistry.Initialize();
       JsQueryBridge.Initialize(state.EntityManager);
 

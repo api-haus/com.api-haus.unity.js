@@ -59,8 +59,9 @@ namespace UnityJS.Entities.Systems
 
     protected override void OnStartRunning()
     {
-      if (m_Vm == null)
-        m_Vm = JsRuntimeManager.GetOrCreate();
+      m_Vm = JsRuntimeManager.Instance;
+      if (m_Vm == null || !m_Vm.IsValid)
+        return;
 
       EntityManager.CreateSingleton<JsScriptingSystemSingleton>();
     }

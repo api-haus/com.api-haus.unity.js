@@ -28,48 +28,6 @@ namespace UnityJS.Runtime
         s_Instance = vm;
     }
 
-    // ── Domain reload simulation ──
-
-    static readonly List<Action> s_domainResetHooks = new();
-    static readonly List<Action> s_domainRegisterHooks = new();
-
-    /// <summary>
-    /// Integration bridges call this from their [AfterAssembliesLoaded] AutoRegister
-    /// so SimulateDomainReload can replay them without conditional compilation.
-    /// </summary>
-    public static void RegisterDomainReloadHook(Action reset, Action register)
-    {
-      if (reset != null) s_domainResetHooks.Add(reset);
-      if (register != null) s_domainRegisterHooks.Add(register);
-    }
-
-    /// <summary>
-    /// Simulates a full Unity domain reload for testing.
-    /// Disposes the VM, calls all registered reset hooks (SubsystemRegistration),
-    /// then calls all registered register hooks (AfterAssembliesLoaded).
-    /// Every assembly registers its own hooks via RegisterDomainReloadHook.
-    /// </summary>
-    public static void SimulateDomainReload()
-    {
-      // Snapshot hooks before clearing (they'll be re-added by register callbacks)
-      var resets = new List<Action>(s_domainResetHooks);
-      var registers = new List<Action>(s_domainRegisterHooks);
-      s_domainResetHooks.Clear();
-      s_domainRegisterHooks.Clear();
-
-      // Phase 1: Dispose VM (clears module cache, bridge state, string caches)
-      s_Instance?.Dispose();
-
-      // Phase 2: SubsystemRegistration — clear all static registries
-      JsScriptSourceRegistry.ResetSession();
-      JsScriptSearchPaths.ResetSession();
-      JsBuiltinModules.ClearCache();
-      foreach (var reset in resets) reset();
-
-      // Phase 3: AfterAssembliesLoaded — re-populate registrations
-      foreach (var register in registers) register();
-    }
-
     JSRuntime m_Runtime;
     JSContext m_Context;
 

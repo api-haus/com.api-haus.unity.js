@@ -38,11 +38,7 @@ namespace UnityJS.Integration.QuantumConsole
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    internal static void AutoRegister()
-    {
-      UnityJS.Entities.Core.JsFunctionRegistry.Register("__global", RegisterGlobals);
-      JsRuntimeManager.RegisterDomainReloadHook(ResetSession, AutoRegister);
-    }
+    internal static void AutoRegister() => UnityJS.Entities.Core.JsFunctionRegistry.Register("__global", RegisterGlobals);
 
     static unsafe void RegisterGlobals(JSContext ctx, JSValue ns)
     {
