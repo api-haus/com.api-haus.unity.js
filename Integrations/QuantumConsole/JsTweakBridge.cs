@@ -26,9 +26,16 @@ namespace UnityJS.Integration.QuantumConsole
     }
 
     static readonly Dictionary<string, TweakConstraint> s_tweaks = new();
+    static readonly Dictionary<string, CommandData> s_registeredCommands = new();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetSession() => s_tweaks.Clear();
+    static void ResetSession()
+    {
+      foreach (var cmd in s_registeredCommands.Values)
+        QuantumConsoleProcessor.TryRemoveCommand(cmd);
+      s_registeredCommands.Clear();
+      s_tweaks.Clear();
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
     static void AutoRegister() =>
@@ -218,7 +225,8 @@ namespace UnityJS.Integration.QuantumConsole
         default: return;
       }
 
-      QuantumConsoleProcessor.TryAddCommand(cmd);
+      if (QuantumConsoleProcessor.TryAddCommand(cmd))
+        s_registeredCommands[name] = cmd;
     }
 
     static string HandleNumberTweak(string name, double val)

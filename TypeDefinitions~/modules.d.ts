@@ -164,6 +164,10 @@ declare module 'unity.js/draw' {
   export function label2d(position: float3, text: string): void;
 }
 
+declare module 'unity.js/lattice' {
+  export function sample(slimeEid: entity, worldPos: float3): float3 | undefined;
+}
+
 declare module 'unity.js/spatial' {
   export function add(eid: entity, tag: string, shape: SpatialShapeObj): boolean;
   export function get(eid: entity): SpatialShapeObj | undefined;

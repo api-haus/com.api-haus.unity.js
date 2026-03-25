@@ -195,6 +195,12 @@ export const random = s.random.bind(s);
 export const randomInt = s.randomInt.bind(s);
 ";
 
+        case "unity.js/lattice":
+          return @"
+const l = globalThis.lattice;
+export const sample = l.sample.bind(l);
+";
+
         default:
           return null;
       }
