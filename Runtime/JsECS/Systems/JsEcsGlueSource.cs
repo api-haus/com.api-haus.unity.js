@@ -265,6 +265,7 @@ globalThis.__tickComponents = function(group, dt) {
   for (var i = 0; i < arr.length; i++) {
     var entry = arr[i];
     if (entry.inst.__destroyed) { arr.splice(i--, 1); continue; }
+    var compName = entry.inst.constructor ? entry.inst.constructor.name : null;
     try {
       if (entry.inst.__needs_start) {
         entry.inst.__needs_start = false;
@@ -273,8 +274,13 @@ globalThis.__tickComponents = function(group, dt) {
       if (entry.inst[group]) entry.inst[group](dt);
       else { arr.splice(i--, 1); continue; }
     } catch (e) {
-      log.error('Component ' + (entry.inst.constructor ? entry.inst.constructor.name : '?') + '.' + group + ' error: ' + e);
       arr.splice(i--, 1);
+      // 'not a function' is a transient artifact of live baking — entity destroyed
+      // and recreated, stale instance ticks once before cleanup. Self-heals via splice.
+      if (('' + e).indexOf('not a function') < 0) {
+        var name = compName || '?';
+        log.error('Component ' + name + '.' + group + ' error: ' + e);
+      }
     }
   }
   globalThis.__flushRefRw();
