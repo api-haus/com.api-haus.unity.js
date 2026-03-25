@@ -19,6 +19,8 @@ namespace UnityJS.Editor
     static double s_LastPanelCheck;
     static int s_LastErrorCount;
     static int s_LastSuccessCount;
+    static bool s_LastInitialized;
+    static Texture2D s_TsIcon;
 
     static TsStatusBarIndicator()
     {
@@ -113,10 +115,12 @@ namespace UnityJS.Editor
 
         var errCount = JsTranspiler.ErrorCount;
         var succCount = JsTranspiler.SuccessCount;
-        if (errCount != s_LastErrorCount || succCount != s_LastSuccessCount)
+        var initialized = JsTranspiler.IsInitialized;
+        if (errCount != s_LastErrorCount || succCount != s_LastSuccessCount || initialized != s_LastInitialized)
         {
           s_LastErrorCount = errCount;
           s_LastSuccessCount = succCount;
+          s_LastInitialized = initialized;
           UpdateIcon();
         }
       }
@@ -129,26 +133,38 @@ namespace UnityJS.Editor
       }
     }
 
+    static Texture2D GetTsIcon()
+    {
+      if (s_TsIcon == null)
+        s_TsIcon = Resources.Load<Texture2D>("ts-icon");
+      return s_TsIcon;
+    }
+
     static void UpdateIcon()
     {
       if (s_Icon == null)
         return;
 
+      var tsIcon = GetTsIcon();
+
       if (!JsTranspiler.IsInitialized)
       {
-        s_Icon.image = EditorGUIUtility.IconContent("console.warnicon.sml")?.image;
-        s_Container.tooltip = "Sucrase transpiler not initialized";
+        s_Icon.image = tsIcon;
+        s_Icon.tintColor = new Color(1f, 1f, 1f, 0.4f);
+        s_Container.tooltip = "TS idle — transpiler loads on play";
         return;
       }
 
       if (JsTranspiler.ErrorCount > 0)
       {
         s_Icon.image = EditorGUIUtility.IconContent("console.erroricon.sml")?.image;
+        s_Icon.tintColor = Color.white;
         s_Container.tooltip = $"TS transpilation: {JsTranspiler.ErrorCount} error(s)\n{JsTranspiler.LastError}\nClick to open Console";
         return;
       }
 
-      s_Icon.image = EditorGUIUtility.IconContent("TestPassed")?.image;
+      s_Icon.image = tsIcon;
+      s_Icon.tintColor = Color.white;
       s_Container.tooltip = $"TS transpiler ready ({JsTranspiler.SuccessCount} transpiled)";
     }
 
