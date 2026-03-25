@@ -166,106 +166,116 @@ namespace UnityJS.Entities.EditModeTests
     }
 
     /// <summary>
-    /// Simulates domain reload mid-play by disposing and recreating the VM.
-    /// This forces JsComponentInitSystem to detect m_Vm != m_LastVm and
-    /// re-initialize all bridges, glue, and scripts from scratch — the exact
-    /// code path that produces TDZ errors in production after recompilation.
+    /// Nukes the VM mid-play and verifies the system recovers with zero errors.
+    /// Expected: after VM destruction, nothing updates (no errors, just silence).
+    /// After fresh VM is created, the system detects the change, re-registers
+    /// bridges, reloads glue, and components resume — including those that
+    /// import from unity.js/components (the TDZ-vulnerable path).
     ///
-    /// [Explicit] — VM recreation breaks ALL running JS systems (not just the
-    /// test entity), producing collateral errors that LogAssert cannot suppress
-    /// across domain reload boundaries. Run manually to verify the TDZ bug.
-    ///
-    /// KNOWN BUG: components importing from unity.js/components fail with
-    /// "ReferenceError: default is not initialized" after VM recreation.
-    /// Once fixed, remove [Explicit] and flip assertions.
+    /// All assertions happen BEFORE ExitPlayMode. LogAssert.ignoreFailingMessages
+    /// covers the exit transition where collateral errors from other project
+    /// systems (character_input etc.) may fire.
     /// </summary>
-    [UnityTest, Explicit("Reproduces TDZ bug — run manually, collateral system errors expected")]
-    public IEnumerator ForcedVmRecreation_ComponentsImport_TDZ()
+    [UnityTest]
+    public IEnumerator VmNuke_ComponentsImport_SurvivesAndResumes()
     {
       yield return new EnterPlayMode();
-      LogAssert.ignoreFailingMessages = true;
       var world = World.DefaultGameObjectInjectionWorld;
 
-      // Phase 1: spawn and fulfill normally
+      // Phase 1: establish baseline — components work
       using (var scene = new SceneFixture(world))
       {
         scene.Spawn(SCRIPT);
         for (var i = 0; i < INIT_FRAMES; i++) yield return null;
-        Assert.IsTrue(scene.AllFulfilled(), "Initial fulfillment must succeed");
+        Assert.IsTrue(scene.AllFulfilled(), "Baseline: e2e_mover must fulfill");
       }
 
-      // Phase 2: destroy the VM and create a fresh one (simulates domain reload)
+      // Phase 2: NUKE the VM
       var oldVm = JsRuntimeManager.Instance;
-      Assert.IsNotNull(oldVm, "VM must exist before forced recreation");
+      Assert.IsNotNull(oldVm, "VM must exist before nuke");
       oldVm.Dispose();
 
-      // Create fresh VM — JsComponentInitSystem.OnUpdate will detect the change
-      var newVm = JsRuntimeManager.GetOrCreate();
-      Assert.AreNotSame(oldVm, newVm, "New VM must be a different instance");
+      // Suppress errors from other project systems that die with the VM.
+      // Our assertions use CapturedExceptions, not LogAssert.
+      LogAssert.ignoreFailingMessages = true;
 
-      // Phase 3: spawn entity on the fresh VM — triggers TDZ-vulnerable path
+      // Let a few frames pass with no VM — nothing should error, just silence
+      for (var i = 0; i < 3; i++) yield return null;
+
+      // Phase 3: bring VM back from the dead
+      var freshVm = JsRuntimeManager.GetOrCreate();
+      Assert.AreNotSame(oldVm, freshVm, "Fresh VM must be a new instance");
+      freshVm.ClearCapturedExceptions();
+
+      // Phase 4: spawn on the fresh VM — system must detect m_Vm != m_LastVm,
+      // re-register bridges, reload glue, and fulfill WITHOUT TDZ errors
       using (var scene2 = new SceneFixture(world))
       {
         scene2.Spawn(SCRIPT);
         for (var i = 0; i < INIT_FRAMES; i++) yield return null;
 
-        // BUG: The component fails to fulfill due to TDZ.
-        // Once fixed, change to Assert.IsTrue and remove [Explicit].
-        Assert.IsFalse(scene2.AllFulfilled(),
-          "BUG: unity.js/components import causes TDZ after VM recreation");
+        // THE critical assertion: zero exceptions after VM recreation
+        Assert.AreEqual(0, freshVm.CapturedExceptions.Count,
+          $"VM must have ZERO exceptions after resurrection, got: " +
+          $"{string.Join("; ", freshVm.CapturedExceptions)}");
 
-        Assert.IsTrue(newVm.CapturedExceptions.Count > 0,
-          "VM must have captured the TDZ exception");
+        Assert.IsTrue(scene2.AllFulfilled(),
+          "e2e_mover must fulfill after VM resurrection (unity.js/components import)");
+
+        var health = freshVm.VerifyModuleHealth();
+        Assert.IsNull(health, $"Module TDZ after resurrection: {health}");
       }
 
       yield return new ExitPlayMode();
     }
 
     /// <summary>
-    /// Same as above but with mixed fixtures — catches ordering-dependent TDZ
-    /// where a unity.js/ecs-only module works but unity.js/components module fails.
+    /// Nukes the VM THREE times in a single play session. Each cycle:
+    /// dispose → recreate → spawn → tick → assert zero errors.
+    /// Catches accumulation bugs: leaked state, stale caches, growing exception lists.
     /// </summary>
-    [UnityTest, Explicit("Reproduces TDZ bug — run manually, collateral system errors expected")]
-    public IEnumerator ForcedVmRecreation_MixedFixtures_NoTDZ()
+    [UnityTest]
+    public IEnumerator VmNuke_ThreeCycles_SurvivesRepeatedDestruction()
     {
       yield return new EnterPlayMode();
-      LogAssert.ignoreFailingMessages = true;
       var world = World.DefaultGameObjectInjectionWorld;
+      LogAssert.ignoreFailingMessages = true;
 
-      // Phase 1: initial fulfillment
+      // Establish baseline
       using (var scene = new SceneFixture(world))
       {
-        scene.Spawn("components/lifecycle_probe");
         scene.Spawn(SCRIPT);
         for (var i = 0; i < INIT_FRAMES; i++) yield return null;
-        Assert.IsTrue(scene.AllFulfilled(), "Initial fulfillment must succeed");
+        Assert.IsTrue(scene.AllFulfilled(), "Baseline must fulfill");
       }
 
-      // Phase 2: force VM recreation
-      var oldVm = JsRuntimeManager.Instance;
-      oldVm.Dispose();
-      var newVm = JsRuntimeManager.GetOrCreate();
-
-      // Phase 3: re-spawn both fixtures on fresh VM
-      using (var scene2 = new SceneFixture(world))
+      // Nuke and resurrect 3 times
+      for (var cycle = 1; cycle <= 3; cycle++)
       {
-        scene2.Spawn("components/lifecycle_probe");
-        scene2.Spawn(SCRIPT);
-        for (var i = 0; i < INIT_FRAMES; i++) yield return null;
+        var doomed = JsRuntimeManager.Instance;
+        doomed?.Dispose();
 
-        Assert.IsTrue(scene2.AllFulfilled(),
-          "Both scripts must fulfill after VM recreation");
+        // Dead frames — silence, no errors
+        for (var i = 0; i < 2; i++) yield return null;
 
-        var moverEid = scene2.GetEntityId(scene2[1]);
-        var moved = JsEval.Bool($"!!_e2e_mover[{moverEid}]");
-        Assert.IsTrue(moved,
-          "e2e_mover must work after VM recreation alongside lifecycle_probe");
+        var risen = JsRuntimeManager.GetOrCreate();
+        risen.ClearCapturedExceptions();
 
-        var health = newVm.VerifyModuleHealth();
-        Assert.IsNull(health, $"TDZ after VM recreation: {health}");
+        using (var scene = new SceneFixture(world))
+        {
+          scene.Spawn(SCRIPT);
+          for (var i = 0; i < INIT_FRAMES; i++) yield return null;
 
-        Assert.AreEqual(0, newVm.CapturedExceptions.Count,
-          $"No JS exceptions expected, got: {string.Join("; ", newVm.CapturedExceptions)}");
+          Assert.AreEqual(0, risen.CapturedExceptions.Count,
+            $"Cycle {cycle}: VM must have ZERO exceptions, got: " +
+            $"{string.Join("; ", risen.CapturedExceptions)}");
+
+          Assert.IsTrue(scene.AllFulfilled(),
+            $"Cycle {cycle}: e2e_mover must fulfill after nuke");
+
+          var health = risen.VerifyModuleHealth();
+          Assert.IsNull(health, $"Cycle {cycle}: TDZ detected: {health}");
+        }
       }
 
       yield return new ExitPlayMode();

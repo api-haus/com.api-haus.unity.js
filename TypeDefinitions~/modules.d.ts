@@ -43,6 +43,10 @@ declare module 'unity.js/ecs' {
 
   export class Component {
     entity: entity;
+    /** Components that must run before this one within the same tick group. */
+    static runsAfter?: (typeof Component)[];
+    /** Components that must run after this one within the same tick group. */
+    static runsBefore?: (typeof Component)[];
     start?(): void;
     update?(dt?: number): void;
     fixedUpdate?(dt?: number): void;

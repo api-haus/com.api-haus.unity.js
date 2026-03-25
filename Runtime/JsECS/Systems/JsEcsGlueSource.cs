@@ -180,6 +180,8 @@ Component.get = function(eid) {
   var s = __js_comp[this.name]; return s ? s[eid] : undefined;
 };
 Component.set = function() {};
+Component.runsAfter = null;
+Component.runsBefore = null;
 Component.prototype.start = null;
 Component.prototype.update = null;
 Component.prototype.fixedUpdate = null;
@@ -189,13 +191,62 @@ globalThis.ecs.Component = Component;
 
 // Auto-tick registry
 var __comp_ticks = { update: [], fixedUpdate: [], lateUpdate: [] };
+var __sortDirty = { update: false, fixedUpdate: false, lateUpdate: false };
+
+function __topoSortTickArray(arr) {
+  if (arr.length <= 1) return;
+  var names = [];
+  var nameSet = {};
+  for (var i = 0; i < arr.length; i++) {
+    var n = arr[i].inst.constructor.name;
+    if (!nameSet[n]) { nameSet[n] = true; names.push(n); }
+  }
+  if (names.length <= 1) return;
+  var adj = {};
+  var inDeg = {};
+  for (var i = 0; i < names.length; i++) { adj[names[i]] = []; inDeg[names[i]] = 0; }
+  for (var i = 0; i < arr.length; i++) {
+    var ctor = arr[i].inst.constructor;
+    var cn = ctor.name;
+    var after = ctor.runsAfter;
+    if (after) {
+      for (var j = 0; j < after.length; j++) {
+        var dep = after[j].name;
+        if (nameSet[dep] && adj[dep].indexOf(cn) === -1) { adj[dep].push(cn); inDeg[cn]++; }
+      }
+    }
+    var before = ctor.runsBefore;
+    if (before) {
+      for (var j = 0; j < before.length; j++) {
+        var tgt = before[j].name;
+        if (nameSet[tgt] && adj[cn].indexOf(tgt) === -1) { adj[cn].push(tgt); inDeg[tgt]++; }
+      }
+    }
+  }
+  var queue = [];
+  for (var i = 0; i < names.length; i++) { if (inDeg[names[i]] === 0) queue.push(names[i]); }
+  var sorted = [];
+  while (queue.length > 0) {
+    var cur = queue.shift();
+    sorted.push(cur);
+    var edges = adj[cur];
+    for (var j = 0; j < edges.length; j++) { if (--inDeg[edges[j]] === 0) queue.push(edges[j]); }
+  }
+  if (sorted.length !== names.length) {
+    log.error('Cycle detected in component execution ordering');
+    return;
+  }
+  var rank = {};
+  for (var i = 0; i < sorted.length; i++) rank[sorted[i]] = i;
+  arr.sort(function(a, b) { return rank[a.inst.constructor.name] - rank[b.inst.constructor.name]; });
+}
 
 function __registerComponentTick(eid, instance) {
   var hasTick = false;
-  if (instance.update) { __comp_ticks.update.push({eid: eid, inst: instance}); hasTick = true; }
-  if (instance.fixedUpdate) { __comp_ticks.fixedUpdate.push({eid: eid, inst: instance}); hasTick = true; }
-  if (instance.lateUpdate) { __comp_ticks.lateUpdate.push({eid: eid, inst: instance}); hasTick = true; }
-  if (!hasTick && instance.__needs_start) __comp_ticks.update.push({eid: eid, inst: instance});
+  if (instance.update) { __comp_ticks.update.push({eid: eid, inst: instance}); __sortDirty.update = true; hasTick = true; }
+  if (instance.fixedUpdate) { __comp_ticks.fixedUpdate.push({eid: eid, inst: instance}); __sortDirty.fixedUpdate = true; hasTick = true; }
+  if (instance.lateUpdate) { __comp_ticks.lateUpdate.push({eid: eid, inst: instance}); __sortDirty.lateUpdate = true; hasTick = true; }
+  if (!hasTick && instance.__needs_start) { __comp_ticks.update.push({eid: eid, inst: instance}); __sortDirty.update = true; }
 }
 
 function __unregisterComponentTick(eid) {
@@ -210,6 +261,7 @@ function __unregisterComponentTick(eid) {
 globalThis.__tickComponents = function(group, dt) {
   var arr = __comp_ticks[group];
   if (!arr) return;
+  if (__sortDirty[group]) { __sortDirty[group] = false; __topoSortTickArray(arr); }
   for (var i = 0; i < arr.length; i++) {
     var entry = arr[i];
     if (entry.inst.__destroyed) { arr.splice(i--, 1); continue; }
