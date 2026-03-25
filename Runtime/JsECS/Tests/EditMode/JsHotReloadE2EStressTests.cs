@@ -35,7 +35,7 @@ namespace UnityJS.Entities.EditModeTests
       { "systems/test_system.ts", @"(\+\s*)\d+" },
     };
 
-    const string SyntaxErrorMarker = "{{{SYNTAX_ERROR}}}";
+    const string SyntaxErrorMarker = "{{{SYNTAX_ERROR";
 
     Dictionary<string, string> m_OriginalContents;
     Dictionary<string, bool> m_HasSyntaxError;
@@ -235,6 +235,18 @@ namespace UnityJS.Entities.EditModeTests
       }
     }
 
+    // ── Helpers ──
+
+    void PreloadScripts(JsRuntimeManager vm)
+    {
+      foreach (var file in MutableFiles)
+      {
+        var scriptName = file.EndsWith(".ts") ? file[..^3] : file;
+        if (!vm.HasScript(scriptName))
+          vm.LoadScript(scriptName);
+      }
+    }
+
     // ── Tests ──
 
     [UnityTest]
@@ -246,9 +258,11 @@ namespace UnityJS.Entities.EditModeTests
       var vm = JsRuntimeManager.Instance;
       Assert.IsNotNull(vm, "VM must exist in play mode");
       vm.ClearCapturedExceptions();
+      PreloadScripts(vm);
 
       var initialSuccessCount = JsTranspiler.SuccessCount;
 
+      LogAssert.ignoreFailingMessages = true;
       StartMutatorThread(seed: 42);
 
       for (var cycle = 0; cycle < 15; cycle++)
@@ -271,6 +285,8 @@ namespace UnityJS.Entities.EditModeTests
           );
         }
       }
+
+      LogAssert.ignoreFailingMessages = false;
 
       Assert.Greater(JsTranspiler.SuccessCount, initialSuccessCount,
         "At least some transpilations should have succeeded");
@@ -331,6 +347,10 @@ namespace UnityJS.Entities.EditModeTests
       var vm = JsRuntimeManager.Instance;
       Assert.IsNotNull(vm);
       vm.ClearCapturedExceptions();
+      PreloadScripts(vm);
+
+      // Transpile errors are expected — suppress so test runner doesn't fail on them
+      LogAssert.ignoreFailingMessages = true;
 
       // Background thread does comment-only mutations for pressure
       StartMutatorThread(seed: 99, commentOnly: true);
@@ -363,6 +383,8 @@ namespace UnityJS.Entities.EditModeTests
         var health = vm.VerifyModuleHealth();
         Assert.IsNull(health, $"Cycle {cycle}: TDZ after recovery: {health}");
       }
+
+      LogAssert.ignoreFailingMessages = false;
     }
 
     [UnityTest]
@@ -374,6 +396,7 @@ namespace UnityJS.Entities.EditModeTests
       var vm = JsRuntimeManager.Instance;
       Assert.IsNotNull(vm);
       vm.ClearCapturedExceptions();
+      PreloadScripts(vm);
 
       var initialSuccessCount = JsTranspiler.SuccessCount;
 

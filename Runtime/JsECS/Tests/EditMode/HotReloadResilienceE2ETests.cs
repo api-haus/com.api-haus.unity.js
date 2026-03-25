@@ -111,6 +111,7 @@ namespace UnityJS.Entities.EditModeTests
       // SimulateHotReload should fail gracefully
       var vm = JsRuntimeManager.Instance;
       vm.ClearCapturedExceptions();
+      LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("\\[JsTranspiler\\]"));
       vm.SimulateHotReload(PROBE);
 
       // Old code should still work
@@ -155,6 +156,7 @@ namespace UnityJS.Entities.EditModeTests
 
       // Transpile broken source — must fail and increment error count
       var errBefore = JsTranspiler.ErrorCount;
+      LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("\\[JsTranspiler\\]"));
       var broken = JsTranspiler.Transpile(vm.Context, "export default class BROKEN {{{{{");
       Assert.IsNull(broken, "Transpilation must fail for broken source");
       Assert.Greater(JsTranspiler.ErrorCount, errBefore, "Error count must increase");

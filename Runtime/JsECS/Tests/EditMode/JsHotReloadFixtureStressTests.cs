@@ -4,7 +4,10 @@ namespace UnityJS.Entities.EditModeTests
   using System.Collections.Generic;
   using System.IO;
   using System.Linq;
+  using System.Text.RegularExpressions;
   using NUnit.Framework;
+  using UnityEngine;
+  using UnityEngine.TestTools;
   using UnityJS.Runtime;
 
   /// <summary>
@@ -81,11 +84,9 @@ namespace UnityJS.Entities.EditModeTests
       foreach (var ts in Directory.GetFiles(fixtureSrc, "*.ts"))
         File.Copy(ts, Path.Combine(m_SrcDir, Path.GetFileName(ts)));
 
-      // Verify transpiler is ready
+      // Ensure VM exists (creates QuickJS runtime + Sucrase transpiler)
+      var vm = JsRuntimeManager.GetOrCreate();
       Assert.IsTrue(JsTranspiler.IsInitialized, "JsTranspiler must be initialized");
-
-      // Verify initial transpilation works for all modules
-      var vm = JsRuntimeManager.Instance;
       Assert.IsNotNull(vm, "VM must exist");
       foreach (var mod in ModuleNames)
       {
@@ -118,8 +119,7 @@ namespace UnityJS.Entities.EditModeTests
 
     string TranspileModule(string module)
     {
-      var vm = JsRuntimeManager.Instance;
-      if (vm == null) return null;
+      var vm = JsRuntimeManager.GetOrCreate();
       var tsSource = File.ReadAllText(TsPath(module));
       return JsTranspiler.Transpile(vm.Context, tsSource);
     }
@@ -163,15 +163,15 @@ namespace UnityJS.Entities.EditModeTests
           var eol = content.IndexOf('\n', importIdx);
           if (eol < 0)
             break;
-          content = content.Insert(eol + 1, "{{{SYNTAX_ERROR}}}\n");
+          content = content.Insert(eol + 1, "{{{SYNTAX_ERROR\n");
           File.WriteAllText(path, content);
           m_HasSyntaxError[module] = true;
           break;
 
         case MutationType.FixSyntaxError:
           var text = File.ReadAllText(path);
-          text = text.Replace("{{{SYNTAX_ERROR}}}\n", "");
-          text = text.Replace("{{{SYNTAX_ERROR}}}", "");
+          text = text.Replace("{{{SYNTAX_ERROR\n", "");
+          text = text.Replace("{{{SYNTAX_ERROR", "");
           File.WriteAllText(path, text);
           m_HasSyntaxError[module] = false;
           break;
@@ -225,6 +225,7 @@ namespace UnityJS.Entities.EditModeTests
       for (var cycle = 0; cycle < 5; cycle++)
       {
         ApplyMutation(target, MutationType.InjectSyntaxError, rng);
+        LogAssert.Expect(LogType.Error, new Regex("\\[JsTranspiler\\]"));
         var js = TranspileModule(target);
         Assert.IsNull(js, $"Cycle {cycle}: should fail with syntax error");
 

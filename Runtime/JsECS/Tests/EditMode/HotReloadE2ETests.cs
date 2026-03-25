@@ -128,7 +128,15 @@ namespace UnityJS.Entities.EditModeTests
     [Test]
     public void ScriptsResolveFromTs()
     {
+      JsRuntimeManager.GetOrCreate();
       JsScriptSearchPaths.Initialize();
+
+      // Fixtures~ may have been unregistered by a previous SceneFixture.Dispose();
+      // re-add it so the resolution test can find the TS fixture.
+      var fixturesPath = SceneFixture.GetPackageFixturesPath();
+      if (fixturesPath != null)
+        JsScriptSearchPaths.AddSearchPath(fixturesPath, 0);
+
       Assert.IsTrue(
         JsScriptSourceRegistry.TryReadScript(SCRIPT, out _, out var resolvedId),
         $"{SCRIPT} must be readable"
