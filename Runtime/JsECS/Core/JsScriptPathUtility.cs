@@ -103,6 +103,10 @@ namespace UnityJS.Entities.Core
       else if (trimmed.EndsWith(TS_EXTENSION, StringComparison.OrdinalIgnoreCase))
         trimmed = trimmed[..^TS_EXTENSION.Length];
 
+      // Strip Assets/StreamingAssets/unity.js/ prefix (baked path from authoring)
+      if (trimmed.StartsWith(s_scriptsFolderRelativeWithSlash, StringComparison.OrdinalIgnoreCase))
+        trimmed = trimmed[s_scriptsFolderRelativeWithSlash.Length..];
+
       if (trimmed.Contains("..", StringComparison.Ordinal))
       {
         error = "Script name cannot navigate directories ('..' is not allowed).";

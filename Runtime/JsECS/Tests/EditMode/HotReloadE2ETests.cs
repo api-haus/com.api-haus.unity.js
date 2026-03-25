@@ -7,7 +7,7 @@ namespace UnityJS.Entities.EditModeTests
   using Unity.Mathematics;
   using UnityEngine;
   using UnityEngine.TestTools;
-  using UnityJS.Editor;
+
   using UnityJS.Runtime;
 
   /// <summary>
@@ -46,7 +46,7 @@ namespace UnityJS.Entities.EditModeTests
       if (m_OriginalContent != null)
       {
         File.WriteAllText(s_tsPath, m_OriginalContent);
-        TscCompiler.Instance?.Recompile();
+        // No recompile needed — transpiled on-demand by JsTranspiler
       }
       yield break;
     }
@@ -74,8 +74,7 @@ namespace UnityJS.Entities.EditModeTests
       Assert.AreNotEqual(m_OriginalContent, mutated, "Mutation must change the file");
       File.WriteAllText(s_tsPath, mutated);
 
-      // Recompile and trigger hot reload
-      TscCompiler.Instance?.Recompile();
+      // Trigger hot reload (transpiled on-demand)
       var vm = JsRuntimeManager.Instance;
       vm?.SimulateHotReload("components/e2e_hot_reload_probe");
 
@@ -109,7 +108,7 @@ namespace UnityJS.Entities.EditModeTests
         var mutated = m_OriginalContent.Replace(
           "const VERSION = 1", $"const VERSION = {round}");
         File.WriteAllText(s_tsPath, mutated);
-        TscCompiler.Instance?.Recompile();
+        // No recompile needed — transpiled on-demand by JsTranspiler
         JsRuntimeManager.Instance?.SimulateHotReload(
           "components/e2e_hot_reload_probe");
         yield return null;
@@ -117,12 +116,53 @@ namespace UnityJS.Entities.EditModeTests
 
       // Restore original
       File.WriteAllText(s_tsPath, m_OriginalContent);
-      TscCompiler.Instance?.Recompile();
 
       var vm = JsRuntimeManager.Instance;
       Assert.IsNotNull(vm, "VM must survive rapid reloads");
       Assert.IsEmpty(vm.CapturedExceptions,
         $"No JS exceptions after rapid reloads: {string.Join("\n", vm.CapturedExceptions)}");
+
+      yield return new ExitPlayMode();
+    }
+
+    [Test]
+    public void ScriptsResolveFromTs()
+    {
+      JsScriptSearchPaths.Initialize();
+      Assert.IsTrue(
+        JsScriptSourceRegistry.TryReadScript(SCRIPT, out _, out var resolvedId),
+        $"{SCRIPT} must be readable"
+      );
+      Assert.IsTrue(
+        resolvedId.EndsWith(".ts"),
+        $"Script should resolve from .ts source, got: {resolvedId}"
+      );
+    }
+
+    [UnityTest]
+    public IEnumerator TouchTs_EnterPlayMode_NoTdzErrors()
+    {
+      // Append comment to fixture .ts before entering play
+      File.WriteAllText(s_tsPath, m_OriginalContent + "\n// touch-test\n");
+
+      yield return new EnterPlayMode();
+
+      var world = World.DefaultGameObjectInjectionWorld;
+      using var scene = new SceneFixture(world);
+
+      var entity = scene.Spawn(SCRIPT);
+      for (var i = 0; i < INIT_FRAMES; i++) yield return null;
+      Assert.IsTrue(scene.AllFulfilled(), "Script must be fulfilled after touch");
+
+      var vm = JsRuntimeManager.Instance;
+      Assert.IsNotNull(vm, "VM should exist");
+
+      var tdzErrors = new System.Collections.Generic.List<string>();
+      foreach (var ex in vm.CapturedExceptions)
+        if (ex.Contains("not initialized") || ex.Contains("not defined"))
+          tdzErrors.Add(ex);
+      Assert.IsEmpty(tdzErrors,
+        "No TDZ errors after touching .ts:\n" + string.Join("\n", tdzErrors));
 
       yield return new ExitPlayMode();
     }

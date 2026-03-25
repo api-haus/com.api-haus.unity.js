@@ -7,7 +7,7 @@ namespace UnityJS.Entities.EditModeTests
   using Unity.Mathematics;
   using UnityEngine;
   using UnityEngine.TestTools;
-  using UnityJS.Editor;
+
   using UnityJS.Runtime;
 
   /// <summary>
@@ -46,7 +46,7 @@ namespace UnityJS.Entities.EditModeTests
       if (m_OriginalContent != null)
       {
         File.WriteAllText(ProbeTsPath, m_OriginalContent);
-        TscCompiler.Instance?.Recompile();
+        // No recompile needed — transpiled on-demand
       }
       yield break;
     }
@@ -107,7 +107,6 @@ namespace UnityJS.Entities.EditModeTests
 
       // Introduce syntax error
       File.WriteAllText(ProbeTsPath, "export default class BROKEN {{{{{");
-      TscCompiler.Instance?.Recompile();
 
       // SimulateHotReload should fail gracefully
       var vm = JsRuntimeManager.Instance;
@@ -123,7 +122,6 @@ namespace UnityJS.Entities.EditModeTests
       // Fix the error and reload
       File.WriteAllText(ProbeTsPath, m_OriginalContent.Replace(
         "const VERSION = 1", "const VERSION = 3"));
-      TscCompiler.Instance?.Recompile();
       vm.ClearCapturedExceptions();
       vm.SimulateHotReload(PROBE);
 
@@ -137,6 +135,34 @@ namespace UnityJS.Entities.EditModeTests
 
       Assert.AreEqual(0, vm.CapturedExceptions.Count,
         $"Zero exceptions after recovery: {string.Join("; ", vm.CapturedExceptions)}");
+
+      yield return new ExitPlayMode();
+    }
+
+    [UnityTest]
+    public IEnumerator HotReload_TranspileError_DetectedAndRecoverable()
+    {
+      yield return new EnterPlayMode();
+      var world = World.DefaultGameObjectInjectionWorld;
+      using var scene = new SceneFixture(world);
+
+      scene.Spawn(PROBE);
+      for (var i = 0; i < INIT_FRAMES; i++) yield return null;
+      Assert.IsTrue(scene.AllFulfilled(), "Probe must fulfill");
+
+      var vm = JsRuntimeManager.Instance;
+      Assert.IsTrue(JsTranspiler.IsInitialized, "Transpiler must be initialized");
+
+      // Transpile broken source — must fail and increment error count
+      var errBefore = JsTranspiler.ErrorCount;
+      var broken = JsTranspiler.Transpile(vm.Context, "export default class BROKEN {{{{{");
+      Assert.IsNull(broken, "Transpilation must fail for broken source");
+      Assert.Greater(JsTranspiler.ErrorCount, errBefore, "Error count must increase");
+      Assert.IsNotNull(JsTranspiler.LastError, "LastError must be set");
+
+      // Transpile valid source — must succeed
+      var valid = JsTranspiler.Transpile(vm.Context, m_OriginalContent);
+      Assert.IsNotNull(valid, "Transpilation must succeed for valid source");
 
       yield return new ExitPlayMode();
     }

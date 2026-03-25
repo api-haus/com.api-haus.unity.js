@@ -5,12 +5,12 @@ namespace UnityJS.Entities.EditModeTests
   using System.IO;
   using System.Linq;
   using NUnit.Framework;
-  using UnityJS.Editor;
+  using UnityJS.Runtime;
 
   /// <summary>
-  /// Fixture-based hot-reload stress tests using TscCompiler (synchronous).
-  /// Copies tests~/hot-reload-fixture/ to a temp dir, compiles with TscCompiler,
-  /// mutates .ts files, recompiles, and verifies compiled output is consistent.
+  /// Fixture-based hot-reload stress tests using JsTranspiler (synchronous).
+  /// Copies tests~/hot-reload-fixture/ to a temp dir, transpiles with Sucrase,
+  /// mutates .ts files, re-transpiles, and verifies output is consistent.
   /// </summary>
   [TestFixture]
   [Timeout(60000)]
@@ -49,14 +49,9 @@ namespace UnityJS.Entities.EditModeTests
     }
 
     string m_WorkDir;
-    string m_OutDir;
     string m_SrcDir;
-    TscCompiler m_Compiler;
 
-    // Track current VALUE per module (after mutations)
     readonly Dictionary<string, long> m_CurrentValues = new();
-
-    // Track which modules have injected syntax errors
     readonly Dictionary<string, bool> m_HasSyntaxError = new();
     int m_MutationCount;
 
@@ -80,25 +75,24 @@ namespace UnityJS.Entities.EditModeTests
         "js-fixture-stress-" + Guid.NewGuid().ToString("N")[..8]
       );
       m_SrcDir = Path.Combine(m_WorkDir, "src");
-      m_OutDir = Path.Combine(m_WorkDir, "out");
       Directory.CreateDirectory(m_SrcDir);
 
-      // Copy fixture .ts files
       var fixtureSrc = Path.Combine(FixtureRoot, "src");
       foreach (var ts in Directory.GetFiles(fixtureSrc, "*.ts"))
         File.Copy(ts, Path.Combine(m_SrcDir, Path.GetFileName(ts)));
 
-      // Copy tsconfig.json
-      File.Copy(
-        Path.Combine(FixtureRoot, "tsconfig.json"),
-        Path.Combine(m_WorkDir, "tsconfig.json")
-      );
+      // Verify transpiler is ready
+      Assert.IsTrue(JsTranspiler.IsInitialized, "JsTranspiler must be initialized");
 
-      m_Compiler = new TscCompiler(m_WorkDir, m_OutDir);
-      Assert.IsTrue(
-        m_Compiler.Recompile(),
-        "Initial compile failed:\n" + string.Join("\n", m_Compiler.LastErrors)
-      );
+      // Verify initial transpilation works for all modules
+      var vm = JsRuntimeManager.Instance;
+      Assert.IsNotNull(vm, "VM must exist");
+      foreach (var mod in ModuleNames)
+      {
+        var tsSource = File.ReadAllText(TsPath(mod));
+        var js = JsTranspiler.Transpile(vm.Context, tsSource);
+        Assert.IsNotNull(js, $"Initial transpile of {mod} failed");
+      }
 
       m_CurrentValues.Clear();
       m_HasSyntaxError.Clear();
@@ -115,19 +109,20 @@ namespace UnityJS.Entities.EditModeTests
     {
       if (m_WorkDir != null && Directory.Exists(m_WorkDir))
       {
-        try
-        {
-          Directory.Delete(m_WorkDir, true);
-        }
-        catch
-        { /* best-effort cleanup */
-        }
+        try { Directory.Delete(m_WorkDir, true); }
+        catch { /* best-effort */ }
       }
     }
 
-    // ── Mutation helpers ──
-
     string TsPath(string module) => Path.Combine(m_SrcDir, module + ".ts");
+
+    string TranspileModule(string module)
+    {
+      var vm = JsRuntimeManager.Instance;
+      if (vm == null) return null;
+      var tsSource = File.ReadAllText(TsPath(module));
+      return JsTranspiler.Transpile(vm.Context, tsSource);
+    }
 
     void ReplaceSlotLine(string module, string slotMarker, string newLine)
     {
@@ -135,7 +130,6 @@ namespace UnityJS.Entities.EditModeTests
       var lines = File.ReadAllLines(path).ToList();
       var idx = lines.FindIndex(l => l.Contains(slotMarker));
       Assert.GreaterOrEqual(idx, 0, $"Slot marker '{slotMarker}' not found in {module}.ts");
-      // Replace the line AFTER the marker
       if (idx + 1 < lines.Count)
         lines[idx + 1] = newLine;
       else
@@ -184,10 +178,8 @@ namespace UnityJS.Entities.EditModeTests
       }
     }
 
-    // ── Tests ──
-
     [Test]
-    public void CommentOnlyMutations_AllCompileSucceed()
+    public void CommentOnlyMutations_AllTranspileSucceed()
     {
       var rng = new System.Random(42);
 
@@ -196,16 +188,14 @@ namespace UnityJS.Entities.EditModeTests
         var module = ModuleNames[rng.Next(ModuleNames.Length)];
         ApplyMutation(module, MutationType.TouchComment, rng);
 
-        Assert.IsTrue(
-          m_Compiler.Recompile(),
-          $"Cycle {cycle}: comment-only mutation to {module} must compile:\n"
-            + string.Join("\n", m_Compiler.LastErrors)
-        );
+        var js = TranspileModule(module);
+        Assert.IsNotNull(js,
+          $"Cycle {cycle}: comment-only mutation to {module} must transpile. Error: {JsTranspiler.LastError}");
       }
     }
 
     [Test]
-    public void ConstantMutations_RecompileReflectsNewValues()
+    public void ConstantMutations_TranspileReflectsNewValues()
     {
       var rng = new System.Random(123);
 
@@ -214,19 +204,14 @@ namespace UnityJS.Entities.EditModeTests
         var module = ModuleNames[cycle % ModuleNames.Length];
         ApplyMutation(module, MutationType.ChangeConstant, rng);
 
-        Assert.IsTrue(
-          m_Compiler.Recompile(),
-          $"Cycle {cycle}: constant change in {module} must compile:\n"
-            + string.Join("\n", m_Compiler.LastErrors)
-        );
+        var js = TranspileModule(module);
+        Assert.IsNotNull(js,
+          $"Cycle {cycle}: constant change in {module} must transpile. Error: {JsTranspiler.LastError}");
 
-        // Verify the compiled JS contains the new value
-        var jsPath = Path.Combine(m_OutDir, module + ".js");
-        var jsContent = File.ReadAllText(jsPath);
+        var expected = m_CurrentValues[module];
         Assert.IsTrue(
-          jsContent.Contains($"VALUE = {m_CurrentValues[module]}")
-            || jsContent.Contains($"VALUE={m_CurrentValues[module]}"),
-          $"Cycle {cycle}: compiled JS for {module} missing VALUE={m_CurrentValues[module]}"
+          js.Contains($"VALUE = {expected}") || js.Contains($"VALUE={expected}"),
+          $"Cycle {cycle}: transpiled JS for {module} missing VALUE={expected}"
         );
       }
     }
@@ -240,17 +225,13 @@ namespace UnityJS.Entities.EditModeTests
       for (var cycle = 0; cycle < 5; cycle++)
       {
         ApplyMutation(target, MutationType.InjectSyntaxError, rng);
-        Assert.IsFalse(m_Compiler.Recompile(), $"Cycle {cycle}: should fail with syntax error");
-        Assert.IsNotEmpty(
-          m_Compiler.LastErrors,
-          $"Cycle {cycle}: failed compile but no errors reported"
-        );
+        var js = TranspileModule(target);
+        Assert.IsNull(js, $"Cycle {cycle}: should fail with syntax error");
 
         ApplyMutation(target, MutationType.FixSyntaxError, rng);
-        Assert.IsTrue(
-          m_Compiler.Recompile(),
-          $"Cycle {cycle}: should succeed after fix:\n" + string.Join("\n", m_Compiler.LastErrors)
-        );
+        js = TranspileModule(target);
+        Assert.IsNotNull(js,
+          $"Cycle {cycle}: should succeed after fix. Error: {JsTranspiler.LastError}");
       }
     }
 
@@ -259,28 +240,20 @@ namespace UnityJS.Entities.EditModeTests
     {
       var rng = new System.Random(456);
 
-      // Mutate several modules with constant changes
       for (var i = 0; i < 5; i++)
       {
         var module = ModuleNames[rng.Next(ModuleNames.Length)];
         ApplyMutation(module, MutationType.ChangeConstant, rng);
       }
 
-      Assert.IsTrue(
-        m_Compiler.Recompile(),
-        "Recompile after mixed mutations must succeed:\n" + string.Join("\n", m_Compiler.LastErrors)
-      );
-
-      // Verify each compiled module has the expected VALUE
       foreach (var mod in ModuleNames)
       {
-        var jsPath = Path.Combine(m_OutDir, mod + ".js");
-        Assert.IsTrue(File.Exists(jsPath), $"Missing compiled JS for {mod}");
-        var jsContent = File.ReadAllText(jsPath);
+        var js = TranspileModule(mod);
+        Assert.IsNotNull(js, $"Transpile of {mod} failed. Error: {JsTranspiler.LastError}");
         var expected = m_CurrentValues[mod];
         Assert.IsTrue(
-          jsContent.Contains($"VALUE = {expected}") || jsContent.Contains($"VALUE={expected}"),
-          $"Module {mod}: expected VALUE={expected} in compiled output"
+          js.Contains($"VALUE = {expected}") || js.Contains($"VALUE={expected}"),
+          $"Module {mod}: expected VALUE={expected} in transpiled output"
         );
       }
     }

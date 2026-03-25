@@ -51,19 +51,12 @@ namespace UnityJS.Runtime
         RegisterPathAsSource(DefaultScriptsPath, "default", 100);
 
 #if UNITY_EDITOR
-        // Register Library/TscBuild for baked script names (full path like "Assets/StreamingAssets/unity.js/components/slime_wander")
-        var tscBuildRoot = Path.Combine(Application.dataPath, "..", "Library", "TscBuild");
-        RegisterPathAsSource(tscBuildRoot, "tsc-build", 50);
-        // Also register the mirrored StreamingAssets subtree for system discovery (relative names like "systems/character_input")
-        var tscBuildScripts = Path.Combine(tscBuildRoot, "Assets", "StreamingAssets", "unity.js");
-        RegisterPathAsSource(tscBuildScripts, "tsc-build-scripts", 45);
-
-        // Register package Fixtures~ (compiled JS) for E2E test fixtures
-        var packageFixtures = Path.GetFullPath(Path.Combine(
-          Application.dataPath, "..", "Library", "TscBuild",
-          "Packages", "com.api-haus.unity.js", "Fixtures~"));
-        if (Directory.Exists(packageFixtures))
-          RegisterPathAsSource(packageFixtures, "package-fixtures", 40);
+        // Register package Fixtures~ directly for E2E test fixtures (transpiled on-demand by JsTranspiler)
+        var packageRoot = Path.GetFullPath(Path.Combine(
+          Application.dataPath, "..", "Packages", "com.api-haus.unity.js"));
+        var fixturesPath = Path.Combine(packageRoot, "Fixtures~");
+        if (Directory.Exists(fixturesPath))
+          RegisterPathAsSource(fixturesPath, "package-fixtures", 40);
 #endif
 
         s_initialized = true;

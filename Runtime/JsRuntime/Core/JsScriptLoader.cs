@@ -54,7 +54,7 @@ namespace UnityJS.Runtime
   }
 
   /// <summary>
-  /// Centralized utility for loading JS scripts from various sources.
+  /// Centralized utility for loading JS/TS scripts from various sources.
   /// </summary>
   public static class JsScriptLoader
   {
@@ -77,6 +77,9 @@ namespace UnityJS.Runtime
       );
     }
 
+    /// <summary>
+    /// Try to find a script file (.ts first, then .js) under StreamingAssets/unity.js/.
+    /// </summary>
     public static JsScriptLoadResult FromStreamingAssets(string relativePath)
     {
       if (string.IsNullOrEmpty(relativePath))
@@ -86,10 +89,14 @@ namespace UnityJS.Runtime
       if (normalized.Length > FixedString64Bytes.UTF8MaxLengthInBytes)
         return JsScriptLoadResult.Failure("Script ID too long (max 64 bytes)");
 
-      var filePath = Path.Combine(s_streamingAssetsJsPath, normalized + ".js");
-
+      // Try .ts first, fall back to .js
+      var filePath = Path.Combine(s_streamingAssetsJsPath, normalized + ".ts");
       if (!File.Exists(filePath))
-        return JsScriptLoadResult.Failure($"File not found: {normalized}");
+      {
+        filePath = Path.Combine(s_streamingAssetsJsPath, normalized + ".js");
+        if (!File.Exists(filePath))
+          return JsScriptLoadResult.Failure($"File not found: {normalized}");
+      }
 
       if (filePath.Length > FixedString512Bytes.UTF8MaxLengthInBytes)
         return JsScriptLoadResult.Failure("File path too long (max 512 bytes)");
@@ -139,10 +146,14 @@ namespace UnityJS.Runtime
       if (normalized.Length > FixedString64Bytes.UTF8MaxLengthInBytes)
         return JsScriptLoadResult.Failure("Script ID too long (max 64 bytes)");
 
-      var relativeFilePath = normalized + ".js";
-
+      // Try .ts first, fall back to .js
+      var relativeFilePath = normalized + ".ts";
       if (!JsScriptSearchPaths.TryFindScript(relativeFilePath, out var filePath, out _))
-        return JsScriptLoadResult.Failure($"File not found in any search path: {normalized}");
+      {
+        relativeFilePath = normalized + ".js";
+        if (!JsScriptSearchPaths.TryFindScript(relativeFilePath, out filePath, out _))
+          return JsScriptLoadResult.Failure($"File not found in any search path: {normalized}");
+      }
 
       if (filePath.Length > FixedString512Bytes.UTF8MaxLengthInBytes)
         return JsScriptLoadResult.Failure("File path too long (max 512 bytes)");
@@ -174,7 +185,16 @@ namespace UnityJS.Runtime
       try
       {
         source = File.ReadAllText(filePath);
-        return true;
+
+        // Transpile .ts files
+        if (filePath.EndsWith(".ts", StringComparison.OrdinalIgnoreCase))
+        {
+          var ctx = JsRuntimeManager.Instance?.Context ?? default;
+          if (!ctx.IsNull)
+            source = JsTranspiler.Transpile(ctx, source);
+        }
+
+        return source != null;
       }
       catch (Exception)
       {
@@ -190,6 +210,8 @@ namespace UnityJS.Runtime
       var normalized = path.Replace('\\', '/').Trim('/');
 
       if (normalized.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+        normalized = normalized[..^3];
+      else if (normalized.EndsWith(".ts", StringComparison.OrdinalIgnoreCase))
         normalized = normalized[..^3];
 
       return normalized;

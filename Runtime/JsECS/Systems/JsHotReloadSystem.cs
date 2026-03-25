@@ -1,9 +1,10 @@
-namespace UnityJS.Editor
+namespace UnityJS.Entities.Systems
 {
   using System;
   using System.Collections.Concurrent;
   using System.IO;
   using Runtime;
+  using Unity.Collections;
   using Unity.Entities;
   using Unity.Logging;
   using UnityEngine;
@@ -13,6 +14,8 @@ namespace UnityJS.Editor
   {
     FileSystemWatcher m_ScriptsWatcher;
     FileSystemWatcher m_DataWatcher;
+    FileSystemWatcher m_ComponentsWatcher;
+    FileSystemWatcher m_SystemsWatcher;
     readonly ConcurrentQueue<string> m_ReloadQueue = new();
     bool m_Initialized;
 
@@ -29,6 +32,8 @@ namespace UnityJS.Editor
       var jsPath = Path.Combine(Application.streamingAssetsPath, "unity.js");
       var scriptsPath = Path.Combine(jsPath, "scripts");
       var dataPath = Path.Combine(jsPath, "data");
+      var componentsPath = Path.Combine(jsPath, "components");
+      var systemsPath = Path.Combine(jsPath, "systems");
 
       if (!Directory.Exists(jsPath))
       {
@@ -43,6 +48,12 @@ namespace UnityJS.Editor
       if (Directory.Exists(dataPath))
         m_DataWatcher = CreateWatcher(dataPath, m_ReloadQueue);
 
+      if (Directory.Exists(componentsPath))
+        m_ComponentsWatcher = CreateWatcher(componentsPath, m_ReloadQueue);
+
+      if (Directory.Exists(systemsPath))
+        m_SystemsWatcher = CreateWatcher(systemsPath, m_ReloadQueue);
+
       m_Initialized = true;
     }
 
@@ -50,7 +61,7 @@ namespace UnityJS.Editor
     {
       var watcher = new FileSystemWatcher(path)
       {
-        Filter = "*.js",
+        Filter = "*.ts",
         NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName,
         EnableRaisingEvents = true,
         IncludeSubdirectories = true,
@@ -89,12 +100,24 @@ namespace UnityJS.Editor
             continue;
 
           var source = File.ReadAllText(filePath);
+
+          // Transpile .ts files
+          if (filePath.EndsWith(".ts", StringComparison.OrdinalIgnoreCase))
+          {
+            source = JsTranspiler.Transpile(vm.Context, source);
+            if (source == null)
+            {
+              Log.Error("[JsHotReload] Transpilation failed for {0} — fix the error and save again", (FixedString128Bytes)fileName);
+              continue;
+            }
+          }
+
           if (vm.ReloadScript(fileName, source, filePath))
-            Log.Debug($"[JsHotReload] Reloaded: {fileName}");
+            Log.Debug("[JsHotReload] Reloaded: {0}", (FixedString128Bytes)fileName);
         }
         catch (Exception ex)
         {
-          Log.Error($"[JsHotReload] Error reloading {filePath}: {ex.Message}");
+          Log.Error("[JsHotReload] Error reloading {0}: {1}", (FixedString128Bytes)filePath, (FixedString128Bytes)ex.Message);
         }
     }
 
@@ -102,6 +125,8 @@ namespace UnityJS.Editor
     {
       DisposeWatcher(ref m_ScriptsWatcher);
       DisposeWatcher(ref m_DataWatcher);
+      DisposeWatcher(ref m_ComponentsWatcher);
+      DisposeWatcher(ref m_SystemsWatcher);
     }
 
     static void DisposeWatcher(ref FileSystemWatcher watcher)

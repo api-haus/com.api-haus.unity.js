@@ -10,50 +10,49 @@ using UnityJS.Runtime;
 
 namespace UnityJS.Editor
 {
+  /// <summary>
+  /// Watches .ts files for changes in the editor. During play mode, triggers hot reload
+  /// by reading and transpiling changed files, then reloading them in the VM.
+  /// </summary>
   [InitializeOnLoad]
-  static class TscFileWatcher
+  static class TsFileWatcher
   {
     const double PollIntervalSec = 1.0;
     static double s_LastPollTime;
     static readonly Dictionary<string, long> s_FileTimestamps = new();
+    static string s_SourceRoot;
 
-    static TscFileWatcher()
+    static TsFileWatcher()
     {
-      var sourceRoot = Path.Combine(Application.streamingAssetsPath, "unity.js");
-      TscCompiler.Instance = new TscCompiler(sourceRoot);
-
-      TscCompiler.Instance.RecompileIfStale();
+      s_SourceRoot = Path.Combine(Application.streamingAssetsPath, "unity.js");
       RefreshSnapshot();
-
       EditorApplication.update += Poll;
     }
 
     static void Poll()
     {
-      var compiler = TscCompiler.Instance;
-      if (compiler == null || compiler.State == TscState.Dead)
-        return;
-
       var now = EditorApplication.timeSinceStartup;
       if (now - s_LastPollTime < PollIntervalSec)
         return;
       s_LastPollTime = now;
 
-      if (HasChanges(compiler.SourceRoot))
-      {
-        compiler.Recompile();
-        RefreshSnapshot();
+      var changedFiles = GetChangedFiles();
+      if (changedFiles.Count == 0)
+        return;
 
-        if (EditorApplication.isPlaying)
-          TriggerHotReload();
-      }
+      RefreshSnapshot();
+
+      if (EditorApplication.isPlaying)
+        ReloadChangedScripts(changedFiles);
     }
 
-    static bool HasChanges(string sourceRoot)
+    static List<string> GetChangedFiles()
     {
-      foreach (var subdir in new[] { "systems", "components", "types" })
+      var changed = new List<string>();
+
+      foreach (var subdir in new[] { "systems", "components", "scripts", "types" })
       {
-        var tsDir = Path.Combine(sourceRoot, subdir);
+        var tsDir = Path.Combine(s_SourceRoot, subdir);
         if (!Directory.Exists(tsDir))
           continue;
 
@@ -63,33 +62,25 @@ namespace UnityJS.Editor
           if (s_FileTimestamps.TryGetValue(ts, out var cached))
           {
             if (ticks != cached)
-              return true;
+              changed.Add(ts);
           }
           else
           {
-            return true;
+            changed.Add(ts);
           }
         }
       }
 
-      // Check for deleted files
-      foreach (var path in s_FileTimestamps.Keys)
-        if (!File.Exists(path))
-          return true;
-
-      return false;
+      return changed;
     }
 
     static void RefreshSnapshot()
     {
       s_FileTimestamps.Clear();
-      var compiler = TscCompiler.Instance;
-      if (compiler == null)
-        return;
 
-      foreach (var subdir in new[] { "systems", "components", "types" })
+      foreach (var subdir in new[] { "systems", "components", "scripts", "types" })
       {
-        var tsDir = Path.Combine(compiler.SourceRoot, subdir);
+        var tsDir = Path.Combine(s_SourceRoot, subdir);
         if (!Directory.Exists(tsDir))
           continue;
 
@@ -98,63 +89,80 @@ namespace UnityJS.Editor
       }
     }
 
-    static void TriggerHotReload()
+    static void ReloadChangedScripts(List<string> changedFiles)
     {
       var vm = JsRuntimeManager.Instance;
       if (vm == null || !vm.IsValid)
         return;
 
-      var compiler = TscCompiler.Instance;
-      if (compiler == null || !Directory.Exists(compiler.OutDir))
-        return;
-
-      ReloadAllCompiledScripts(vm, compiler);
-    }
-
-    internal static void ReloadAllCompiledScripts(JsRuntimeManager vm, TscCompiler compiler)
-    {
-      var outDir = compiler.OutDir;
-
-      // Reload systems
-      var systemsDir = Path.Combine(outDir, "systems");
-      if (Directory.Exists(systemsDir))
+      foreach (var filePath in changedFiles)
       {
-        var world = World.DefaultGameObjectInjectionWorld;
-        if (world != null)
+        try
         {
-          var runnerHandle = world.Unmanaged.GetExistingUnmanagedSystem<JsSystemRunner>();
-          foreach (var jsFile in Directory.GetFiles(systemsDir, "*.js", SearchOption.AllDirectories))
+          var fileName = Path.GetFileNameWithoutExtension(filePath);
+          var parentDir = Path.GetFileName(Path.GetDirectoryName(filePath));
+
+          // Determine script name based on directory
+          string scriptName;
+          if (parentDir == "systems")
           {
-            var systemName = Path.GetFileNameWithoutExtension(jsFile);
-            if (!vm.HasScript("system:" + systemName))
+            scriptName = "system:" + fileName;
+            if (!vm.HasScript(scriptName))
               continue;
-            if (runnerHandle != SystemHandle.Null)
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            if (world != null)
             {
-              ref var sysState = ref world.Unmanaged.ResolveSystemStateRef(runnerHandle);
-              JsSystemDiscovery.ReloadSystem(ref sysState, systemName);
+              var runnerHandle = world.Unmanaged.GetExistingUnmanagedSystem<JsSystemRunner>();
+              if (runnerHandle != SystemHandle.Null)
+              {
+                ref var sysState = ref world.Unmanaged.ResolveSystemStateRef(runnerHandle);
+                JsSystemDiscovery.ReloadSystem(ref sysState, fileName);
+              }
             }
           }
-        }
-      }
-
-      // Reload components
-      var componentsDir = Path.Combine(outDir, "components");
-      if (Directory.Exists(componentsDir))
-      {
-        foreach (
-          var jsFile in Directory.GetFiles(componentsDir, "*.js", SearchOption.AllDirectories)
-        )
-        {
-          var fileName = Path.GetFileNameWithoutExtension(jsFile);
-          var scriptName = $"components/{fileName}";
-          if (!vm.HasScript(scriptName))
-            continue;
-          var source = File.ReadAllText(jsFile);
-          if (vm.ReloadScript(scriptName, source, jsFile))
+          else if (parentDir == "components")
           {
-            vm.ComponentReload(scriptName);
-            Log.Debug("[TscFileWatcher] Reloaded component: {0}", scriptName);
+            scriptName = $"components/{fileName}";
+            if (!vm.HasScript(scriptName))
+              continue;
+
+            var tsSource = File.ReadAllText(filePath);
+            var jsSource = JsTranspiler.Transpile(vm.Context, tsSource);
+            if (jsSource == null)
+            {
+              Log.Error("[TsFileWatcher] Transpilation failed for {0}", (Unity.Collections.FixedString128Bytes)scriptName);
+              continue;
+            }
+
+            if (vm.ReloadScript(scriptName, jsSource, filePath))
+            {
+              vm.ComponentReload(scriptName);
+              Log.Debug("[TsFileWatcher] Reloaded component: {0}", (Unity.Collections.FixedString128Bytes)scriptName);
+            }
           }
+          else
+          {
+            // scripts/ or other directories
+            scriptName = fileName;
+            if (!vm.HasScript(scriptName))
+              continue;
+
+            var tsSource = File.ReadAllText(filePath);
+            var jsSource = JsTranspiler.Transpile(vm.Context, tsSource);
+            if (jsSource == null)
+            {
+              Log.Error("[TsFileWatcher] Transpilation failed for {0}", (Unity.Collections.FixedString128Bytes)scriptName);
+              continue;
+            }
+
+            if (vm.ReloadScript(scriptName, jsSource, filePath))
+              Log.Debug("[TsFileWatcher] Reloaded script: {0}", (Unity.Collections.FixedString128Bytes)scriptName);
+          }
+        }
+        catch (Exception ex)
+        {
+          Debug.LogError($"[TsFileWatcher] Error reloading {filePath}: {ex.Message}");
         }
       }
     }

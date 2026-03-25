@@ -13,7 +13,6 @@ namespace UnityJS.Entities.EditModeTests
   using Unity.Transforms;
   using UnityEngine;
   using UnityEngine.TestTools;
-  using UnityJS.Editor;
   using UnityJS.Entities.Components;
   using UnityJS.Entities.Core;
   using UnityJS.Runtime;
@@ -63,8 +62,6 @@ namespace UnityJS.Entities.EditModeTests
         m_HasSyntaxError[file] = false;
       }
 
-      TscCompiler.Instance?.Recompile();
-
       yield break;
     }
 
@@ -81,8 +78,6 @@ namespace UnityJS.Entities.EditModeTests
         if (m_OriginalContents.TryGetValue(file, out var original))
           File.WriteAllText(path, original);
       }
-
-      TscCompiler.Instance?.Recompile();
 
       if (UnityEditor.EditorApplication.isPlaying)
         yield return new ExitPlayMode();
@@ -184,14 +179,60 @@ namespace UnityJS.Entities.EditModeTests
           {
             ApplyMutation(file, type, rng);
           }
-          catch
-          { /* file may be locked by tsc — ignore */
-          }
+          catch { /* file may be locked — ignore */ }
           Thread.Sleep(rng.Next(minIntervalMs, maxIntervalMs));
         }
       });
       m_MutatorThread.IsBackground = true;
       m_MutatorThread.Start();
+    }
+
+    /// <summary>
+    /// Reload a script by reading its .ts source, transpiling, and hot-reloading.
+    /// Returns true if transpilation + reload succeeded.
+    /// </summary>
+    bool ReloadScript(JsRuntimeManager vm, string relPath)
+    {
+      var tsPath = GetTsPath(relPath);
+      if (!File.Exists(tsPath))
+        return false;
+
+      var tsSource = File.ReadAllText(tsPath);
+      var jsSource = JsTranspiler.Transpile(vm.Context, tsSource);
+      if (jsSource == null)
+        return false;
+
+      var scriptName = relPath.EndsWith(".ts")
+        ? relPath[..^3]
+        : relPath;
+
+      if (!vm.HasScript(scriptName))
+        return false;
+
+      return vm.ReloadScript(scriptName, jsSource, tsPath);
+    }
+
+    void ReloadAllScripts(JsRuntimeManager vm)
+    {
+      foreach (var file in MutableFiles)
+      {
+        var scriptName = file.EndsWith(".ts") ? file[..^3] : file;
+        if (!vm.HasScript(scriptName))
+          continue;
+
+        var tsPath = GetTsPath(file);
+        if (!File.Exists(tsPath))
+          continue;
+
+        var tsSource = File.ReadAllText(tsPath);
+        var jsSource = JsTranspiler.Transpile(vm.Context, tsSource);
+        if (jsSource != null)
+        {
+          vm.ReloadScript(scriptName, jsSource, tsPath);
+          if (scriptName.StartsWith("components/"))
+            vm.ComponentReload(scriptName);
+        }
+      }
     }
 
     // ── Tests ──
@@ -206,8 +247,7 @@ namespace UnityJS.Entities.EditModeTests
       Assert.IsNotNull(vm, "VM must exist in play mode");
       vm.ClearCapturedExceptions();
 
-      var compiler = TscCompiler.Instance;
-      var initialEpoch = compiler.Epoch;
+      var initialSuccessCount = JsTranspiler.SuccessCount;
 
       StartMutatorThread(seed: 42);
 
@@ -216,19 +256,12 @@ namespace UnityJS.Entities.EditModeTests
         for (var f = 0; f < 5; f++)
           yield return null;
 
-        var epochBefore = compiler.Epoch;
-        var success = compiler.Recompile();
+        var errBefore = JsTranspiler.ErrorCount;
+        ReloadAllScripts(vm);
 
-        if (success)
+        if (JsTranspiler.ErrorCount == errBefore)
         {
-          TscFileWatcher.ReloadAllCompiledScripts(vm, compiler);
-
-          Assert.AreEqual(
-            epochBefore + 1,
-            compiler.Epoch,
-            $"Cycle {cycle}: epoch should advance by 1 on success"
-          );
-
+          // No new errors — verify health
           var health = vm.VerifyModuleHealth();
           Assert.IsNull(health, $"Cycle {cycle}: TDZ after reload: {health}");
 
@@ -237,21 +270,10 @@ namespace UnityJS.Entities.EditModeTests
             $"Cycle {cycle}: JS exceptions:\n" + string.Join("\n", vm.CapturedExceptions)
           );
         }
-        else
-        {
-          Assert.AreEqual(
-            epochBefore,
-            compiler.Epoch,
-            $"Cycle {cycle}: epoch advanced despite failed compile"
-          );
-          Assert.IsNotEmpty(
-            compiler.LastErrors,
-            $"Cycle {cycle}: failed compile but no errors reported"
-          );
-        }
       }
 
-      Assert.Greater(compiler.Epoch, initialEpoch, "At least one successful compile expected");
+      Assert.Greater(JsTranspiler.SuccessCount, initialSuccessCount,
+        "At least some transpilations should have succeeded");
     }
 
     [UnityTest]
@@ -277,15 +299,16 @@ namespace UnityJS.Entities.EditModeTests
         "Entity must be fulfilled before reload cycles"
       );
 
-      var compiler = TscCompiler.Instance;
-
       for (var cycle = 0; cycle < 10; cycle++)
       {
         var path = GetTsPath("components/slime_wander.ts");
         File.AppendAllText(path, $"// reload-{cycle}\n");
 
-        Assert.IsTrue(compiler.Recompile(), $"Cycle {cycle}: comment-only change must compile");
-        TscFileWatcher.ReloadAllCompiledScripts(vm, compiler);
+        Assert.IsTrue(
+          ReloadScript(vm, "components/slime_wander.ts"),
+          $"Cycle {cycle}: comment-only change must reload successfully"
+        );
+        vm.ComponentReload("components/slime_wander");
 
         yield return null;
 
@@ -309,8 +332,6 @@ namespace UnityJS.Entities.EditModeTests
       Assert.IsNotNull(vm);
       vm.ClearCapturedExceptions();
 
-      var compiler = TscCompiler.Instance;
-
       // Background thread does comment-only mutations for pressure
       StartMutatorThread(seed: 99, commentOnly: true);
 
@@ -323,18 +344,21 @@ namespace UnityJS.Entities.EditModeTests
         for (var f = 0; f < 3; f++)
           yield return null;
 
-        var errorResult = compiler.Recompile();
-        Assert.IsFalse(errorResult, $"Cycle {cycle}: compilation should fail with syntax error");
+        var errBefore = JsTranspiler.ErrorCount;
+        ReloadScript(vm, targetFile);
+        Assert.Greater(JsTranspiler.ErrorCount, errBefore,
+          $"Cycle {cycle}: transpilation should fail with syntax error");
 
         ApplyMutation(targetFile, MutationType.FixSyntaxError, new System.Random(cycle));
 
         for (var f = 0; f < 3; f++)
           yield return null;
 
-        var fixResult = compiler.Recompile();
-        Assert.IsTrue(fixResult, $"Cycle {cycle}: compilation should succeed after fix");
-
-        TscFileWatcher.ReloadAllCompiledScripts(vm, compiler);
+        Assert.IsTrue(
+          ReloadScript(vm, targetFile),
+          $"Cycle {cycle}: transpilation should succeed after fix"
+        );
+        vm.ComponentReload("components/slime_wander");
 
         var health = vm.VerifyModuleHealth();
         Assert.IsNull(health, $"Cycle {cycle}: TDZ after recovery: {health}");
@@ -342,7 +366,7 @@ namespace UnityJS.Entities.EditModeTests
     }
 
     [UnityTest]
-    public IEnumerator StressTest_RapidCommentMutations_AllCompileSucceed()
+    public IEnumerator StressTest_RapidCommentMutations_AllTranspileSucceed()
     {
       yield return new EnterPlayMode();
       yield return null;
@@ -351,9 +375,7 @@ namespace UnityJS.Entities.EditModeTests
       Assert.IsNotNull(vm);
       vm.ClearCapturedExceptions();
 
-      var compiler = TscCompiler.Instance;
-      var initialEpoch = compiler.Epoch;
-      var ourSuccessCount = 0;
+      var initialSuccessCount = JsTranspiler.SuccessCount;
 
       StartMutatorThread(seed: 777, minIntervalMs: 10, maxIntervalMs: 30, commentOnly: true);
 
@@ -362,28 +384,14 @@ namespace UnityJS.Entities.EditModeTests
         for (var f = 0; f < 5; f++)
           yield return null;
 
-        var epochBefore = compiler.Epoch;
-        Assert.IsTrue(
-          compiler.Recompile(),
-          $"Cycle {cycle}: comment-only mutations must always compile"
-        );
-
-        Assert.AreEqual(
-          epochBefore + 1,
-          compiler.Epoch,
-          $"Cycle {cycle}: epoch should advance by 1 on success"
-        );
-        ourSuccessCount++;
-
-        TscFileWatcher.ReloadAllCompiledScripts(vm, compiler);
+        var errBefore = JsTranspiler.ErrorCount;
+        ReloadAllScripts(vm);
+        Assert.AreEqual(errBefore, JsTranspiler.ErrorCount,
+          $"Cycle {cycle}: comment-only mutations must always transpile");
       }
 
-      Assert.AreEqual(10, ourSuccessCount, "All 10 cycles should have succeeded");
-      Assert.GreaterOrEqual(
-        compiler.Epoch,
-        initialEpoch + 10,
-        "Epoch should advance at least 10 times"
-      );
+      Assert.Greater(JsTranspiler.SuccessCount, initialSuccessCount + 10,
+        "Should have many successful transpilations");
 
       Assert.IsEmpty(
         vm.CapturedExceptions,

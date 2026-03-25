@@ -112,6 +112,7 @@ namespace UnityJS.Runtime
         JsScriptSearchPaths.AddSearchPath(basePath, 0);
 
       JsModuleLoader.Install(m_Context);
+      JsTranspiler.Initialize(m_Context);
 
       s_InstanceVersion++;
       s_Instance = this;

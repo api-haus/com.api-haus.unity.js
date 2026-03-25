@@ -9,7 +9,6 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
-using UnityJS.Editor;
 using UnityJS.Entities.Components;
 using UnityJS.Entities.Core;
 using UnityJS.Runtime;
@@ -18,7 +17,7 @@ namespace UnityJS.Integrations.Editor
 {
   /// <summary>
   /// Reusable test harness for integration E2E tests.
-  /// Provides fixture compilation, search path management, entity creation,
+  /// Provides search path management, entity creation,
   /// test input injection, and assertion helpers.
   /// </summary>
   public static class IntegrationTestHarness
@@ -38,15 +37,11 @@ namespace UnityJS.Integrations.Editor
       return Path.Combine(pkgInfo.resolvedPath, integrationRelativePath);
     }
 
-    // ── TypeScript Compilation ──
+    // ── Fixture Path Resolution ──
 
     /// <summary>
-    /// Compiles fixture .ts files via the project-root tsconfig.
-    /// All fixtures are included in the single tsconfig and compile to Library/TscBuild/.
-    /// Returns the compiled output path matching the fixture source tree.
-    ///
-    /// For fixtures with their own tsconfig.json (e.g. hot-reload stress tests),
-    /// a separate TscCompiler is used with a temp output directory.
+    /// Returns the fixtures path directly — no compilation needed.
+    /// Scripts are transpiled on-demand by JsTranspiler at load time.
     /// </summary>
     public static string CompileFixtures(string fixturesPath)
     {
@@ -55,39 +50,8 @@ namespace UnityJS.Integrations.Editor
         $"Fixtures directory does not exist: {fixturesPath}"
       );
 
-      // Fixtures with their own tsconfig compile independently (e.g. hot-reload tests)
-      var fixtureConfig = Path.Combine(fixturesPath, "tsconfig.json");
-      if (File.Exists(fixtureConfig))
-      {
-        var outDir = Path.Combine(
-          Path.GetTempPath(),
-          "unity-js-fixtures-" + fixturesPath.GetHashCode().ToString("x8")
-        );
-        var compiler = new TscCompiler(fixturesPath, outDir, fixtureConfig);
-        var success = compiler.Recompile();
-        Assert.IsTrue(
-          success,
-          $"Fixture compilation failed:\n{string.Join("\n", compiler.LastErrors)}"
-        );
-        return outDir;
-      }
-
-      // No per-fixture tsconfig — compiled by the project-root tsconfig
-      var mainCompiler = TscCompiler.Instance;
-      Assert.IsNotNull(mainCompiler, "TscCompiler.Instance not initialized");
-      mainCompiler.RecompileIfStale();
-
-      var projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
-      var normalizedFixtures = Path.GetFullPath(fixturesPath).Replace("\\", "/");
-      var normalizedRoot = projectRoot.Replace("\\", "/");
-
-      string relative;
-      if (normalizedFixtures.StartsWith(normalizedRoot + "/"))
-        relative = normalizedFixtures.Substring(normalizedRoot.Length + 1);
-      else
-        relative = normalizedFixtures;
-
-      return Path.Combine(mainCompiler.OutDir, relative);
+      // No compilation needed — .ts files are transpiled on-demand at runtime
+      return fixturesPath;
     }
 
     // ── Search Path Scope ──
@@ -100,8 +64,8 @@ namespace UnityJS.Integrations.Editor
     public static SearchPathScope UseSearchPath(string absolutePath) => new(absolutePath);
 
     /// <summary>
-    /// Registers a fixture path as the ONLY search path, removing all others
-    /// (StreamingAssets, TscBuild). Prevents game scripts from interfering with fixtures.
+    /// Registers a fixture path as the ONLY search path, removing all others.
+    /// Prevents game scripts from interfering with fixtures.
     /// Restores original paths on dispose.
     /// </summary>
     public static IsolatedSearchPathScope UseIsolatedSearchPath(string absolutePath) => new(absolutePath);
@@ -167,7 +131,6 @@ namespace UnityJS.Integrations.Editor
     /// <summary>
     /// Creates an entity with JsEntityId, LocalTransform, and a JsScript (unfulfilled)
     /// for the given script name, plus any extra component types.
-    /// Follows the same pattern as JsPlayModeCycleTests.CreateSlimeEntities.
     /// </summary>
     public static Entity CreateScriptedEntity(
       EntityManager em,

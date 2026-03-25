@@ -14,11 +14,23 @@ namespace UnityJS.Runtime
   {
     static QJSNormalizeCallback s_normalizeDelegate;
     static QJSReadFileCallback s_readFileDelegate;
+    static JSContext s_ctx;
 
     static string StripVersionSuffix(string path)
     {
       var idx = path.IndexOf("?v=", StringComparison.Ordinal);
       return idx >= 0 ? path.Substring(0, idx) : path;
+    }
+
+    /// <summary>
+    /// Resolve a file extension for a path without one.
+    /// Prefers .ts on disk, falls back to .js.
+    /// </summary>
+    static string ResolveExtension(string pathWithoutExt)
+    {
+      if (File.Exists(pathWithoutExt + ".ts"))
+        return pathWithoutExt + ".ts";
+      return pathWithoutExt + ".js";
     }
 
     [MonoPInvokeCallback(typeof(QJSNormalizeCallback))]
@@ -38,7 +50,6 @@ namespace UnityJS.Runtime
 
           if (baseStr.StartsWith("bundle://"))
           {
-            // Virtual path — resolve manually without Path.GetFullPath
             var baseDir = baseStr.Substring(0, baseStr.LastIndexOf('/'));
             var relative = nameStr;
             while (relative.StartsWith("../"))
@@ -59,29 +70,44 @@ namespace UnityJS.Runtime
         }
         else if (nameStr.StartsWith("unity.js/"))
         {
-          // Synthetic built-in module — pass specifier through as-is
           resolved = nameStr;
         }
         else
         {
-          // Bare module import — try registry then search paths
-          var searchName = nameStr;
-          if (!searchName.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
-            searchName += ".js";
+          // Bare module import — try .ts first, then .js
+          var searchNameTs = nameStr;
+          if (!searchNameTs.EndsWith(".ts", StringComparison.OrdinalIgnoreCase)
+              && !searchNameTs.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+            searchNameTs += ".ts";
 
-          if (JsScriptSourceRegistry.TryFindModule(searchName, out var resolvedPath))
+          if (JsScriptSourceRegistry.TryFindModule(searchNameTs, out var resolvedPath))
             resolved = resolvedPath;
-          else if (JsScriptSearchPaths.TryFindScript(searchName, out var foundPath, out _))
+          else if (JsScriptSearchPaths.TryFindScript(searchNameTs, out var foundPath, out _))
             resolved = foundPath;
           else
-            resolved = nameStr;
+          {
+            // Fall back to .js
+            var searchNameJs = nameStr;
+            if (!searchNameJs.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+              searchNameJs += ".js";
+
+            if (JsScriptSourceRegistry.TryFindModule(searchNameJs, out resolvedPath))
+              resolved = resolvedPath;
+            else if (JsScriptSearchPaths.TryFindScript(searchNameJs, out foundPath, out _))
+              resolved = foundPath;
+            else
+              resolved = nameStr;
+          }
         }
 
-        if (
-          !resolved.StartsWith("unity.js/")
-          && !resolved.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
-        )
-          resolved += ".js";
+        // Append extension if missing — prefer .ts on disk, fall back to .js
+        if (!resolved.StartsWith("unity.js/")
+            && !resolved.StartsWith("bundle://")
+            && !resolved.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
+            && !resolved.EndsWith(".ts", StringComparison.OrdinalIgnoreCase))
+        {
+          resolved = ResolveExtension(resolved);
+        }
 
         var bytes = Encoding.UTF8.GetBytes(resolved);
         if (bytes.Length > outBufLen)
@@ -106,8 +132,6 @@ namespace UnityJS.Runtime
           return 0;
 
         // Handle unity.js/* synthetic modules
-        // The C shim null-terminates the buffer itself (loader_trampoline),
-        // so we return raw content bytes without a trailing '\0'.
         if (nameStr.StartsWith("unity.js/"))
         {
           var source = JsBuiltinModules.GetModuleSource(nameStr);
@@ -144,10 +168,32 @@ namespace UnityJS.Runtime
 
         // Filesystem path — strip ?v=N version suffix used for cache invalidation
         var fsPath = StripVersionSuffix(nameStr);
+
+        // Try .ts variant if .js not found
+        if (!File.Exists(fsPath) && fsPath.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+        {
+          var tsPath = fsPath[..^3] + ".ts";
+          if (File.Exists(tsPath))
+            fsPath = tsPath;
+        }
+
         if (!File.Exists(fsPath))
           return 0;
 
-        var data = File.ReadAllBytes(fsPath);
+        byte[] data;
+        if (fsPath.EndsWith(".ts", StringComparison.OrdinalIgnoreCase))
+        {
+          // Transpile .ts files on the fly
+          var tsSource = File.ReadAllText(fsPath);
+          var jsSource = JsTranspiler.Transpile(s_ctx, tsSource);
+          if (jsSource == null)
+            return 0;
+          data = Encoding.UTF8.GetBytes(jsSource);
+        }
+        else
+        {
+          data = File.ReadAllBytes(fsPath);
+        }
 
         // Size query
         if (outBuf == null)
@@ -167,7 +213,7 @@ namespace UnityJS.Runtime
 
     public static void Install(JSContext ctx)
     {
-      // Keep delegates alive for the lifetime of the process
+      s_ctx = ctx;
       s_normalizeDelegate = Normalize;
       s_readFileDelegate = ReadFile;
       QJSShim.qjs_shim_set_module_loader(ctx, s_normalizeDelegate, s_readFileDelegate);
