@@ -29,7 +29,7 @@ namespace UnityJS.Integration.QuantumConsole
     static readonly Dictionary<string, CommandData> s_registeredCommands = new();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetSession()
+    internal static void ResetSession()
     {
       foreach (var cmd in s_registeredCommands.Values)
         QuantumConsoleProcessor.TryRemoveCommand(cmd);
@@ -38,8 +38,11 @@ namespace UnityJS.Integration.QuantumConsole
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void AutoRegister() =>
+    internal static void AutoRegister()
+    {
       UnityJS.Entities.Core.JsFunctionRegistry.Register("__global", RegisterGlobals);
+      JsRuntimeManager.RegisterDomainReloadHook(ResetSession, AutoRegister);
+    }
 
     static unsafe void RegisterGlobals(JSContext ctx, JSValue ns)
     {

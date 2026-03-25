@@ -32,7 +32,15 @@ namespace UnityJS.Entities.Systems.Support
 
     protected override void OnStartRunning()
     {
-      m_Vm = JsRuntimeManager.Instance ?? JsRuntimeManager.GetOrCreate();
+      // Always start with a fresh VM. A surviving VM from a previous world
+      // (or from before domain reload) has a stale QuickJS module cache —
+      // synthetic modules (unity.js/ecs, unity.js/components) bind globals
+      // at eval time, so cached namespaces reference dead bridge objects.
+      var existing = JsRuntimeManager.Instance;
+      if (existing != null && existing.IsValid)
+        existing.Dispose();
+
+      m_Vm = JsRuntimeManager.GetOrCreate();
 
       // Create bridge state if not yet set (first system to touch the VM)
       m_Vm.BridgeState ??= new JsBridgeState();

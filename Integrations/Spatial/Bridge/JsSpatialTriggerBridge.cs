@@ -37,10 +37,14 @@ namespace UnityJS.Integration.Spatial
     static readonly HashSet<int> s_pendingRemove = new();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void AutoRegister() => JsFunctionRegistry.Register("spatial", RegisterTriggerFunctions);
+    internal static void AutoRegister()
+    {
+      JsFunctionRegistry.Register("spatial", RegisterTriggerFunctions);
+      Runtime.JsRuntimeManager.RegisterDomainReloadHook(ResetSession, AutoRegister);
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetSession()
+    internal static void ResetSession()
     {
       s_callbacks.Clear();
       s_pendingRemove.Clear();

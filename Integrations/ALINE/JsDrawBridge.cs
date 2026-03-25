@@ -28,15 +28,18 @@ namespace UnityJS.Integration.ALINE
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetSession()
+    internal static void ResetSession()
     {
       s_drawColor = Color.white;
       s_drawDuration = 0;
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void AutoRegister() =>
+    internal static void AutoRegister()
+    {
       UnityJS.Entities.Core.JsFunctionRegistry.Register("draw", RegisterDrawFunctions);
+      JsRuntimeManager.RegisterDomainReloadHook(ResetSession, AutoRegister);
+    }
 
     [MonoPInvokeCallback(typeof(QJSShimCallback))]
     static unsafe void Draw_SetColor(

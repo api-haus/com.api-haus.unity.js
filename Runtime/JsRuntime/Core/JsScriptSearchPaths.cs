@@ -24,7 +24,7 @@ namespace UnityJS.Runtime
     static readonly Dictionary<string, string> s_pathToSourceId = new();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetSession()
+    internal static void ResetSession()
     {
       s_initialized = false;
       s_defaultScriptsPath = null;

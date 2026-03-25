@@ -95,7 +95,7 @@ namespace UnityJS.Entities.Core
     [UnityEngine.RuntimeInitializeOnLoadMethod(
       UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration
     )]
-    static void ResetSession()
+    internal static void ResetSession()
     {
       s_world = null;
       s_entityManager = default;

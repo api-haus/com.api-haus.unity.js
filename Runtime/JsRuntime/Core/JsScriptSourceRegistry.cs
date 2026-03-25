@@ -15,7 +15,7 @@ namespace UnityJS.Runtime
     [UnityEngine.RuntimeInitializeOnLoadMethod(
       UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration
     )]
-    static void ResetSession()
+    internal static void ResetSession()
     {
       lock (s_lock)
       {

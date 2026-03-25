@@ -10,7 +10,7 @@ namespace UnityJS.Entities.Core
     static readonly Dictionary<string, List<Action<JSContext, JSValue>>> s_registrations = new();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetSession()
+    internal static void ResetSession()
     {
       s_registrations.Clear();
     }
