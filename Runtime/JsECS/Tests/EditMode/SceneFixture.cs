@@ -144,7 +144,7 @@ namespace UnityJS.Entities.EditModeTests
 
     /// <summary>
     /// Spawn an entity with multiple component scripts (like multiple
-    /// JsScriptAuthoring on one GameObject).
+    /// JsComponentAuthoring on one GameObject).
     /// </summary>
     public Entity Spawn(string[] scriptNames, float3 position = default, string propertiesJson = null)
     {

@@ -90,6 +90,15 @@ namespace UnityJS.Entities.Core
         return true;
       }
 
+      // Fallback: check JS-defined components (ecs.define / ecs.add)
+      var slot = JsComponentStore.GetSlotForName(jsName);
+      if (slot >= 0)
+      {
+        componentType = JsComponentStore.GetTagType(slot);
+        s_components[jsName] = componentType;
+        return true;
+      }
+
       componentType = default;
       return false;
     }

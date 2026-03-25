@@ -226,6 +226,123 @@ namespace UnityJS.QJS.Tests
       *outTag = v.tag;
     }
 
+    [MonoPInvokeCallback(typeof(QJSShimCallback))]
+    static void CallbackReadsObjectProperty(
+      JSContext ctx,
+      long thisU,
+      long thisTag,
+      int argc,
+      JSValue* argv,
+      long* outU,
+      long* outTag
+    )
+    {
+      var pX = stackalloc byte[] { (byte)'x', 0 };
+      var prop = QJS.JS_GetPropertyStr(ctx, argv[0], pX);
+      *outU = prop.u;
+      *outTag = prop.tag;
+    }
+
+    [MonoPInvokeCallback(typeof(QJSShimCallback))]
+    static void CallbackReadsArrayLength(
+      JSContext ctx,
+      long thisU,
+      long thisTag,
+      int argc,
+      JSValue* argv,
+      long* outU,
+      long* outTag
+    )
+    {
+      var pLen = stackalloc byte[] { (byte)'l', (byte)'e', (byte)'n', (byte)'g', (byte)'t', (byte)'h', 0 };
+      var prop = QJS.JS_GetPropertyStr(ctx, argv[0], pLen);
+      *outU = prop.u;
+      *outTag = prop.tag;
+    }
+
+    /// <summary>
+    /// Reproduces the exact chain from JsQueryBridge.Query:
+    /// 1. argv[0] is an object {all: ['X']}
+    /// 2. JS_GetPropertyStr(ctx, argv[0], "all") → allArr
+    /// 3. JS_GetPropertyStr(ctx, allArr, "length") → lenVal (chained call on returned JSValue)
+    /// 4. JS_GetPropertyUint32(ctx, allArr, 0) → elem
+    /// Returns: [allArr.tag, len, elem.tag] encoded as allArr.tag * 10000 + len * 100 + elem.tag_abs
+    /// </summary>
+    [MonoPInvokeCallback(typeof(QJSShimCallback))]
+    static void CallbackChainedPropertyAccess(
+      JSContext ctx,
+      long thisU,
+      long thisTag,
+      int argc,
+      JSValue* argv,
+      long* outU,
+      long* outTag
+    )
+    {
+      // Step 1: read "all" from argv[0]
+      var pAll = stackalloc byte[] { (byte)'a', (byte)'l', (byte)'l', 0 };
+      var allArr = QJS.JS_GetPropertyStr(ctx, argv[0], pAll);
+
+      // Save to statics IMMEDIATELY
+      s_diagAllU = allArr.u;
+      s_diagAllTag = allArr.tag;
+
+      // Step 2: read "length" from allArr
+      var pLen = stackalloc byte[] { (byte)'l', (byte)'e', (byte)'n', (byte)'g', (byte)'t', (byte)'h', 0 };
+      var lenVal = QJS.JS_GetPropertyStr(ctx, allArr, pLen);
+      int len;
+      QJS.JS_ToInt32(ctx, &len, lenVal);
+      QJS.JS_FreeValue(ctx, lenVal);
+      s_diagLen = len;
+
+      // Step 3: read element 0 from allArr
+      var elem = QJS.JS_GetPropertyUint32(ctx, allArr, 0);
+      s_diagElemIsStr = QJS.IsString(elem) ? 1 : 0;
+
+      QJS.JS_FreeValue(ctx, elem);
+      QJS.JS_FreeValue(ctx, allArr);
+
+      var v = QJS.NewInt32(ctx, 0);
+      *outU = v.u;
+      *outTag = v.tag;
+    }
+
+    /// <summary>
+    /// Same as above but passes allArr through a helper method (tests method-call passing).
+    /// </summary>
+    [MonoPInvokeCallback(typeof(QJSShimCallback))]
+    static void CallbackChainedViaHelper(
+      JSContext ctx,
+      long thisU,
+      long thisTag,
+      int argc,
+      JSValue* argv,
+      long* outU,
+      long* outTag
+    )
+    {
+      var pAll = stackalloc byte[] { (byte)'a', (byte)'l', (byte)'l', 0 };
+      var allArr = QJS.JS_GetPropertyStr(ctx, argv[0], pAll);
+
+      int len = ReadArrayLength(ctx, allArr);
+
+      QJS.JS_FreeValue(ctx, allArr);
+
+      var v = QJS.NewInt32(ctx, len);
+      *outU = v.u;
+      *outTag = v.tag;
+    }
+
+    static unsafe int ReadArrayLength(JSContext ctx, JSValue arr)
+    {
+      var pLen = stackalloc byte[] { (byte)'l', (byte)'e', (byte)'n', (byte)'g', (byte)'t', (byte)'h', 0 };
+      var lenVal = QJS.JS_GetPropertyStr(ctx, arr, pLen);
+      int len;
+      QJS.JS_ToInt32(ctx, &len, lenVal);
+      QJS.JS_FreeValue(ctx, lenVal);
+      return len;
+    }
+
     // ── Original tests ──
 
     [Test]
@@ -392,6 +509,55 @@ namespace UnityJS.QJS.Tests
       var result = Eval("getPi()");
       Assert.IsFalse(QJS.IsException(result), "getPi() returned exception");
       Assert.AreEqual(3.14, ToFloat64(result), 0.0001);
+      QJS.JS_FreeValue(m_Ctx, result);
+    }
+
+    // Diagnostic static fields for fine-grained checking
+    static long s_diagAllU, s_diagAllTag;
+    static int s_diagLen, s_diagElemIsStr;
+
+    [Test]
+    public void Callback_ChainedPropertyAccess_Inline()
+    {
+      SetGlobalFunction("readChained", CallbackChainedPropertyAccess, 1);
+      var result = Eval("readChained({all: ['LocalTransform']})");
+      Assert.IsFalse(QJS.IsException(result), "readChained() returned exception");
+
+      // Check static diagnostics captured inside the callback
+      Assert.AreEqual(-1, s_diagAllTag, $"allArr.tag: saved immediately after JS_GetPropertyStr");
+      Assert.AreEqual(1, s_diagLen, $"length from JS_GetPropertyStr on allArr");
+      Assert.AreEqual(1, s_diagElemIsStr, $"elem[0] from JS_GetPropertyUint32 on allArr");
+      QJS.JS_FreeValue(m_Ctx, result);
+    }
+
+    [Test]
+    public void Callback_ChainedPropertyAccess_ViaHelper()
+    {
+      // Same chain but passes JSValue through a helper method
+      SetGlobalFunction("readHelper", CallbackChainedViaHelper, 1);
+      var result = Eval("readHelper({all: ['LocalTransform']})");
+      Assert.IsFalse(QJS.IsException(result), "readHelper() returned exception");
+      Assert.AreEqual(1, ToInt32(result), "helper should read array length 1");
+      QJS.JS_FreeValue(m_Ctx, result);
+    }
+
+    [Test]
+    public void Callback_ReadsObjectProperty()
+    {
+      SetGlobalFunction("readProp", CallbackReadsObjectProperty, 1);
+      var result = Eval("readProp({x: 42})");
+      Assert.IsFalse(QJS.IsException(result), "readProp() returned exception");
+      Assert.AreEqual(42, ToInt32(result), "JS_GetPropertyStr on argv[0] object should return property value");
+      QJS.JS_FreeValue(m_Ctx, result);
+    }
+
+    [Test]
+    public void Callback_ReadsArrayLength()
+    {
+      SetGlobalFunction("readLen", CallbackReadsArrayLength, 1);
+      var result = Eval("readLen([1,2,3])");
+      Assert.IsFalse(QJS.IsException(result), "readLen() returned exception");
+      Assert.AreEqual(3, ToInt32(result), "JS_GetPropertyStr 'length' on argv[0] array should return 3");
       QJS.JS_FreeValue(m_Ctx, result);
     }
   }

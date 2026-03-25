@@ -9,11 +9,6 @@ namespace UnityJS.Entities.EditModeTests
   /// <summary>
   /// E2E tests for ecs.query().withNone() filter.
   /// Uses e2e_query_filter_probe.ts system.
-  ///
-  /// KNOWN FAILURE: withNone() for JS-defined components does not work correctly
-  /// through the native query bridge. The filtered query returns 0 matches even
-  /// when no entities have the excluded tag. This test intentionally fails to
-  /// document the limitation and will pass once the issue is fixed.
   /// </summary>
   public class QueryFilterE2ETests
   {

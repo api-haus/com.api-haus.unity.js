@@ -67,7 +67,7 @@
 * JS ECS benchmark suite, expose _nativeQuery globally ([c7f8ba3](https://github.com/api-haus/unity.js/commit/c7f8ba3943d6d98ff711ab21a95badc163e2662d))
 * refactor benchmarks to read-write only, codegen query bridge improvements ([b493d0b](https://github.com/api-haus/unity.js/commit/b493d0b18c94205301bf2ff3b8fb51c06c4e6b23))
 * replace LuaJIT with QuickJS-ng P/Invoke bindings ([7caab57](https://github.com/api-haus/unity.js/commit/7caab57c65289af00ec745acae1a3e57c7c31e8b))
-* restrict JsScriptAuthoring inspector to public fields only ([aff6a58](https://github.com/api-haus/unity.js/commit/aff6a585e40c93014dcae3732c75a8b3cc2119a5))
+* restrict JsComponentAuthoring inspector to public fields only ([aff6a58](https://github.com/api-haus/unity.js/commit/aff6a585e40c93014dcae3732c75a8b3cc2119a5))
 * Stage 3 — ECS core (UnityJS.Entities assembly) ([a1c1674](https://github.com/api-haus/unity.js/commit/a1c1674a4f7401e814e040742490d5645df728b1))
 * Stage 4 — fill 47 bridge function stubs, add EditMode test suite ([190a491](https://github.com/api-haus/unity.js/commit/190a4916cfffbbaada698d1c7bb1978073dad989))
 * Stage 5-7,9 — remove legacy Lua, port editor tools to JS, enable codegen ([5e69b21](https://github.com/api-haus/unity.js/commit/5e69b21541382914afca0862170ecda8d24db5e9))

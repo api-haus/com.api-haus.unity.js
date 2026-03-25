@@ -1,4 +1,8 @@
+#ifdef USE_COMPAT_HEADER
+#include "quickjs_compat.h"
+#else
 #include "quickjs.h"
+#endif
 #include <stdint.h>
 #include <string.h>
 
@@ -100,6 +104,29 @@ SHIM_API void qjs_shim_set_module_loader(JSContext *ctx,
     s_read_file_cb = read_file_cb;
     JS_SetModuleLoaderFunc(JS_GetRuntime(ctx),
                            normalize_trampoline, loader_trampoline, NULL);
+}
+
+/* Workaround for Mono P/Invoke bug: JS_GetPropertyStr with a JSValue returned
+   from a prior P/Invoke call mismarshals the 16-byte struct. Taking u/tag as
+   separate int64s avoids the struct-by-value issue. */
+SHIM_API JSValue qjs_shim_get_property_str(JSContext *ctx,
+                                            int64_t obj_u, int64_t obj_tag,
+                                            const char *prop)
+{
+    JSValue obj;
+    int64_t *pu = (int64_t *)&obj;
+    pu[0] = obj_u;
+    pu[1] = obj_tag;
+    return JS_GetPropertyStr(ctx, obj, prop);
+}
+
+SHIM_API int qjs_shim_is_array(JSContext *ctx, int64_t val_u, int64_t val_tag)
+{
+    JSValue val;
+    int64_t *pv = (int64_t *)&val;
+    pv[0] = val_u;
+    pv[1] = val_tag;
+    return JS_IsArray(ctx, val);
 }
 
 SHIM_API JSValue qjs_shim_new_float32array(JSContext *ctx, const float *data, int count)

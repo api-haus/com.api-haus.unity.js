@@ -4,12 +4,12 @@ namespace UnityJS.Entities.Authoring
   using Unity.Entities;
   using UnityEngine;
 
-  [AddComponentMenu("JS/Js Script Authoring")]
+  [AddComponentMenu("JS/Js Component Authoring")]
   [RequireComponent(typeof(JsScriptBufferAuthoring))]
-  public class JsScriptAuthoring : MonoBehaviour
+  public class JsComponentAuthoring : MonoBehaviour
   {
-    [Tooltip("Path relative to project root (e.g. Assets/StreamingAssets/unity.js/components/slime_wander.ts)")]
-    public string scriptPath;
+    [Tooltip("Component name (e.g. slime_wander, slime_spatial)")]
+    public string componentName;
 
     [Tooltip(
       "How this entity uses transforms. Set to Dynamic if the script modifies LocalTransform."
@@ -18,7 +18,7 @@ namespace UnityJS.Entities.Authoring
 
     public List<JsSerializedProperty> propertyOverrides = new();
 
-    public bool HasValidScript => !string.IsNullOrEmpty(scriptPath);
+    public bool HasValidComponent => !string.IsNullOrEmpty(componentName);
 
     void Reset()
     {

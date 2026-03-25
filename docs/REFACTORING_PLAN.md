@@ -61,7 +61,7 @@ Each "almost" costs 2-8 hours of debugging across conversations.
 | **Spatial queries** | `spatial.query(tag, shape)`, `spatial.trigger(eid, tag, shape).on('enter', cb)` | `JsSpatialBridge.cs`, `JsSpatialTriggerBridge.cs` |
 | **System info** | `system.deltaTime()`, `system.time()`, `system.random()` | `JsSystemBridge.cs` |
 | **Type system** | `float2/3/4`, `entity`, `ComponentAccessor<T>`, `QueryBuilder` | `globals.d.ts`, `modules.d.ts` |
-| **Authoring** | `JsScriptAuthoring` MonoBehaviour on GameObjects (editor) | `JsScriptAuthoring.cs`, `JsScriptBufferAuthoring.cs` |
+| **Authoring** | `JsComponentAuthoring` MonoBehaviour on GameObjects (editor) | `JsComponentAuthoring.cs`, `JsScriptBufferAuthoring.cs` |
 | **Hot reload** | Edit `.ts` file → auto-recompile → live update in play mode | `TscCompiler`, `JsHotReloadSystem` |
 
 ### Layer 2: Architectural Features (internal systems)

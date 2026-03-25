@@ -25,7 +25,7 @@ namespace UnityJS.Entities.Authoring
 
     public class Baker : Baker<JsScriptBufferAuthoring>
     {
-      readonly List<JsScriptAuthoring> m_Scripts = new();
+      readonly List<JsComponentAuthoring> m_Scripts = new();
       readonly StringBuilder m_JsonBuilder = new();
 
       public override void Bake(JsScriptBufferAuthoring authoring)
@@ -39,7 +39,7 @@ namespace UnityJS.Entities.Authoring
         {
           DependsOn(script);
 
-          if (script == null || !script.HasValidScript)
+          if (script == null || !script.HasValidComponent)
             continue;
 
           hasValidScript = true;
@@ -57,10 +57,10 @@ namespace UnityJS.Entities.Authoring
 
         foreach (var scriptAuthor in m_Scripts)
         {
-          if (scriptAuthor == null || string.IsNullOrEmpty(scriptAuthor.scriptPath))
+          if (scriptAuthor == null || string.IsNullOrEmpty(scriptAuthor.componentName))
             continue;
 
-          var scriptId = JsScriptPathUtility.NormalizeScriptId(scriptAuthor.scriptPath);
+          var scriptId = "components/" + scriptAuthor.componentName;
           if (string.IsNullOrEmpty(scriptId))
             continue;
 

@@ -159,23 +159,18 @@ namespace UnityJS.Entities.Core
       if (argc >= 1 && QJS.IsObject(argv[0]) && QJS.JS_IsArray(ctx, argv[0]) == 0)
       {
         // Table form: { all: [...], none: [...] }
-        var pAllBytes = QJS.U8("all");
-        var pNoneBytes = QJS.U8("none");
-        fixed (
-          byte* pAll = pAllBytes,
-            pNone = pNoneBytes
-        )
-        {
-          var allArr = QJS.JS_GetPropertyStr(ctx, argv[0], pAll);
-          if (QJS.IsObject(allArr) && QJS.JS_IsArray(ctx, allArr) != 0)
-            ReadJsComponentArray(ctx, allArr, allComponents);
-          QJS.JS_FreeValue(ctx, allArr);
+        var pAll = stackalloc byte[] { (byte)'a', (byte)'l', (byte)'l', 0 };
+        var pNone = stackalloc byte[] { (byte)'n', (byte)'o', (byte)'n', (byte)'e', 0 };
 
-          var noneArr = QJS.JS_GetPropertyStr(ctx, argv[0], pNone);
-          if (QJS.IsObject(noneArr) && QJS.JS_IsArray(ctx, noneArr) != 0)
-            ReadJsComponentArray(ctx, noneArr, noneComponents);
-          QJS.JS_FreeValue(ctx, noneArr);
-        }
+        var allArr = QJS.JS_GetPropertyStr(ctx, argv[0], pAll);
+        if (QJS.IsObject(allArr))
+          ReadJsComponentArray(ctx, allArr, allComponents);
+        QJS.JS_FreeValue(ctx, allArr);
+
+        var noneArr = QJS.JS_GetPropertyStr(ctx, argv[0], pNone);
+        if (QJS.IsObject(noneArr))
+          ReadJsComponentArray(ctx, noneArr, noneComponents);
+        QJS.JS_FreeValue(ctx, noneArr);
       }
       else
       {
@@ -223,28 +218,25 @@ namespace UnityJS.Entities.Core
       SetResult(outU, outTag, QJS.JS_NewArray(ctx));
     }
 
-    static unsafe void ReadJsComponentArray(JSContext ctx, JSValue arr, List<ComponentType> result)
+static unsafe void ReadJsComponentArray(JSContext ctx, JSValue arr, List<ComponentType> result)
     {
-      var pLengthBytes = QJS.U8("length");
-      fixed (byte* pLength = pLengthBytes)
+      var pLength = stackalloc byte[] { (byte)'l', (byte)'e', (byte)'n', (byte)'g', (byte)'t', (byte)'h', 0 };
+      var lenVal = QJS.JS_GetPropertyStr(ctx, arr, pLength);
+      int len;
+      QJS.JS_ToInt32(ctx, &len, lenVal);
+      QJS.JS_FreeValue(ctx, lenVal);
+
+      for (uint i = 0; i < len; i++)
       {
-        var lenVal = QJS.JS_GetPropertyStr(ctx, arr, pLength);
-        int len;
-        QJS.JS_ToInt32(ctx, &len, lenVal);
-        QJS.JS_FreeValue(ctx, lenVal);
-
-        for (uint i = 0; i < len; i++)
+        var elem = QJS.JS_GetPropertyUint32(ctx, arr, i);
+        if (QJS.IsString(elem))
         {
-          var elem = QJS.JS_GetPropertyUint32(ctx, arr, i);
-          if (QJS.IsString(elem))
-          {
-            var name = QJS.ToManagedString(ctx, elem);
-            if (name != null && JsComponentRegistry.TryGetComponentType(name, out var ct))
-              result.Add(ct);
-          }
-
-          QJS.JS_FreeValue(ctx, elem);
+          var name = QJS.ToManagedString(ctx, elem);
+          if (name != null && JsComponentRegistry.TryGetComponentType(name, out var ct))
+            result.Add(ct);
         }
+
+        QJS.JS_FreeValue(ctx, elem);
       }
     }
 

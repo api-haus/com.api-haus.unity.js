@@ -609,7 +609,7 @@ namespace UnityJS.Entities.Core
     };
     // @formatter:on
 
-    static ComponentType GetTagType(int slot)
+    internal static ComponentType GetTagType(int slot)
     {
       if (slot < 0 || slot >= MaxSlots)
         throw new System.InvalidOperationException($"Tag pool slot {slot} out of range");

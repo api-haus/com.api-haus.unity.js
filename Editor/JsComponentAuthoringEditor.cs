@@ -7,19 +7,19 @@ namespace UnityJS.Editor
   using UnityEditor;
   using UnityEngine;
 
-  [CustomEditor(typeof(JsScriptAuthoring))]
-  public class JsScriptAuthoringEditor : UnityEditor.Editor
+  [CustomEditor(typeof(JsComponentAuthoring))]
+  public class JsComponentAuthoringEditor : UnityEditor.Editor
   {
-    SerializedProperty m_ScriptPath;
+    SerializedProperty m_ComponentName;
     SerializedProperty m_TransformUsageType;
     SerializedProperty m_PropertyOverrides;
     List<JsParsedProperty> m_ParsedProperties;
-    string m_LastParsedPath;
+    string m_LastParsedName;
     string m_LastParsedContent;
 
     void OnEnable()
     {
-      m_ScriptPath = serializedObject.FindProperty("scriptPath");
+      m_ComponentName = serializedObject.FindProperty("componentName");
       m_TransformUsageType = serializedObject.FindProperty("transformUsageType");
       m_PropertyOverrides = serializedObject.FindProperty("propertyOverrides");
     }
@@ -28,65 +28,45 @@ namespace UnityJS.Editor
     {
       serializedObject.Update();
 
-      DrawScriptPathField();
+      DrawComponentNameField();
       EditorGUILayout.PropertyField(m_TransformUsageType, new GUIContent("Transform Usage"));
 
-      var authoring = (JsScriptAuthoring)target;
-      if (authoring.HasValidScript)
+      var authoring = (JsComponentAuthoring)target;
+      if (authoring.HasValidComponent)
         DrawPropertyOverrides(authoring);
 
       serializedObject.ApplyModifiedProperties();
     }
 
-    void DrawScriptPathField()
+    void DrawComponentNameField()
     {
-      EditorGUILayout.BeginHorizontal();
-      EditorGUILayout.PropertyField(m_ScriptPath, new GUIContent("Script Path"));
+      EditorGUILayout.PropertyField(m_ComponentName, new GUIContent("Component"));
 
-      if (GUILayout.Button("Browse", GUILayout.Width(60)))
+      var name = m_ComponentName.stringValue;
+      if (!string.IsNullOrEmpty(name))
       {
-        var initialDir = Path.Combine(Application.streamingAssetsPath, "unity.js");
-        var path = EditorUtility.OpenFilePanel("Select TS Script", initialDir, "ts");
-        if (!string.IsNullOrEmpty(path))
-        {
-          var projectRoot = Path.GetDirectoryName(Application.dataPath);
-          var relative = GetRelativePath(path, projectRoot);
-          if (relative != null)
-          {
-            m_ScriptPath.stringValue = relative;
-            m_ParsedProperties = null;
-          }
-        }
-      }
-
-      EditorGUILayout.EndHorizontal();
-
-      // Validate
-      var scriptPath = m_ScriptPath.stringValue;
-      if (!string.IsNullOrEmpty(scriptPath))
-      {
-        var fullPath = ResolveScriptAbsolutePath(scriptPath);
+        var fullPath = ResolveComponentPath(name);
         if (fullPath == null || !File.Exists(fullPath))
-          EditorGUILayout.HelpBox($"Script not found: {scriptPath}", MessageType.Warning);
+          EditorGUILayout.HelpBox($"Component not found: {name}", MessageType.Warning);
       }
     }
 
-    void DrawPropertyOverrides(JsScriptAuthoring authoring)
+    void DrawPropertyOverrides(JsComponentAuthoring authoring)
     {
-      var scriptPath = authoring.scriptPath;
-      var fullPath = ResolveScriptAbsolutePath(scriptPath);
+      var name = authoring.componentName;
+      var fullPath = ResolveComponentPath(name);
       if (fullPath == null || !File.Exists(fullPath))
         return;
 
       var content = File.ReadAllText(fullPath);
       if (
         m_ParsedProperties == null
-        || m_LastParsedPath != scriptPath
+        || m_LastParsedName != name
         || m_LastParsedContent != content
       )
       {
         m_ParsedProperties = JsPropertyParser.Parse(content);
-        m_LastParsedPath = scriptPath;
+        m_LastParsedName = name;
         m_LastParsedContent = content;
       }
 
@@ -98,7 +78,6 @@ namespace UnityJS.Editor
 
       foreach (var parsed in m_ParsedProperties)
       {
-        // Skip internal state properties
         if (IsInternalProperty(parsed.name))
           continue;
 
@@ -186,7 +165,7 @@ namespace UnityJS.Editor
       }
     }
 
-    void SetOverride(JsScriptAuthoring authoring, string key, JsPropertyType type, float value)
+    void SetOverride(JsComponentAuthoring authoring, string key, JsPropertyType type, float value)
     {
       Undo.RecordObject(authoring, "Change JS Property");
       var idx = FindOverrideIndex(authoring.propertyOverrides, key);
@@ -203,7 +182,7 @@ namespace UnityJS.Editor
       EditorUtility.SetDirty(authoring);
     }
 
-    void SetOverrideBool(JsScriptAuthoring authoring, string key, bool value)
+    void SetOverrideBool(JsComponentAuthoring authoring, string key, bool value)
     {
       Undo.RecordObject(authoring, "Change JS Property");
       var idx = FindOverrideIndex(authoring.propertyOverrides, key);
@@ -220,7 +199,7 @@ namespace UnityJS.Editor
       EditorUtility.SetDirty(authoring);
     }
 
-    void SetOverrideString(JsScriptAuthoring authoring, string key, string value)
+    void SetOverrideString(JsComponentAuthoring authoring, string key, string value)
     {
       Undo.RecordObject(authoring, "Change JS Property");
       var idx = FindOverrideIndex(authoring.propertyOverrides, key);
@@ -237,7 +216,7 @@ namespace UnityJS.Editor
       EditorUtility.SetDirty(authoring);
     }
 
-    void SetOverrideVector2(JsScriptAuthoring authoring, string key, Vector2 value)
+    void SetOverrideVector2(JsComponentAuthoring authoring, string key, Vector2 value)
     {
       Undo.RecordObject(authoring, "Change JS Property");
       var idx = FindOverrideIndex(authoring.propertyOverrides, key);
@@ -254,7 +233,7 @@ namespace UnityJS.Editor
       EditorUtility.SetDirty(authoring);
     }
 
-    void SetOverrideVector3(JsScriptAuthoring authoring, string key, Vector3 value)
+    void SetOverrideVector3(JsComponentAuthoring authoring, string key, Vector3 value)
     {
       Undo.RecordObject(authoring, "Change JS Property");
       var idx = FindOverrideIndex(authoring.propertyOverrides, key);
@@ -281,27 +260,34 @@ namespace UnityJS.Editor
 
     static bool IsInternalProperty(string name)
     {
-      // Skip properties that are runtime state, not configurable from inspector
       return name is "pauseTimer" or "paused" or "target" or "origin";
     }
 
-    static string ResolveScriptAbsolutePath(string scriptPath)
+    /// <summary>
+    /// Resolve a component name to an absolute .ts file path by searching
+    /// {searchPath}/components/{name}.ts across all registered search paths.
+    /// </summary>
+    static string ResolveComponentPath(string componentName)
     {
-      if (string.IsNullOrEmpty(scriptPath))
+      if (string.IsNullOrEmpty(componentName))
         return null;
+
+      var relativePath = "components/" + componentName + ".ts";
+
+      // Check default StreamingAssets path
+      var defaultBase = JsScriptPathUtility.SCRIPTS_FOLDER_RELATIVE;
       var projectRoot = Path.GetDirectoryName(Application.dataPath);
-      return Path.Combine(projectRoot, scriptPath);
-    }
+      var candidate = Path.Combine(projectRoot, defaultBase, relativePath);
+      if (File.Exists(candidate))
+        return candidate;
 
-    static string GetRelativePath(string fullPath, string basePath)
-    {
-      fullPath = fullPath.Replace('\\', '/');
-      basePath = basePath.Replace('\\', '/');
-      if (!basePath.EndsWith("/"))
-        basePath += "/";
-
-      if (fullPath.StartsWith(basePath))
-        return fullPath.Substring(basePath.Length);
+      // Check registered search paths
+      foreach (var searchPath in JsScriptPathUtility.GetSearchPaths())
+      {
+        candidate = Path.Combine(searchPath, relativePath);
+        if (File.Exists(candidate))
+          return candidate;
+      }
 
       return null;
     }

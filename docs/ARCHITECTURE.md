@@ -142,7 +142,7 @@ These are what TypeScript developers interact with.
 | **Spatial queries** | `spatial.query(tag, shape)`, `spatial.trigger(eid, tag, shape).on('enter', cb)` | `JsSpatialBridge.cs`, `JsSpatialTriggerBridge.cs` |
 | **System info** | `system.deltaTime()`, `system.time()`, `system.random()` | `JsSystemBridge.cs` |
 | **Hot reload** | Edit `.ts` → auto-recompile → live update | `TscCompiler`, `JsHotReloadSystem` |
-| **Authoring** | `JsScriptAuthoring` MonoBehaviour on GameObjects | `JsScriptAuthoring.cs` |
+| **Authoring** | `JsComponentAuthoring` MonoBehaviour on GameObjects | `JsComponentAuthoring.cs` |
 
 ### Layer 2: Architectural Features
 
@@ -200,7 +200,7 @@ sequenceDiagram
     participant Tick as TickSystem<br/>(Layer 4)
     participant Cleanup as CleanupSystem<br/>(Layer 4)
 
-    Editor->>Baker: JsScriptAuthoring on GameObject
+    Editor->>Baker: JsComponentAuthoring on GameObject
     Baker->>Baker: Bake → JsScript { stateRef=-1, scriptName }
 
     Note over InitSys: InitializationSystemGroup (first)
@@ -596,7 +596,7 @@ All entity/component mutations from JS go through `EntityCommandBuffer`. No dire
 | `Editor/TscBuildPreprocessor.cs` | Pre-build compilation |
 | `Editor/JsHotReloadSystem.cs` | Runtime hot reload |
 | `Editor/JsTypeStubGenerator.cs` | Auto-generate .d.ts |
-| `Editor/JsScriptAuthoringEditor.cs` | Inspector UI |
+| `Editor/JsComponentAuthoringEditor.cs` | Inspector UI |
 | `Editor/JsPropertyParser.cs` | Property annotation parsing |
 
 ### Integrations (Optional Layer 3-4)
@@ -631,7 +631,7 @@ These are the rules that, when violated, cause the failures cataloged in the roo
 
 | Bug | Root Cause | Test | Fix |
 |-----|-----------|------|-----|
-| `withNone()` silently ignores JS-defined components | `JsComponentRegistry.TryGetComponentType()` only checks C#-registered components, not `JsComponentStore.NameToSlot`. JS component names are dropped from the none-list in `JsQueryBridge.ReadJsComponentArray()`. | `QueryFilterE2ETests.WithNone_ExcludesTaggedEntities` (FAILING) | Add `JsComponentStore` fallback in `TryGetComponentType` returning `JsDynTag[slot]` |
+| *(none currently)* | | | |
 
 ---
 
@@ -684,13 +684,13 @@ Instead of Unity scene files (closed YAML format, fragile, hard for agents to cr
 
 using var scene = new SceneFixture(world);
 
-// Spawn a component entity (like putting JsScriptAuthoring on a GameObject)
+// Spawn a component entity (like putting JsComponentAuthoring on a GameObject)
 var slime = scene.Spawn("components/slime_wander", new float3(0, 1, 0));
 
 // Spawn with property overrides (like setting values in the Inspector)
 var fast = scene.Spawn("components/movement", float3.zero, @"{""speed"":50}");
 
-// Spawn with multiple scripts (like multiple JsScriptAuthoring on one GO)
+// Spawn with multiple scripts (like multiple JsComponentAuthoring on one GO)
 var multi = scene.Spawn(new[] { "components/health", "components/armor" });
 
 // Spawn a bare entity (no scripts, just transform + ID — for query targets)

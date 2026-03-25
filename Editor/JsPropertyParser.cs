@@ -23,7 +23,7 @@ namespace UnityJS.Editor
   {
     // Match: public <name> = <value>
     // Also matches: public <name>: <type> = <value>
-    // Only public fields are exposed in JsScriptAuthoring inspector.
+    // Only public fields are exposed in JsComponentAuthoring inspector.
     static readonly Regex s_PropertyRegex = new(@"^\s*public\s+(\w+)(?:\s*:\s*\w+)?\s*=\s*(.+)$");
 
     static readonly Regex s_Float3Call = new(
