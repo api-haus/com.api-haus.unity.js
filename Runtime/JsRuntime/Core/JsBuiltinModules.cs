@@ -183,7 +183,7 @@ export const get = s.get.bind(s);
 export const query = s.query.bind(s);
 export const sphere = s.sphere.bind(s);
 export const box = s.box.bind(s);
-export function trigger() { return globalThis.spatial.trigger.apply(globalThis.spatial, arguments); }
+export const trigger = s.trigger.bind(s);
 ";
 
         case "unity.js/system":

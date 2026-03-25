@@ -12,6 +12,26 @@ namespace MiniSpatial
     public Vector3 halfExtents = Vector3.one;
     public Vector3 center;
 
+#if UNITY_EDITOR
+    void OnDrawGizmosSelected()
+    {
+      Gizmos.matrix = transform.localToWorldMatrix;
+
+      if (shapeType == SpatialShapeType.Sphere)
+      {
+        Gizmos.color = Color.green;
+        Gizmos.DrawWireSphere(center, radius);
+      }
+      else
+      {
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireCube(center, halfExtents * 2);
+      }
+
+      UnityEditor.Handles.Label(transform.TransformPoint(center), tag);
+    }
+#endif
+
     class Baker : Baker<SpatialAgentAuthoring>
     {
       public override void Bake(SpatialAgentAuthoring authoring)

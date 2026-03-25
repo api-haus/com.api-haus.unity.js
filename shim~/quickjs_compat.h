@@ -36,9 +36,13 @@ void *js_malloc(JSContext *ctx, size_t size);
 void js_free(JSContext *ctx, void *ptr);
 JSValue JS_Eval(JSContext *ctx, const char *input, size_t input_len,
                 const char *filename, int eval_flags);
-int JS_IsException(JSValueConst val);
+static inline int JS_IsException(JSValueConst val) {
+    return val.tag == JS_TAG_EXCEPTION;
+}
 JSValue JS_ThrowInternalError(JSContext *ctx, const char *fmt, ...);
-void *JS_VALUE_GET_PTR(JSValue val);
+static inline void *JS_VALUE_GET_PTR(JSValue val) {
+    return val.u.ptr;
+}
 int JS_ResolveModule(JSContext *ctx, JSValueConst val);
 JSValue JS_EvalFunction(JSContext *ctx, JSValue fun);
 JSValue JS_GetModuleNamespace(JSContext *ctx, JSModuleDef *m);
@@ -52,7 +56,7 @@ JSValue JS_GetPropertyStr(JSContext *ctx, JSValueConst this_obj, const char *pro
 int JS_IsArray(JSContext *ctx, JSValueConst val);
 
 /* Constants */
-#define JS_CFUNC_generic_magic 5
+#define JS_CFUNC_generic_magic 1
 #define JS_EVAL_TYPE_MODULE 1
 #define JS_EVAL_FLAG_COMPILE_ONLY (1 << 5)
 #define JS_TYPED_ARRAY_FLOAT32 10

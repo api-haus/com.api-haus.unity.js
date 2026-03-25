@@ -55,6 +55,8 @@ namespace UnityJS.Entities.Systems.Support
       InitializeVm(m_Vm, World);
       m_LastVm = m_Vm;
 
+      m_WasPlaying = UnityEngine.Application.isPlaying;
+
       UnityEngine.Debug.Log(
         $"[JsComponentInit] OnStartRunning — v{JsRuntimeManager.InstanceVersion} " +
         $"(disposedStale={hadExisting})");

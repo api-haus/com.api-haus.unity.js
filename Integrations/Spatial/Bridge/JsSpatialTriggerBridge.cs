@@ -37,7 +37,10 @@ namespace UnityJS.Integration.Spatial
     static readonly HashSet<int> s_pendingRemove = new();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    internal static void AutoRegister() => JsFunctionRegistry.Register("spatial", RegisterTriggerFunctions);
+    internal static void AutoRegister()
+    {
+      JsFunctionRegistry.Register("spatial", RegisterTriggerFunctions);
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     internal static void ResetSession()
@@ -46,12 +49,16 @@ namespace UnityJS.Integration.Spatial
       s_pendingRemove.Clear();
     }
 
+    static readonly unsafe QJSShimCallback s_triggerCallback = Spatial_Trigger;
+    static readonly unsafe QJSShimCallback s_onCallback = Handle_On;
+    static readonly unsafe QJSShimCallback s_destroyCallback = Handle_Destroy;
+
     static unsafe void RegisterTriggerFunctions(JSContext ctx, JSValue ns)
     {
       var bytes = Encoding.UTF8.GetBytes("trigger\0");
       fixed (byte* p = bytes)
       {
-        var fn = QJSShim.qjs_shim_new_function(ctx, Spatial_Trigger, p, 3);
+        var fn = QJSShim.qjs_shim_new_function(ctx, s_triggerCallback, p, 3);
         QJS.JS_SetPropertyStr(ctx, ns, p, fn);
       }
     }
@@ -82,64 +89,43 @@ namespace UnityJS.Integration.Spatial
     {
       int entityId;
       QJS.JS_ToInt32(ctx, &entityId, argv[0]);
-      if (entityId <= 0)
-      {
-        RetUndefined(outU, outTag);
-        return;
-      }
+      if (entityId <= 0) { RetUndefined(outU, outTag); return; }
 
       var tagHash = ReadTagHash(ctx, argv, 1);
-      if (tagHash == 0)
-      {
-        RetUndefined(outU, outTag);
-        return;
-      }
+      if (tagHash == 0) { RetUndefined(outU, outTag); return; }
 
       var shape = MarshalShape(ctx, argv[2]);
 
       if (!JsECSBridge.TryGetBurstContextECB(out var ecb))
-      {
-        RetUndefined(outU, outTag);
-        return;
-      }
+      { RetUndefined(outU, outTag); return; }
 
       var entity = JsECSBridge.GetEntityFromIdBurst(entityId);
       if (entity == Entity.Null)
-      {
-        RetUndefined(outU, outTag);
-        return;
-      }
+      { RetUndefined(outU, outTag); return; }
 
-      // If entity already has a trigger, free old callbacks
       if (s_callbacks.TryGetValue(entityId, out var oldCb))
         FreeCallbacks(ctx, ref oldCb);
 
-      // Add ECS components via ECB
       ecb.AddComponent(entity, new SpatialTrigger { shape = shape, targetTag = tagHash });
       ecb.AddBuffer<StatefulSpatialOverlap>(entity);
       ecb.AddBuffer<PreviousSpatialOverlap>(entity);
 
-      // Initialize empty callbacks
       s_callbacks[entityId] = new TriggerCallbacks();
 
-      // Build JS handle object
       var handle = QJS.JS_NewObject(ctx);
 
-      // Store entity ID on handle
       fixed (byte* pEid = s_eid)
         QJS.JS_SetPropertyStr(ctx, handle, pEid, QJS.NewInt32(ctx, entityId));
 
-      // .on(eventName, callback) method
       fixed (byte* pOn = s_on)
       {
-        var onFn = QJSShim.qjs_shim_new_function(ctx, Handle_On, pOn, 2);
+        var onFn = QJSShim.qjs_shim_new_function(ctx, s_onCallback, pOn, 2);
         QJS.JS_SetPropertyStr(ctx, handle, pOn, onFn);
       }
 
-      // .destroy() method
       fixed (byte* pDestroy = s_destroy)
       {
-        var destroyFn = QJSShim.qjs_shim_new_function(ctx, Handle_Destroy, pDestroy, 0);
+        var destroyFn = QJSShim.qjs_shim_new_function(ctx, s_destroyCallback, pDestroy, 0);
         QJS.JS_SetPropertyStr(ctx, handle, pDestroy, destroyFn);
       }
 
@@ -162,10 +148,8 @@ namespace UnityJS.Integration.Spatial
       long* outTag
     )
     {
-      // 'this' is the handle object
       var thisVal = new JSValue { u = thisU, tag = thisTag };
 
-      // Read entity ID from handle
       int entityId;
       fixed (byte* pEid = s_eid)
       {
@@ -176,15 +160,12 @@ namespace UnityJS.Integration.Spatial
 
       if (!s_callbacks.TryGetValue(entityId, out var cb))
       {
-        // Handle is dead or invalid, return this for chaining
+        QJS.JS_DupValue(ctx, thisVal);
         *outU = thisVal.u;
         *outTag = thisVal.tag;
-        // Dup since we're returning it
-        QJS.JS_DupValue(ctx, thisVal);
         return;
       }
 
-      // Read event name
       var namePtr = QJS.JS_ToCString(ctx, argv[0]);
       if (namePtr == null)
       {
@@ -202,22 +183,16 @@ namespace UnityJS.Integration.Spatial
       switch (name)
       {
         case "enter":
-          if (cb.hasEnter)
-            QJS.JS_FreeValue(ctx, cb.enter);
-          cb.enter = callback;
-          cb.hasEnter = true;
+          if (cb.hasEnter) QJS.JS_FreeValue(ctx, cb.enter);
+          cb.enter = callback; cb.hasEnter = true;
           break;
         case "stay":
-          if (cb.hasStay)
-            QJS.JS_FreeValue(ctx, cb.stay);
-          cb.stay = callback;
-          cb.hasStay = true;
+          if (cb.hasStay) QJS.JS_FreeValue(ctx, cb.stay);
+          cb.stay = callback; cb.hasStay = true;
           break;
         case "exit":
-          if (cb.hasExit)
-            QJS.JS_FreeValue(ctx, cb.exit);
-          cb.exit = callback;
-          cb.hasExit = true;
+          if (cb.hasExit) QJS.JS_FreeValue(ctx, cb.exit);
+          cb.exit = callback; cb.hasExit = true;
           break;
         default:
           QJS.JS_FreeValue(ctx, callback);
@@ -226,7 +201,6 @@ namespace UnityJS.Integration.Spatial
 
       s_callbacks[entityId] = cb;
 
-      // Return this for chaining
       QJS.JS_DupValue(ctx, thisVal);
       *outU = thisVal.u;
       *outTag = thisVal.tag;
@@ -253,20 +227,16 @@ namespace UnityJS.Integration.Spatial
         QJS.JS_FreeValue(ctx, eidVal);
       }
 
-      // Mark handle as dead
       fixed (byte* pDead = s_dead)
         QJS.JS_SetPropertyStr(ctx, thisVal, pDead, QJS.NewBool(ctx, true));
 
-      // Free callbacks
       if (s_callbacks.TryGetValue(entityId, out var cb))
       {
         FreeCallbacks(ctx, ref cb);
         s_callbacks.Remove(entityId);
       }
 
-      // Queue for ECS component removal
       s_pendingRemove.Add(entityId);
-
       RetUndefined(outU, outTag);
     }
 

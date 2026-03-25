@@ -4,6 +4,7 @@
 #include "quickjs.h"
 #endif
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #ifdef _WIN32
@@ -27,9 +28,34 @@ typedef void (*ManagedCallback)(
 static ManagedCallback s_callbacks[MAX_CALLBACKS];
 static int s_count = 0;
 
+/* ── Module deduplication ── */
+
+#define MAX_MODULES 256
+
+static struct { char *name; JSModuleDef *def; } s_modules[MAX_MODULES];
+static int s_module_count = 0;
+
+static JSModuleDef *find_module(const char *name)
+{
+    for (int i = 0; i < s_module_count; i++)
+        if (strcmp(s_modules[i].name, name) == 0)
+            return s_modules[i].def;
+    return NULL;
+}
+
+static void track_module(const char *name, JSModuleDef *def)
+{
+    if (s_module_count >= MAX_MODULES) return;
+    s_modules[s_module_count].name = strdup(name);
+    s_modules[s_module_count].def = def;
+    s_module_count++;
+}
+
 static JSValue trampoline(JSContext *ctx, JSValueConst this_val,
                           int argc, JSValueConst *argv, int magic)
 {
+    if (magic < 0 || magic >= s_count || !s_callbacks[magic])
+        return JS_UNDEFINED;
     JSValue result;
     int64_t *pu = (int64_t *)&result;
     int64_t *ptag = pu + 1;
@@ -53,6 +79,9 @@ SHIM_API JSValue qjs_shim_new_function(JSContext *ctx, ManagedCallback cb,
 SHIM_API void qjs_shim_reset(void)
 {
     s_count = 0;
+    for (int i = 0; i < s_module_count; i++)
+        free(s_modules[i].name);
+    s_module_count = 0;
 }
 
 /* ── Module loader trampolines ── */
@@ -79,6 +108,10 @@ static char *normalize_trampoline(JSContext *ctx, const char *base,
 
 static JSModuleDef *loader_trampoline(JSContext *ctx, const char *name, void *opaque)
 {
+    /* Return cached module if already loaded */
+    JSModuleDef *cached = find_module(name);
+    if (cached) return cached;
+
     /* Query length */
     int len = s_read_file_cb(name, NULL, 0);
     if (len <= 0) return NULL;
@@ -92,6 +125,7 @@ static JSModuleDef *loader_trampoline(JSContext *ctx, const char *name, void *op
     js_free(ctx, buf);
     if (JS_IsException(val)) return NULL;
     JSModuleDef *m = (JSModuleDef *)JS_VALUE_GET_PTR(val);
+    track_module(name, m);
     JS_FreeValue(ctx, val);
     return m;
 }
@@ -153,12 +187,19 @@ SHIM_API JSValue qjs_shim_eval_module(JSContext *ctx,
                                        const char *source, int source_len,
                                        const char *filename)
 {
+    /* Return cached namespace if this module was already loaded (e.g. as a
+       dependency of another module via loader_trampoline). */
+    JSModuleDef *cached = find_module(filename);
+    if (cached)
+        return JS_GetModuleNamespace(ctx, cached);
+
     JSValue compiled = JS_Eval(ctx, source, source_len, filename,
                                JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
     if (JS_IsException(compiled))
         return compiled;
 
     JSModuleDef *m = (JSModuleDef *)JS_VALUE_GET_PTR(compiled);
+    track_module(filename, m);
 
     if (JS_ResolveModule(ctx, compiled) < 0) {
         JS_FreeValue(ctx, compiled);
