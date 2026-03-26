@@ -39,7 +39,7 @@ namespace UnityJS.Entities.Authoring
         {
           DependsOn(script);
 
-          if (script == null || !script.HasValidComponent)
+          if (script == null || !script.enabled || !script.HasValidComponent)
             continue;
 
           hasValidScript = true;
@@ -57,7 +57,7 @@ namespace UnityJS.Entities.Authoring
 
         foreach (var scriptAuthor in m_Scripts)
         {
-          if (scriptAuthor == null || string.IsNullOrEmpty(scriptAuthor.componentName))
+          if (scriptAuthor == null || !scriptAuthor.enabled || string.IsNullOrEmpty(scriptAuthor.componentName))
             continue;
 
           var scriptId = "components/" + scriptAuthor.componentName;

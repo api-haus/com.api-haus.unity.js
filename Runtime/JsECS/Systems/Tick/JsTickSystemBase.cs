@@ -49,12 +49,10 @@ namespace UnityJS.Entities.Systems.Tick
       if (vm == null || !vm.IsValid)
         return;
 
-      state.EntityManager.CompleteDependencyBeforeRW<LocalTransform>();
+      state.CompleteDependency();
       tickState.TransformLookup.Update(ref state);
       tickState.ScriptBufferLookup.Update(ref state);
-
       JsComponentRegistry.UpdateAllLookups(ref state);
-      state.CompleteDependency();
 
       var worldTime = state.WorldUnmanaged.Time;
       var deltaTime = worldTime.DeltaTime;

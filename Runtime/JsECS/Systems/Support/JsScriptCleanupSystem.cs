@@ -71,8 +71,6 @@ namespace UnityJS.Entities.Systems.Support
 
         Log.Verbose("[JsCleanup] Destroying entity {0}", entities[i].Index);
         entityManager.DestroyEntity(entities[i]);
-
-        entityManager.RemoveComponent<JsScript>(entities[i]);
       }
 
       entities.Dispose();

@@ -88,11 +88,11 @@ namespace UnityJS.Entities.Systems
       RegisterSentinelEntities(ref state);
       PrewarmComponentQueries(ref state);
 
-      state.EntityManager.CompleteDependencyBeforeRW<LocalTransform>();
+      // LocalTransform deps already completed by JsScriptingSystem (runs before us).
+      // JS does not schedule ECS jobs, so no new deps can appear between the two systems.
       m_TransformLookup.Update(ref state);
 
       JsSystemBridge.UpdateContext(deltaTime, elapsedTime);
-      JsComponentRegistry.UpdateAllLookups(ref state);
 
       if (!SystemAPI.TryGetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>(out var ecbSingleton))
         return;

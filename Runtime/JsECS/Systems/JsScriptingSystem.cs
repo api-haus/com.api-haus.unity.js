@@ -118,6 +118,7 @@ namespace UnityJS.Entities.Systems
 
       m_TransformLookup.Update(this);
       m_ScriptBufferLookup.Update(this);
+      JsComponentRegistry.UpdateAllLookups(ref CheckedStateRef);
 
       JsECSBridge.UpdateBurstContext(
         m_CurrentECB,
