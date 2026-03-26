@@ -6,6 +6,7 @@ namespace UnityJS.Entities.EditModeTests
   using Unity.Mathematics;
   using UnityEngine;
   using UnityEngine.TestTools;
+  using UnityJS.Entities.Tests;
 
   /// <summary>
   /// E2E tests for the query pipeline.

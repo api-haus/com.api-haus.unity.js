@@ -1,4 +1,4 @@
-namespace UnityJS.Entities.EditModeTests
+namespace UnityJS.Entities.Tests
 {
   using NUnit.Framework;
   using Runtime;

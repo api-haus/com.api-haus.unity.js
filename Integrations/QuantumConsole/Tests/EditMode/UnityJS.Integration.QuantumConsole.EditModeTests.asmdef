@@ -14,7 +14,8 @@
     "Unity.Mathematics",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner",
-    "UnityJS.Integrations.Editor"
+    "UnityJS.Integrations.Editor",
+    "UnityJS.Entities.TestUtils"
   ],
   "includePlatforms": [
     "Editor"

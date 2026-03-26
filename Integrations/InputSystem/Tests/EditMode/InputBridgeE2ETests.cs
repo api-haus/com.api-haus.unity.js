@@ -2,6 +2,7 @@ namespace UnityJS.Integration.InputSystem.EditModeTests
 {
   using System.Collections;
   using Entities.EditModeTests;
+  using Entities.Tests;
   using NUnit.Framework;
   using Unity.Entities;
   using Unity.Mathematics;

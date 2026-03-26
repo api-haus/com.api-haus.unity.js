@@ -8,6 +8,7 @@ namespace UnityJS.Entities.EditModeTests
   using UnityEngine;
   using UnityEngine.TestTools;
 
+  using UnityJS.Entities.Tests;
   using UnityJS.Runtime;
 
   /// <summary>

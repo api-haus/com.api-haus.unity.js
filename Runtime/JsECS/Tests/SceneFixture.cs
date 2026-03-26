@@ -1,4 +1,4 @@
-namespace UnityJS.Entities.EditModeTests
+namespace UnityJS.Entities.Tests
 {
   using System;
   using System.Collections.Generic;

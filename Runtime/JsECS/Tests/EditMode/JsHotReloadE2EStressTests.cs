@@ -198,7 +198,7 @@ namespace UnityJS.Entities.EditModeTests
         return false;
 
       var tsSource = File.ReadAllText(tsPath);
-      var jsSource = JsTranspiler.Transpile(vm.Context, tsSource);
+      var jsSource = JsTranspiler.Transpile(tsSource, tsPath);
       if (jsSource == null)
         return false;
 
@@ -225,7 +225,7 @@ namespace UnityJS.Entities.EditModeTests
           continue;
 
         var tsSource = File.ReadAllText(tsPath);
-        var jsSource = JsTranspiler.Transpile(vm.Context, tsSource);
+        var jsSource = JsTranspiler.Transpile(tsSource, tsPath);
         if (jsSource != null)
         {
           vm.ReloadScript(scriptName, jsSource, tsPath);

@@ -16,7 +16,8 @@
     "Unity.Physics",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner",
-    "UnityJS.Entities.EditModeTests"
+    "UnityJS.Entities.EditModeTests",
+    "UnityJS.Entities.TestUtils"
   ],
   "includePlatforms": [
     "Editor"

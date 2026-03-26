@@ -4,6 +4,7 @@ namespace UnityJS.Entities.EditModeTests
   using NUnit.Framework;
   using Unity.Entities;
   using UnityEngine.TestTools;
+  using UnityJS.Entities.Tests;
 
   public class ComponentOrderE2ETests
   {

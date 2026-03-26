@@ -4,6 +4,7 @@ namespace UnityJS.Entities.EditModeTests
   using NUnit.Framework;
   using Unity.Entities;
   using UnityEngine.TestTools;
+  using UnityJS.Entities.Tests;
 
   /// <summary>
   /// E2E tests for color conversion bridge (hsvToRgb, rgbToHsv, oklabToRgb, rgbToOklab).

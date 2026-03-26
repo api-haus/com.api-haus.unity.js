@@ -71,12 +71,7 @@ namespace UnityJS.Runtime
     {
       var raw = File.ReadAllText(filePath);
       if (filePath.EndsWith(".ts", StringComparison.OrdinalIgnoreCase))
-      {
-        var ctx = JsRuntimeManager.Instance?.Context ?? default;
-        if (ctx.IsNull)
-          return raw; // No runtime yet — return raw (shouldn't happen in normal flow)
-        return JsTranspiler.Transpile(ctx, raw);
-      }
+        return JsTranspiler.Transpile(raw, filePath);
       return raw;
     }
 

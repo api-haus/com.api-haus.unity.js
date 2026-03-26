@@ -1,24 +1,21 @@
 {
-  "name": "UnityJS.Integration.ALINE.EditModeTests",
-  "rootNamespace": "UnityJS.Integration.ALINE.EditModeTests",
+  "name": "UnityJS.Entities.TestUtils",
+  "rootNamespace": "UnityJS.Entities.Tests",
   "references": [
     "UnityJS.QJS",
     "UnityJS.Runtime",
     "UnityJS.Entities",
-    "UnityJS.Integration.ALINE",
     "Unity.Entities",
+    "Unity.Entities.Hybrid",
     "Unity.Mathematics",
     "Unity.Collections",
-    "ALINE",
+    "Unity.Transforms",
+    "Unity.Burst",
+    "Unity.Logging",
     "UnityEngine.TestRunner",
-    "UnityEditor.TestRunner",
-    "UnityJS.Integrations.Editor",
-    "UnityJS.Entities.EditModeTests",
-    "UnityJS.Entities.TestUtils"
+    "Project.ECS"
   ],
-  "includePlatforms": [
-    "Editor"
-  ],
+  "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": true,
   "overrideReferences": true,

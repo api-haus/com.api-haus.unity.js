@@ -6,6 +6,7 @@ namespace UnityJS.Entities.EditModeTests
   using Unity.Entities;
   using Unity.Mathematics;
   using UnityEngine.TestTools;
+  using UnityJS.Entities.Tests;
 
   /// <summary>
   /// E2E tests for domain reload (enter/exit play mode cycles).

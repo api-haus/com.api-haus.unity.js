@@ -4,6 +4,7 @@ namespace UnityJS.Entities.EditModeTests
   using NUnit.Framework;
   using Unity.Entities;
   using UnityEngine.TestTools;
+  using UnityJS.Entities.Tests;
 
   /// <summary>
   /// E2E tests for system.deltaTime, system.time, system.random, system.randomInt.

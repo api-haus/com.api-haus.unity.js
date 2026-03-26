@@ -5,6 +5,7 @@ namespace UnityJS.Entities.EditModeTests
   using Unity.Entities;
   using UnityEngine;
   using UnityEngine.TestTools;
+  using UnityJS.Entities.Tests;
 
   /// <summary>
   /// E2E tests for system auto-discovery and onUpdate execution.

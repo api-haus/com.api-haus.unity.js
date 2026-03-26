@@ -185,7 +185,7 @@ namespace UnityJS.Runtime
         {
           // Transpile .ts files on the fly
           var tsSource = File.ReadAllText(fsPath);
-          var jsSource = JsTranspiler.Transpile(s_ctx, tsSource);
+          var jsSource = JsTranspiler.Transpile(tsSource, fsPath);
           if (jsSource == null)
             return 0;
           data = Encoding.UTF8.GetBytes(jsSource);

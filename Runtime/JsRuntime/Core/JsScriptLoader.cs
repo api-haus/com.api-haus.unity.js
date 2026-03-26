@@ -188,11 +188,7 @@ namespace UnityJS.Runtime
 
         // Transpile .ts files
         if (filePath.EndsWith(".ts", StringComparison.OrdinalIgnoreCase))
-        {
-          var ctx = JsRuntimeManager.Instance?.Context ?? default;
-          if (!ctx.IsNull)
-            source = JsTranspiler.Transpile(ctx, source);
-        }
+          source = JsTranspiler.Transpile(source, filePath);
 
         return source != null;
       }

@@ -5,6 +5,7 @@ namespace UnityJS.Entities.EditModeTests
   using Unity.Entities;
   using Unity.Mathematics;
   using UnityEngine.TestTools;
+  using UnityJS.Entities.Tests;
 
   public class EntityOperationsE2ETests
   {

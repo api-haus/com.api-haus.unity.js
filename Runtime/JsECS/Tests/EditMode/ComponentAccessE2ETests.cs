@@ -5,6 +5,7 @@ namespace UnityJS.Entities.EditModeTests
   using Unity.Entities;
   using Unity.Mathematics;
   using UnityEngine.TestTools;
+  using UnityJS.Entities.Tests;
 
   /// <summary>
   /// E2E tests for JS-defined component access (ecs.define/add/get/has/remove).

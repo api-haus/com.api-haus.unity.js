@@ -1,4 +1,3 @@
-using System;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
@@ -10,16 +9,11 @@ namespace UnityJS.Editor
   [InitializeOnLoad]
   static class TsStatusBarIndicator
   {
-    const double PollInterval = 1.0;
     const double PanelCheckInterval = 2.0;
 
     static VisualElement s_Container;
     static Image s_Icon;
-    static double s_LastPollTime;
     static double s_LastPanelCheck;
-    static int s_LastErrorCount;
-    static int s_LastSuccessCount;
-    static bool s_LastInitialized;
     static Texture2D s_TsIcon;
 
     static TsStatusBarIndicator()
@@ -99,32 +93,20 @@ namespace UnityJS.Editor
       s_Container.AddManipulator(new Clickable(OnClick));
       visualTree.Add(s_Container);
 
+      JsTranspiler.OnStateChanged -= OnStateChanged;
+      JsTranspiler.OnStateChanged += OnStateChanged;
+
       EditorApplication.update -= OnEditorUpdate;
       EditorApplication.update += OnEditorUpdate;
 
       UpdateIcon();
     }
 
+    static void OnStateChanged() => UpdateIcon();
+
     static void OnEditorUpdate()
     {
       var now = EditorApplication.timeSinceStartup;
-
-      if (now - s_LastPollTime >= PollInterval)
-      {
-        s_LastPollTime = now;
-
-        var errCount = JsTranspiler.ErrorCount;
-        var succCount = JsTranspiler.SuccessCount;
-        var initialized = JsTranspiler.IsInitialized;
-        if (errCount != s_LastErrorCount || succCount != s_LastSuccessCount || initialized != s_LastInitialized)
-        {
-          s_LastErrorCount = errCount;
-          s_LastSuccessCount = succCount;
-          s_LastInitialized = initialized;
-          UpdateIcon();
-        }
-      }
-
       if (now - s_LastPanelCheck > PanelCheckInterval)
       {
         s_LastPanelCheck = now;
@@ -151,7 +133,7 @@ namespace UnityJS.Editor
       {
         s_Icon.image = tsIcon;
         s_Icon.tintColor = new Color(1f, 1f, 1f, 0.4f);
-        s_Container.tooltip = "TS idle — transpiler loads on play";
+        s_Container.tooltip = "TS idle — transpiler not yet initialized";
         return;
       }
 

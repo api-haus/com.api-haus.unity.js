@@ -22,6 +22,8 @@ namespace UnityJS.Integration.QuantumConsole
       public double[] numberValues;
       public string[] stringValues;
       public double min, max, step;
+      public double defaultNumber;
+      public string defaultString;
       public string description;
     }
 
@@ -43,7 +45,7 @@ namespace UnityJS.Integration.QuantumConsole
     static unsafe void RegisterGlobals(JSContext ctx, JSValue ns)
     {
       var global = QJS.JS_GetGlobalObject(ctx);
-      AddFunction(ctx, global, "param", Param_Callback, 3);
+      AddFunction(ctx, global, "param", Param_Callback, 4);
       QJS.JS_FreeValue(ctx, global);
     }
 
@@ -52,7 +54,7 @@ namespace UnityJS.Integration.QuantumConsole
       JSContext ctx, long thisU, long thisTag, int argc, JSValue* argv,
       long* outU, long* outTag)
     {
-      if (argc < 2)
+      if (argc < 3)
       {
         SetUndefined(outU, outTag);
         return;
@@ -88,8 +90,18 @@ namespace UnityJS.Integration.QuantumConsole
         return;
       }
 
-      if (argc >= 3)
-        constraint.description = QJS.ToManagedString(ctx, argv[2]);
+      // argv[2] = default value (required)
+      if (constraint.kind == TweakConstraint.Kind.StringEnum)
+        constraint.defaultString = QJS.ToManagedString(ctx, argv[2]) ?? "";
+      else
+      {
+        double defVal;
+        QJS.JS_ToFloat64(ctx, &defVal, argv[2]);
+        constraint.defaultNumber = defVal;
+      }
+
+      if (argc >= 4)
+        constraint.description = QJS.ToManagedString(ctx, argv[3]);
 
       bool alreadyRegistered = s_tweaks.ContainsKey(name);
       s_tweaks[name] = constraint;
@@ -187,18 +199,14 @@ namespace UnityJS.Integration.QuantumConsole
       if (PrefsStore.TryGet(in key, out _))
         return;
 
-      switch (c.kind)
+      if (c.kind == TweakConstraint.Kind.StringEnum)
       {
-        case TweakConstraint.Kind.NumberEnum:
-          PrefsStore.SetNumber(in key, c.numberValues[0]);
-          break;
-        case TweakConstraint.Kind.StringEnum:
-          var sv = new FixedString64Bytes(c.stringValues[0]);
-          PrefsStore.SetString(in key, in sv);
-          break;
-        case TweakConstraint.Kind.Range:
-          PrefsStore.SetNumber(in key, c.min);
-          break;
+        var sv = new FixedString64Bytes(c.defaultString);
+        PrefsStore.SetString(in key, in sv);
+      }
+      else
+      {
+        PrefsStore.SetNumber(in key, c.defaultNumber);
       }
     }
 

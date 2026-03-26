@@ -566,7 +566,7 @@ interface UpdateState { deltaTime: number; elapsedTime: number; }
 
 // ── Tweak Commands ─────────────────────────────────────
 
-declare function param<T extends string | number>(name: string, constraint: T[] | { min: T; max: T; step?: T }, description?: string): void;
+declare function param<T extends string | number>(name: string, constraint: T[] | { min: T; max: T; step?: T }, defaultValue: T, description?: string): void;
 
 // ── Spatial Shapes ──────────────────────────────────────
 

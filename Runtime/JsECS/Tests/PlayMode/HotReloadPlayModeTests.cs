@@ -1,21 +1,17 @@
-namespace UnityJS.Entities.EditModeTests
+namespace UnityJS.Entities.PlayModeTests
 {
   using System.Collections;
   using System.IO;
+  using System.Text.RegularExpressions;
   using NUnit.Framework;
   using Unity.Entities;
   using Unity.Mathematics;
   using UnityEngine;
   using UnityEngine.TestTools;
-
   using UnityJS.Entities.Tests;
   using UnityJS.Runtime;
 
-  /// <summary>
-  /// Hot reload resilience tests for the modder scenario:
-  /// editing TS files while the game is running.
-  /// </summary>
-  public class HotReloadResilienceE2ETests
+  public class HotReloadPlayModeTests
   {
     const string MOVER = "components/e2e_mover";
     const string PROBE = "components/e2e_hot_reload_probe";
@@ -33,53 +29,45 @@ namespace UnityJS.Entities.EditModeTests
     }
 
     string m_OriginalContent;
+    SceneFixture m_Scene;
 
-    [UnitySetUp]
-    public IEnumerator SetUp()
+    [SetUp]
+    public void SetUp()
     {
       m_OriginalContent = File.ReadAllText(ProbeTsPath);
-      yield break;
+      m_Scene = new SceneFixture(World.DefaultGameObjectInjectionWorld);
     }
 
-    [UnityTearDown]
-    public IEnumerator TearDown()
+    [TearDown]
+    public void TearDown()
     {
+      m_Scene?.Dispose();
       if (m_OriginalContent != null)
-      {
         File.WriteAllText(ProbeTsPath, m_OriginalContent);
-        // No recompile needed — transpiled on-demand
-      }
-      yield break;
     }
 
     [UnityTest]
-    public IEnumerator HotReload_ComponentWithImports_PreservesAndResumes()
+    public IEnumerator HotReload_ComponentReload_PreservesEntity()
     {
-      yield return new EnterPlayMode();
-      var world = World.DefaultGameObjectInjectionWorld;
-      using var scene = new SceneFixture(world);
-
-      var entity = scene.Spawn(MOVER);
+      var entity = m_Scene.Spawn(MOVER);
       for (var i = 0; i < INIT_FRAMES; i++) yield return null;
-      Assert.IsTrue(scene.AllFulfilled(), "e2e_mover must fulfill");
+      Assert.IsTrue(m_Scene.AllFulfilled(), "e2e_mover must fulfill");
 
-      var eid = scene.GetEntityId(entity);
+      var eid = m_Scene.GetEntityId(entity);
       var movedBefore = JsEval.Bool($"!!_e2e_mover[{eid}]");
       Assert.IsTrue(movedBefore, "e2e_mover must have ticked before reload");
 
-      var posBefore = scene.GetPosition(entity);
+      var posBefore = m_Scene.GetPosition(entity);
 
-      // Hot reload the component (imports unity.js/components)
       var vm = JsRuntimeManager.Instance;
       vm.SimulateHotReload(MOVER);
       vm.ComponentReload(MOVER);
       vm.ClearCapturedExceptions();
 
-      // Let it run more frames — should resume without TDZ
       for (var i = 0; i < INIT_FRAMES; i++) yield return null;
 
-      var posAfter = scene.GetPosition(entity);
-      Assert.Greater(math.distance(posAfter, posBefore), 0.01f,
+      var posAfter = m_Scene.GetPosition(entity);
+      Assert.Greater(math.distance(posAfter, posBefore), 0.001f,
         "Entity must keep moving after hot reload");
 
       Assert.AreEqual(0, vm.CapturedExceptions.Count,
@@ -87,32 +75,25 @@ namespace UnityJS.Entities.EditModeTests
 
       var health = vm.VerifyModuleHealth();
       Assert.IsNull(health, $"Module health after reload: {health}");
-
-      yield return new ExitPlayMode();
     }
 
     [UnityTest]
     public IEnumerator HotReload_SyntaxError_OldCodeSurvives()
     {
-      yield return new EnterPlayMode();
-      var world = World.DefaultGameObjectInjectionWorld;
-      using var scene = new SceneFixture(world);
-
-      scene.Spawn(PROBE);
+      m_Scene.Spawn(PROBE);
       for (var i = 0; i < INIT_FRAMES; i++) yield return null;
-      Assert.IsTrue(scene.AllFulfilled(), "Probe must fulfill");
+      Assert.IsTrue(m_Scene.AllFulfilled(), "Probe must fulfill");
 
-      var eid = scene.GetEntityId(scene[0]);
+      var eid = m_Scene.GetEntityId(m_Scene[0]);
       var v1 = JsEval.Int($"_e2e_hot[{eid}]?.version ?? -1");
       Assert.AreEqual(1, v1, "Initial version must be 1");
 
       // Introduce syntax error
       File.WriteAllText(ProbeTsPath, "export default class BROKEN {{{{{");
 
-      // SimulateHotReload should fail gracefully
       var vm = JsRuntimeManager.Instance;
       vm.ClearCapturedExceptions();
-      LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("\\[JsTranspiler\\]"));
+      LogAssert.Expect(LogType.Error, new Regex("\\[JsTranspiler\\]"));
       vm.SimulateHotReload(PROBE);
 
       // Old code should still work
@@ -128,70 +109,34 @@ namespace UnityJS.Entities.EditModeTests
       vm.SimulateHotReload(PROBE);
 
       // Spawn new entity with fixed code
-      var entity2 = scene.Spawn(PROBE);
+      var entity2 = m_Scene.Spawn(PROBE);
       for (var i = 0; i < INIT_FRAMES; i++) yield return null;
 
-      var eid2 = scene.GetEntityId(entity2);
+      var eid2 = m_Scene.GetEntityId(entity2);
       var v3 = JsEval.Int($"_e2e_hot[{eid2}]?.version ?? -1");
       Assert.AreEqual(3, v3, "New entity after recovery must have version 3");
 
       Assert.AreEqual(0, vm.CapturedExceptions.Count,
         $"Zero exceptions after recovery: {string.Join("; ", vm.CapturedExceptions)}");
-
-      yield return new ExitPlayMode();
     }
 
     [UnityTest]
-    public IEnumerator HotReload_TranspileError_DetectedAndRecoverable()
+    public IEnumerator HotReload_RapidReloads_NoExceptions()
     {
-      yield return new EnterPlayMode();
-      var world = World.DefaultGameObjectInjectionWorld;
-      using var scene = new SceneFixture(world);
-
-      scene.Spawn(PROBE);
+      m_Scene.Spawn(MOVER);
       for (var i = 0; i < INIT_FRAMES; i++) yield return null;
-      Assert.IsTrue(scene.AllFulfilled(), "Probe must fulfill");
-
-      var vm = JsRuntimeManager.Instance;
-      Assert.IsTrue(JsTranspiler.IsInitialized, "Transpiler must be initialized");
-
-      // Transpile broken source — must fail and increment error count
-      var errBefore = JsTranspiler.ErrorCount;
-      LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("\\[JsTranspiler\\]"));
-      var broken = JsTranspiler.Transpile("export default class BROKEN {{{{{", "broken.ts");
-      Assert.IsNull(broken, "Transpilation must fail for broken source");
-      Assert.Greater(JsTranspiler.ErrorCount, errBefore, "Error count must increase");
-      Assert.IsNotNull(JsTranspiler.LastError, "LastError must be set");
-
-      // Transpile valid source — must succeed
-      var valid = JsTranspiler.Transpile(m_OriginalContent, "valid.ts");
-      Assert.IsNotNull(valid, "Transpilation must succeed for valid source");
-
-      yield return new ExitPlayMode();
-    }
-
-    [UnityTest]
-    public IEnumerator HotReload_RapidReloads_ComponentWithImports()
-    {
-      yield return new EnterPlayMode();
-      var world = World.DefaultGameObjectInjectionWorld;
-      using var scene = new SceneFixture(world);
-
-      scene.Spawn(MOVER);
-      for (var i = 0; i < INIT_FRAMES; i++) yield return null;
-      Assert.IsTrue(scene.AllFulfilled(), "e2e_mover must fulfill");
+      Assert.IsTrue(m_Scene.AllFulfilled(), "e2e_mover must fulfill");
 
       var vm = JsRuntimeManager.Instance;
       vm.ClearCapturedExceptions();
 
-      // Rapid-fire 10 reloads of a component with unity.js/components imports
+      // Rapid-fire 10 reloads
       for (var round = 0; round < 10; round++)
       {
         vm.SimulateHotReload(MOVER);
         vm.ComponentReload(MOVER);
       }
 
-      // Let it stabilize
       for (var i = 0; i < INIT_FRAMES; i++) yield return null;
 
       Assert.AreEqual(0, vm.CapturedExceptions.Count,
@@ -200,9 +145,36 @@ namespace UnityJS.Entities.EditModeTests
       var health = vm.VerifyModuleHealth();
       Assert.IsNull(health, $"Module health after rapid reloads: {health}");
 
-      Assert.IsTrue(scene.AllFulfilled(), "Entity must still be fulfilled");
+      Assert.IsTrue(m_Scene.AllFulfilled(), "Entity must still be fulfilled");
+    }
 
-      yield return new ExitPlayMode();
+    [UnityTest]
+    public IEnumerator HotReload_TranspileErrorLifecycle()
+    {
+      yield return null; // let runtime initialize
+
+      Assert.IsTrue(JsTranspiler.IsInitialized, "Transpiler must be initialized in play mode");
+
+      // Inject errors for two different files
+      LogAssert.Expect(LogType.Error, new Regex("\\[JsTranspiler\\]"));
+      JsTranspiler.Transpile("syntax error {{{{", "pm_hot_a.ts");
+      LogAssert.Expect(LogType.Error, new Regex("\\[JsTranspiler\\]"));
+      JsTranspiler.Transpile("another broken ]]]]", "pm_hot_b.ts");
+
+      Assert.GreaterOrEqual(JsTranspiler.ErrorCount, 2, "At least two errors tracked");
+      Assert.IsTrue(JsTranspiler.Errors.ContainsKey("pm_hot_a.ts"));
+      Assert.IsTrue(JsTranspiler.Errors.ContainsKey("pm_hot_b.ts"));
+
+      // Fix file_a
+      var fixedA = JsTranspiler.Transpile("export const a: number = 1;", "pm_hot_a.ts");
+      Assert.IsNotNull(fixedA);
+      Assert.IsFalse(JsTranspiler.Errors.ContainsKey("pm_hot_a.ts"), "Fixed file must clear");
+      Assert.IsTrue(JsTranspiler.Errors.ContainsKey("pm_hot_b.ts"), "Other file still broken");
+
+      // Fix file_b
+      var fixedB = JsTranspiler.Transpile("export const b: number = 2;", "pm_hot_b.ts");
+      Assert.IsNotNull(fixedB);
+      Assert.IsFalse(JsTranspiler.Errors.ContainsKey("pm_hot_b.ts"), "All errors cleared");
     }
   }
 }

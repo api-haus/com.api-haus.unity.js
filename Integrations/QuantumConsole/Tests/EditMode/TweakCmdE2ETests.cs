@@ -10,6 +10,7 @@ namespace UnityJS.Integration.QuantumConsole.EditModeTests
   using Unity.Entities;
   using UnityEngine.TestTools;
   using UnityJS.Entities.EditModeTests;
+  using UnityJS.Entities.Tests;
   using UnityJS.Runtime;
 
   public class TweakCmdE2ETests

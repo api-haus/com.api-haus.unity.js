@@ -5,6 +5,7 @@
     "UnityJS.QJS",
     "UnityJS.Runtime",
     "UnityJS.Entities",
+    "UnityJS.Entities.TestUtils",
     "UnityJS.Editor",
     "Unity.Entities",
     "Unity.Entities.Hybrid",

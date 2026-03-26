@@ -84,16 +84,16 @@ namespace UnityJS.Entities.EditModeTests
       foreach (var ts in Directory.GetFiles(fixtureSrc, "*.ts"))
         File.Copy(ts, Path.Combine(m_SrcDir, Path.GetFileName(ts)));
 
-      // Ensure VM exists (creates QuickJS runtime + Sucrase transpiler)
+      // Ensure VM exists
       var vm = JsRuntimeManager.GetOrCreate();
-      Assert.IsTrue(JsTranspiler.IsInitialized, "JsTranspiler must be initialized");
       Assert.IsNotNull(vm, "VM must exist");
       foreach (var mod in ModuleNames)
       {
         var tsSource = File.ReadAllText(TsPath(mod));
-        var js = JsTranspiler.Transpile(vm.Context, tsSource);
+        var js = JsTranspiler.Transpile(tsSource, TsPath(mod));
         Assert.IsNotNull(js, $"Initial transpile of {mod} failed");
       }
+      Assert.IsTrue(JsTranspiler.IsInitialized, "JsTranspiler must be initialized after first transpile");
 
       m_CurrentValues.Clear();
       m_HasSyntaxError.Clear();
@@ -121,7 +121,7 @@ namespace UnityJS.Entities.EditModeTests
     {
       var vm = JsRuntimeManager.GetOrCreate();
       var tsSource = File.ReadAllText(TsPath(module));
-      return JsTranspiler.Transpile(vm.Context, tsSource);
+      return JsTranspiler.Transpile(tsSource, TsPath(module));
     }
 
     void ReplaceSlotLine(string module, string slotMarker, string newLine)
