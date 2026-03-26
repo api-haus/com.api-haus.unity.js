@@ -1,3 +1,46 @@
+# [1.2.0](https://github.com/api-haus/com.api-haus.unity.js/compare/v1.1.0...v1.2.0) (2026-03-26)
+
+
+### Bug Fixes
+
+* centralize runtime resource lifecycle — eliminate TDZ regression ([c8d51f8](https://github.com/api-haus/com.api-haus.unity.js/commit/c8d51f8795e2114c18afe81c55624e45470bf632))
+* dispose stale VM on system start to prevent TDZ after domain reload ([40ab44b](https://github.com/api-haus/com.api-haus.unity.js/commit/40ab44b9004ad4933f201a167c4f3a753384e552))
+* eliminate TDZ errors in system probes, add PlayModeControlE2ETests ([bb37361](https://github.com/api-haus/com.api-haus.unity.js/commit/bb37361e007cf4cb4e96a2ee4e65eeeaa26f5579))
+* remove auto-discovered query probe that broke PlayMode tests ([21d6f2b](https://github.com/api-haus/com.api-haus.unity.js/commit/21d6f2b64a2492d3eefbb6b64b70d790883c3898))
+* resolve 10 failing hotreload tests ([dcdd80b](https://github.com/api-haus/com.api-haus.unity.js/commit/dcdd80bb56b00326323680f2113b1f18748ab7a2))
+* resolve all 271 PlayMode test cross-contamination failures ([7e2ff9c](https://github.com/api-haus/com.api-haus.unity.js/commit/7e2ff9cb1a515061eb02b8fef7fa63d7dcd3cd16))
+* strengthen weak assertions, fix e2e_entity_ops TDZ ([5cc108c](https://github.com/api-haus/com.api-haus.unity.js/commit/5cc108c0cd5f591321fc780c403d1703ad7b5e1d))
+* suppress transient tick errors during live baking rebake ([9177c86](https://github.com/api-haus/com.api-haus.unity.js/commit/9177c8628eba0ab9e70788dad5ca481b9349b347))
+* TDZ + spatial trigger — module dedup and JS_CFUNC_generic_magic enum ([e07ea11](https://github.com/api-haus/com.api-haus.unity.js/commit/e07ea11891fd69221f0520bb008540623f1a21d9))
+* withNone query filter — JS_IsArray returns 0 for P/Invoke-returned arrays ([02722c4](https://github.com/api-haus/com.api-haus.unity.js/commit/02722c472e2f0631250055dd3b46a81daeea9d88))
+
+
+### Features
+
+* add ColorBridge + SystemInfo E2E tests (7 tests) ([70e65fc](https://github.com/api-haus/com.api-haus.unity.js/commit/70e65fce80be77d3d751191dcad107e1e2132060))
+* add ComponentAccess E2E tests (define, add, get, has, remove) ([8acdaec](https://github.com/api-haus/com.api-haus.unity.js/commit/8acdaec795b671fc6678ec5dd5d9e7d9295df42f))
+* add E2E tests for TDZ bug with unity.js/components import after domain reload ([168e621](https://github.com/api-haus/com.api-haus.unity.js/commit/168e621ab2a9aa644763f99385525bbeeb8dece0))
+* add EntityOperations E2E tests (create, create with position, destroy) ([a3742ad](https://github.com/api-haus/com.api-haus.unity.js/commit/a3742ad1fa7e65038a1f4382286dd22084fe6b24))
+* add hot reload resilience E2E tests ([9431b59](https://github.com/api-haus/com.api-haus.unity.js/commit/9431b59b756ecfcd6e73ec5a96cde602506ba7de))
+* add HotReload E2E tests (version mutation + rapid reload stability) ([7ef9469](https://github.com/api-haus/com.api-haus.unity.js/commit/7ef946902e7c3aa9450bfe0d66907f013242abf0))
+* add integration E2E tests for ALINE draw + spatial.query() ([ad1d86e](https://github.com/api-haus/com.api-haus.unity.js/commit/ad1d86e104f218991e387d74c2af2e21461a3b8e))
+* add QueryPipeline E2E tests (match count, write-back, stability) ([b7300af](https://github.com/api-haus/com.api-haus.unity.js/commit/b7300afdcf5b1c6d95179f1e936117a4f42a413c))
+* add runsAfter/runsBefore component execution ordering with topological sort ([9cc3950](https://github.com/api-haus/com.api-haus.unity.js/commit/9cc39505a521764c93955cfde6b61dbfd5030589))
+* add SystemExecution and MathBridge E2E tests, fix spatial wait budget ([e654d40](https://github.com/api-haus/com.api-haus.unity.js/commit/e654d405636a03eb99fd78904f0618744dbe0bb5))
+* address blind spots — property overrides test, tightened assertions, state isolation ([cd13853](https://github.com/api-haus/com.api-haus.unity.js/commit/cd13853103ce5c40bffd584dec06b78bd2759558))
+* complete E2E test suite — LogBridge, TickGroups, MultiScript, ModuleImport, InputBridge, DomainReload ([1d4084a](https://github.com/api-haus/com.api-haus.unity.js/commit/1d4084a6707c51f27ee1f3a56fc339f5b24436ce))
+* consolidate MiniSpatial runtime + JS bridge as bundled integration ([20c9ea3](https://github.com/api-haus/com.api-haus.unity.js/commit/20c9ea3a865bd18fc99a431f0acbe61f99f3486c))
+* E2E test infrastructure with SceneFixture DSL and gameplay lighthouse tests ([da145fc](https://github.com/api-haus/com.api-haus.unity.js/commit/da145fc7796bed24a030d9af89d3f3214d504fcc))
+* param() accepts explicit default value as required 3rd argument ([b502979](https://github.com/api-haus/com.api-haus.unity.js/commit/b5029790563e6e8a356edc072b10645a4ed86c3a))
+* replace tsc build pipeline with runtime Sucrase transpilation ([1ed374d](https://github.com/api-haus/com.api-haus.unity.js/commit/1ed374d50e606036abd04c44e02b23ae5e11c739))
+* StoredPrefs store, param() command system, and scripts/ script type ([4c00d51](https://github.com/api-haus/com.api-haus.unity.js/commit/4c00d5137394a957f52c03e710aa78eb6dd9fa21))
+* use TypeScript logo for status bar indicator, neutral idle state ([c04c8cb](https://github.com/api-haus/com.api-haus.unity.js/commit/c04c8cb1edf98c2dc956e6e2cc8df87fcf71ca7c))
+
+
+### Performance Improvements
+
+* remove redundant ECS sync points in JS tick systems ([7cfcf15](https://github.com/api-haus/com.api-haus.unity.js/commit/7cfcf15a04b4946373add108da747c5d1e79a239))
+
 # [1.1.0](https://github.com/api-haus/com.api-haus.unity.js/compare/v1.0.4...v1.1.0) (2026-03-22)
 
 
