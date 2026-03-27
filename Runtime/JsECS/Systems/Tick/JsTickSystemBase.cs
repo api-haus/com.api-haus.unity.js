@@ -15,6 +15,19 @@ namespace UnityJS.Entities.Systems.Tick
   /// </summary>
   public static class JsTickSystemHelper
   {
+    // Bitmask tracking which tick groups have at least one active script.
+    // Set by JsComponentInitSystem when scripts are fulfilled.
+    // Bit N = 1 << (int)JsTickGroup.
+    static int s_activeTickGroups;
+
+    public static bool IsTickGroupActive(JsTickGroup group) =>
+      (s_activeTickGroups & (1 << (int)group)) != 0;
+
+    public static void SetTickGroupActive(JsTickGroup group) =>
+      s_activeTickGroups |= 1 << (int)group;
+
+    public static void ClearActiveTickGroups() => s_activeTickGroups = 0;
+
     public struct State
     {
       public ComponentLookup<LocalTransform> TransformLookup;
@@ -45,6 +58,10 @@ namespace UnityJS.Entities.Systems.Tick
       EntityCommandBuffer ecb
     )
     {
+      // Fast path: skip everything if no scripts use this tick group.
+      if (!IsTickGroupActive(tickGroup))
+        return;
+
       var vm = JsRuntimeManager.Instance;
       if (vm == null || !vm.IsValid)
         return;

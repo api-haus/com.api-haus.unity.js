@@ -3,6 +3,7 @@ namespace UnityJS.Entities.Systems.Support
   using Components;
   using Core;
   using Runtime;
+  using Tick;
   using Unity.Collections;
   using Unity.Entities;
   using Unity.Logging;
@@ -18,6 +19,9 @@ namespace UnityJS.Entities.Systems.Support
     EntityQuery m_ScriptQuery;
     ComponentLookup<LocalTransform> m_TransformLookup;
     BufferLookup<JsScript> m_ScriptBufferLookup;
+
+    // Track query version so we can skip OnUpdate when no structural changes
+    uint m_LastOrderVersion;
 
     protected override void OnCreate()
     {
@@ -79,6 +83,7 @@ namespace UnityJS.Entities.Systems.Support
         InitializeVm(m_Vm, World);
         m_LastVm = m_Vm;
         m_LoggedFulfillment = false;
+        JsTickSystemHelper.ClearActiveTickGroups();
         InvalidateStaleScripts();
       }
       m_WasPlaying = isPlaying;
@@ -95,11 +100,19 @@ namespace UnityJS.Entities.Systems.Support
       {
         m_LastVm = m_Vm;
         InitializeVm(m_Vm, World);
+        JsTickSystemHelper.ClearActiveTickGroups();
         InvalidateStaleScripts();
       }
 
       if (m_ScriptQuery.IsEmptyIgnoreFilter)
         return;
+
+      // Fast path: once all scripts are fulfilled, only re-scan if new entities
+      // were added (structural change detected via query order version).
+      var currentOrderVersion = (uint)m_ScriptQuery.GetCombinedComponentOrderVersion();
+      if (m_LoggedFulfillment && currentOrderVersion == m_LastOrderVersion)
+        return;
+      m_LastOrderVersion = currentOrderVersion;
 
       using var ecb = new EntityCommandBuffer(Allocator.Temp);
       var entities = m_ScriptQuery.ToEntityArray(Allocator.Temp);
@@ -192,6 +205,9 @@ namespace UnityJS.Entities.Systems.Support
           entry.entityIndex = entityId;
           entry.tickGroup = annotations.tickGroup;
           scripts[i] = entry;
+
+          // Register this tick group as active so the corresponding tick system runs.
+          JsTickSystemHelper.SetTickGroupActive(annotations.tickGroup);
 
           Log.Verbose(
             "[JsComponentInit] Initialized script '{0}' on entity {1}, stateRef={2}",

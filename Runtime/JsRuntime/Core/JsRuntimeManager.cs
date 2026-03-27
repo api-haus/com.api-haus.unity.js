@@ -39,6 +39,10 @@ namespace UnityJS.Runtime
     readonly Dictionary<FixedString32Bytes, string> m_StringCache32 = new();
     readonly Dictionary<string, byte[]> m_EncodedStringCache = new();
 
+    // Cache: (scriptName, funcNameBytes ref) → JS function JSValue.
+    // Avoids repeated JS_GetPropertyStr per entity per frame.
+    readonly Dictionary<(string, byte[]), JSValue> m_FuncCache = new();
+
     // ── Sub-objects ──
 
     public JsModuleManager Modules { get; }
@@ -143,10 +147,17 @@ namespace UnityJS.Runtime
     public unsafe bool LoadScriptAsModule(string scriptId, string source, string filename) =>
       Modules.LoadAsModule(scriptId, source, filename);
 
-    public unsafe bool ReloadScript(string scriptName, string source, string filename) =>
-      Modules.Reload(scriptName, source, filename);
+    public unsafe bool ReloadScript(string scriptName, string source, string filename)
+    {
+      InvalidateFuncCache(scriptName);
+      return Modules.Reload(scriptName, source, filename);
+    }
 
-    public bool SimulateHotReload(string scriptName) => Modules.SimulateHotReload(scriptName);
+    public bool SimulateHotReload(string scriptName)
+    {
+      InvalidateFuncCache(scriptName);
+      return Modules.SimulateHotReload(scriptName);
+    }
 
     public unsafe string VerifyModuleHealth() => Modules.VerifyHealth();
 
@@ -174,37 +185,50 @@ namespace UnityJS.Runtime
       if (!Modules.ScriptRefs.TryGetValue(scriptName, out var scriptObj))
         return false;
 
-      fixed (byte* pFuncName = funcNameBytes)
+      // Try cached function lookup first — avoids JS_GetPropertyStr P/Invoke per call.
+      var cacheKey = (scriptName, funcNameBytes);
+      if (!m_FuncCache.TryGetValue(cacheKey, out var func))
       {
-        var func = QJS.JS_GetPropertyStr(m_Context, scriptObj, pFuncName);
+        fixed (byte* pFuncName = funcNameBytes)
+          func = QJS.JS_GetPropertyStr(m_Context, scriptObj, pFuncName);
+
         if (QJS.JS_IsFunction(m_Context, func) == 0)
         {
           QJS.JS_FreeValue(m_Context, func);
+          // Cache a sentinel so we don't re-lookup non-function exports.
+          m_FuncCache[cacheKey] = QJS.JS_UNDEFINED;
           return true;
         }
 
-        if (!States.Refs.TryGetValue(stateRef, out var stateVal))
-          stateVal = QJS.JS_UNDEFINED;
-
-        var totalArgc = 1 + extraArgc;
-        var argv = stackalloc JSValue[totalArgc];
-        argv[0] = stateVal;
-        for (var i = 0; i < extraArgc; i++)
-          argv[1 + i] = extraArgv[i];
-
-        var result = QJS.JS_Call(m_Context, func, scriptObj, totalArgc, argv);
-        if (QJS.IsException(result))
-        {
-          LogException(errorContext);
-          QJS.JS_FreeValue(m_Context, result);
-          QJS.JS_FreeValue(m_Context, func);
-          return false;
-        }
-
-        QJS.JS_FreeValue(m_Context, result);
+        // DupValue to keep the function alive across frames.
+        m_FuncCache[cacheKey] = QJS.JS_DupValue(m_Context, func);
         QJS.JS_FreeValue(m_Context, func);
-        return true;
+        func = m_FuncCache[cacheKey];
       }
+
+      // Sentinel: export exists but is not a function — skip silently.
+      if (QJS.JS_IsFunction(m_Context, func) == 0)
+        return true;
+
+      if (!States.Refs.TryGetValue(stateRef, out var stateVal))
+        stateVal = QJS.JS_UNDEFINED;
+
+      var totalArgc = 1 + extraArgc;
+      var argv = stackalloc JSValue[totalArgc];
+      argv[0] = stateVal;
+      for (var i = 0; i < extraArgc; i++)
+        argv[1 + i] = extraArgv[i];
+
+      var result = QJS.JS_Call(m_Context, func, scriptObj, totalArgc, argv);
+      if (QJS.IsException(result))
+      {
+        LogException(errorContext);
+        QJS.JS_FreeValue(m_Context, result);
+        return false;
+      }
+
+      QJS.JS_FreeValue(m_Context, result);
+      return true;
     }
 
     public unsafe bool CallFunction(string scriptName, string funcName, int stateRef)
@@ -410,6 +434,36 @@ namespace UnityJS.Runtime
       return QJS.EvalGlobal(ctx, code, filename);
     }
 
+    // ── Function cache ──
+
+    void ClearFuncCache()
+    {
+      if (!m_Context.IsNull)
+      {
+        foreach (var kv in m_FuncCache)
+          if (QJS.JS_IsFunction(m_Context, kv.Value) != 0)
+            QJS.JS_FreeValue(m_Context, kv.Value);
+      }
+      m_FuncCache.Clear();
+    }
+
+    void InvalidateFuncCache(string scriptName)
+    {
+      // Remove all cached functions for this specific module.
+      var toRemove = new List<(string, byte[])>();
+      foreach (var kv in m_FuncCache)
+        if (kv.Key.Item1 == scriptName)
+          toRemove.Add(kv.Key);
+
+      foreach (var key in toRemove)
+      {
+        if (!m_Context.IsNull && m_FuncCache.TryGetValue(key, out var val))
+          if (QJS.JS_IsFunction(m_Context, val) != 0)
+            QJS.JS_FreeValue(m_Context, val);
+        m_FuncCache.Remove(key);
+      }
+    }
+
     // ── Dispose ──
 
     readonly List<Action<JSContext>> m_PreDisposeCallbacks = new();
@@ -448,6 +502,7 @@ namespace UnityJS.Runtime
       m_StringCache.Clear();
       m_StringCache32.Clear();
       m_EncodedStringCache.Clear();
+      ClearFuncCache();
 
       States.DisposeAll();
       Modules.DisposeAll();
