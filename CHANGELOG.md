@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/api-haus/com.api-haus.unity.js/compare/v1.2.0...v1.2.1) (2026-03-27)
+
+
+### Performance Improvements
+
+* eliminate ~10ms/frame of wasted JS tick system overhead ([6fc5685](https://github.com/api-haus/com.api-haus.unity.js/commit/6fc5685e109242bc503491b8e88da12af5dde528))
+
 # [1.2.0](https://github.com/api-haus/com.api-haus.unity.js/compare/v1.1.0...v1.2.0) (2026-03-26)
 
 
