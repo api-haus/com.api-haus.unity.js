@@ -364,9 +364,7 @@ namespace UnityJS.Entities.EditModeTests
         for (var f = 0; f < 3; f++)
           yield return null;
 
-        var errBefore = JsTranspiler.ErrorCount;
-        ReloadScript(vm, targetFile);
-        Assert.Greater(JsTranspiler.ErrorCount, errBefore,
+        Assert.IsFalse(ReloadScript(vm, targetFile),
           $"Cycle {cycle}: transpilation should fail with syntax error");
 
         ApplyMutation(targetFile, MutationType.FixSyntaxError, new System.Random(cycle));

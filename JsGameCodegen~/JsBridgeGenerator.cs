@@ -786,6 +786,8 @@ namespace JsGameCodegen
       );
       sb.AppendLine("\t\t\tint argc, JSValue* argv, long* outU, long* outTag)");
       sb.AppendLine("\t\t{");
+      sb.AppendLine("\t\t\ttry");
+      sb.AppendLine("\t\t\t{");
       sb.AppendLine("\t\t\tint entityId;");
       sb.AppendLine("\t\t\tQJS.JS_ToInt32(ctx, &entityId, argv[0]);");
       sb.AppendLine("\t\t\tvar entity = JsECSBridge.GetEntityFromIdBurst(entityId);");
@@ -879,6 +881,14 @@ namespace JsGameCodegen
 
       sb.AppendLine("\t\t\t*outU = obj.u;");
       sb.AppendLine("\t\t\t*outTag = obj.tag;");
+      sb.AppendLine("\t\t\t}");
+      sb.AppendLine("\t\t\tcatch (System.Exception ex)");
+      sb.AppendLine("\t\t\t{");
+      sb.AppendLine("\t\t\t\tUnityEngine.Debug.LogError(\"[JsBridge] Get_Component threw: \" + ex);");
+      sb.AppendLine("\t\t\t\tvar undef = QJS.JS_UNDEFINED;");
+      sb.AppendLine("\t\t\t\t*outU = undef.u;");
+      sb.AppendLine("\t\t\t\t*outTag = undef.tag;");
+      sb.AppendLine("\t\t\t}");
       sb.AppendLine("\t\t}");
       sb.AppendLine();
     }
@@ -895,13 +905,15 @@ namespace JsGameCodegen
       );
       sb.AppendLine("\t\t\tint argc, JSValue* argv, long* outU, long* outTag)");
       sb.AppendLine("\t\t{");
+      sb.AppendLine("\t\t\ttry");
+      sb.AppendLine("\t\t\t{");
       sb.AppendLine("\t\t\tint entityId;");
       sb.AppendLine("\t\t\tQJS.JS_ToInt32(ctx, &entityId, argv[0]);");
       sb.AppendLine("\t\t\tvar entity = JsECSBridge.GetEntityFromIdBurst(entityId);");
       sb.AppendLine("\t\t\tif (entity == Entity.Null || !s_lookup.Data.HasComponent(entity))");
       sb.AppendLine("\t\t\t{");
       sb.AppendLine(
-        "\t\t\t\tUnityEngine.Debug.LogError(\"[JsBridge] "
+        "\t\t\t\tUnityEngine.Debug.LogWarning(\"[JsBridge] "
           + fullTypeName
           + ".set: entity \" + entityId + \" not found or missing component\");"
       );
@@ -915,6 +927,14 @@ namespace JsGameCodegen
       sb.AppendLine("\t\t\tvar ret = QJS.JS_UNDEFINED;");
       sb.AppendLine("\t\t\t*outU = ret.u;");
       sb.AppendLine("\t\t\t*outTag = ret.tag;");
+      sb.AppendLine("\t\t\t}");
+      sb.AppendLine("\t\t\tcatch (System.Exception ex)");
+      sb.AppendLine("\t\t\t{");
+      sb.AppendLine("\t\t\t\tUnityEngine.Debug.LogError(\"[JsBridge] Set_Component threw: \" + ex);");
+      sb.AppendLine("\t\t\t\tvar undef = QJS.JS_UNDEFINED;");
+      sb.AppendLine("\t\t\t\t*outU = undef.u;");
+      sb.AppendLine("\t\t\t\t*outTag = undef.tag;");
+      sb.AppendLine("\t\t\t}");
       sb.AppendLine("\t\t}");
       sb.AppendLine();
     }
@@ -974,6 +994,8 @@ namespace JsGameCodegen
       );
       sb.AppendLine("\t\t\tint argc, JSValue* argv, long* outU, long* outTag)");
       sb.AppendLine("\t\t{");
+      sb.AppendLine("\t\t\ttry");
+      sb.AppendLine("\t\t\t{");
       // Get the backing buffer of the Int32Array
       sb.AppendLine("\t\t\tnint byteOffset, byteLen, bpe;");
       sb.AppendLine(
@@ -1115,6 +1137,14 @@ namespace JsGameCodegen
       );
       sb.AppendLine("\t\t\t*outU = result.u;");
       sb.AppendLine("\t\t\t*outTag = result.tag;");
+      sb.AppendLine("\t\t\t}");
+      sb.AppendLine("\t\t\tcatch (System.Exception ex)");
+      sb.AppendLine("\t\t\t{");
+      sb.AppendLine("\t\t\t\tUnityEngine.Debug.LogError(\"[JsBridge] GetAll_Component threw: \" + ex);");
+      sb.AppendLine("\t\t\t\tvar undef = QJS.JS_UNDEFINED;");
+      sb.AppendLine("\t\t\t\t*outU = undef.u;");
+      sb.AppendLine("\t\t\t\t*outTag = undef.tag;");
+      sb.AppendLine("\t\t\t}");
       sb.AppendLine("\t\t}");
       sb.AppendLine();
     }
@@ -1132,6 +1162,8 @@ namespace JsGameCodegen
       );
       sb.AppendLine("\t\t\tint argc, JSValue* argv, long* outU, long* outTag)");
       sb.AppendLine("\t\t{");
+      sb.AppendLine("\t\t\ttry");
+      sb.AppendLine("\t\t\t{");
       // argv[0] = Int32Array of entity IDs, argv[1] = Float32Array of data
       sb.AppendLine("\t\t\tnint idByteOff, idByteLen, idBpe;");
       sb.AppendLine(
@@ -1259,6 +1291,14 @@ namespace JsGameCodegen
       sb.AppendLine("\t\t\tvar ret = QJS.JS_UNDEFINED;");
       sb.AppendLine("\t\t\t*outU = ret.u;");
       sb.AppendLine("\t\t\t*outTag = ret.tag;");
+      sb.AppendLine("\t\t\t}");
+      sb.AppendLine("\t\t\tcatch (System.Exception ex)");
+      sb.AppendLine("\t\t\t{");
+      sb.AppendLine("\t\t\t\tUnityEngine.Debug.LogError(\"[JsBridge] SetAll_Component threw: \" + ex);");
+      sb.AppendLine("\t\t\t\tvar undef = QJS.JS_UNDEFINED;");
+      sb.AppendLine("\t\t\t\t*outU = undef.u;");
+      sb.AppendLine("\t\t\t\t*outTag = undef.tag;");
+      sb.AppendLine("\t\t\t}");
       sb.AppendLine("\t\t}");
       sb.AppendLine();
     }

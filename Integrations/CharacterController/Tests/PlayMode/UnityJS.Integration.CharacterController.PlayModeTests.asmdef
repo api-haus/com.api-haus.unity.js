@@ -1,0 +1,31 @@
+{
+  "name": "UnityJS.Integration.CharacterController.PlayModeTests",
+  "rootNamespace": "UnityJS.Integration.CharacterController.PlayModeTests",
+  "references": [
+    "UnityJS.QJS",
+    "UnityJS.Runtime",
+    "UnityJS.Entities",
+    "UnityJS.Integration.CharacterController",
+    "Unity.Entities",
+    "Unity.Mathematics",
+    "Unity.Collections",
+    "Unity.Transforms",
+    "Unity.Physics",
+    "Unity.CharacterController",
+    "UnityEngine.TestRunner",
+    "UnityJS.Entities.TestUtils"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

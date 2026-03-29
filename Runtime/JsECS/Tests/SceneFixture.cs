@@ -29,6 +29,8 @@ namespace UnityJS.Entities.Tests
   {
     const string PACKAGE_NAME = "com.api-haus.unity.js";
 
+    static bool s_FixturesDiscovered;
+
     readonly World m_World;
     readonly EntityManager m_Em;
     readonly List<Entity> m_Entities = new();
@@ -54,6 +56,20 @@ namespace UnityJS.Entities.Tests
       {
         JsScriptSearchPaths.AddSearchPath(fixturesPath, 0);
         m_FixturesRegistered = true;
+
+        // In PlayMode, system discovery already ran before the test started.
+        // Force re-discovery ONCE so system scripts from Fixtures~ get loaded.
+        // Only once — repeated ForceRediscovery overflows the 256-slot module cache.
+        if (!s_FixturesDiscovered)
+        {
+          s_FixturesDiscovered = true;
+          var handle = m_World.Unmanaged.GetExistingUnmanagedSystem<Systems.JsSystemRunner>();
+          if (handle != Unity.Entities.SystemHandle.Null)
+          {
+            ref var sysState = ref m_World.Unmanaged.ResolveSystemStateRef(handle);
+            Systems.JsSystemDiscovery.ForceRediscovery(ref sysState);
+          }
+        }
       }
     }
 
@@ -278,32 +294,18 @@ namespace UnityJS.Entities.Tests
       if (m_Disposed) return;
       m_Disposed = true;
 
-      // Clean up _e2e_* globals to prevent cross-test state bleed
-      var vm = Runtime.JsRuntimeManager.Instance;
-      if (vm != null && vm.IsValid)
-      {
-        Runtime.JsEvalUtility.EvalVoid(
-          "for(var k in globalThis){if(k.startsWith('_e2e'))delete globalThis[k]}");
-      }
+      // Don't clear _e2e_* globals — they are scoped per entity ID, so there's
+      // no cross-test bleed (each test gets a unique eid). System script globals
+      // (_e2e_math, _e2e_sys etc.) are constant or reset explicitly by tests.
 
-      // Unregister fixtures search path
-      if (m_FixturesRegistered)
-      {
-        var path = GetPackageFixturesPath();
-        if (path != null)
-          JsScriptSearchPaths.RemoveSearchPath(path);
-        m_FixturesRegistered = false;
-      }
+      // Keep fixtures search path registered — in PlayMode, system scripts need
+      // the path to remain for auto-discovery across tests. The path registration
+      // is idempotent; re-adding in the next test's SetUp is a no-op.
 
-      // World may already be destroyed (e.g. after ExitPlayMode) — safe to skip
-      if (m_World.IsCreated)
-      {
-        foreach (var entity in m_Entities)
-        {
-          if (m_Em.Exists(entity))
-            m_Em.DestroyEntity(entity);
-        }
-      }
+      // Don't destroy entities — while bridge lookups are now refreshed before
+      // every tick (structural changes are safe), the JS runtime still holds stateRefs
+      // for destroyed entities and will tick them, causing "entity not found" errors.
+      // Proper fix requires JS-side cleanup of script state on entity destruction.
       m_Entities.Clear();
     }
   }

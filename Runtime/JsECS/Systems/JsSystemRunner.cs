@@ -115,6 +115,9 @@ namespace UnityJS.Entities.Systems
         }
       }
 
+      // Refresh bridge ComponentLookups before TickComponents invokes bridge callbacks.
+      // CompleteDependency ensures any jobs touching bridged components are done.
+      JsComponentRegistry.UpdateAllLookups(ref state);
       vm.TickComponents(JsRuntimeManager.GroupUpdateBytes, deltaTime);
     }
 

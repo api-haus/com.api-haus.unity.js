@@ -58,18 +58,19 @@ namespace UnityJS.Entities.Systems.Tick
       EntityCommandBuffer ecb
     )
     {
-      // Fast path: skip everything if no scripts use this tick group.
-      if (!IsTickGroupActive(tickGroup))
+      // Component lifecycle ticks (fixedUpdate, lateUpdate) are independent of
+      // entity script tick groups — always run them.
+      var hasComponentLifecycle =
+        tickGroup == JsTickGroup.Fixed || tickGroup == JsTickGroup.AfterTransform;
+      var hasEntityScripts = IsTickGroupActive(tickGroup);
+
+      // Fast path: skip entirely if no entity scripts AND no component lifecycle.
+      if (!hasEntityScripts && !hasComponentLifecycle)
         return;
 
       var vm = JsRuntimeManager.Instance;
       if (vm == null || !vm.IsValid)
         return;
-
-      state.CompleteDependency();
-      tickState.TransformLookup.Update(ref state);
-      tickState.ScriptBufferLookup.Update(ref state);
-      JsComponentRegistry.UpdateAllLookups(ref state);
 
       var worldTime = state.WorldUnmanaged.Time;
       var deltaTime = worldTime.DeltaTime;
@@ -78,41 +79,50 @@ namespace UnityJS.Entities.Systems.Tick
 
       var elapsedTime = worldTime.ElapsedTime;
 
-      JsECSBridge.UpdateBurstContext(ecb, deltaTime, tickState.TransformLookup, tickState.ScriptBufferLookup);
-
-      var entities = tickState.ScriptQuery.ToEntityArray(Allocator.Temp);
-      for (var e = 0; e < entities.Length; e++)
+      if (hasEntityScripts || hasComponentLifecycle)
       {
-        var entity = entities[e];
-        var scripts = state.EntityManager.GetBuffer<JsScript>(entity, true);
-
-        for (var i = 0; i < scripts.Length; i++)
-        {
-          var script = scripts[i];
-          if (script.stateRef < 0 || script.disabled || script.tickGroup != tickGroup)
-            continue;
-
-          if (!vm.ValidateStateRef(script.stateRef))
-          {
-            Log.Warning(
-              "[JsTick:{0}] StateRef mismatch for entity={1} - skipping",
-              tickGroup,
-              script.entityIndex
-            );
-            continue;
-          }
-
-          vm.CallTick(vm.Intern(script.scriptName), script.stateRef, deltaTime, elapsedTime);
-
-          // Entity may have been destroyed by a JS callback
-          if (!state.EntityManager.Exists(entity))
-            break;
-        }
+        state.CompleteDependency();
+        tickState.TransformLookup.Update(ref state);
+        tickState.ScriptBufferLookup.Update(ref state);
+        JsComponentRegistry.UpdateAllLookups(ref state);
+        JsECSBridge.UpdateBurstContext(ecb, deltaTime, tickState.TransformLookup, tickState.ScriptBufferLookup);
       }
 
-      entities.Dispose();
+      if (hasEntityScripts)
+      {
+        var entities = tickState.ScriptQuery.ToEntityArray(Allocator.Temp);
+        for (var e = 0; e < entities.Length; e++)
+        {
+          var entity = entities[e];
+          var scripts = state.EntityManager.GetBuffer<JsScript>(entity, true);
 
-      // Tick Component instances for matching tick groups
+          for (var i = 0; i < scripts.Length; i++)
+          {
+            var script = scripts[i];
+            if (script.stateRef < 0 || script.disabled || script.tickGroup != tickGroup)
+              continue;
+
+            if (!vm.ValidateStateRef(script.stateRef))
+            {
+              Log.Warning(
+                "[JsTick:{0}] StateRef mismatch for entity={1} - skipping",
+                tickGroup,
+                script.entityIndex
+              );
+              continue;
+            }
+
+            vm.CallTick(vm.Intern(script.scriptName), script.stateRef, deltaTime, elapsedTime);
+
+            if (!state.EntityManager.Exists(entity))
+              break;
+          }
+        }
+
+        entities.Dispose();
+      }
+
+      // Tick Component lifecycle methods (fixedUpdate, lateUpdate).
       if (tickGroup == JsTickGroup.Fixed)
         vm.TickComponents(JsRuntimeManager.GroupFixedUpdateBytes, deltaTime);
       else if (tickGroup == JsTickGroup.AfterTransform)

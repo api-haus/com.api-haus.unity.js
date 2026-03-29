@@ -59,6 +59,7 @@ namespace UnityJS.Entities.Systems.Support
       JsScriptSearchPaths.Initialize();
       InitializeVm(m_Vm, World);
       m_LastVm = m_Vm;
+      JsTickSystemHelper.ClearActiveTickGroups();
 
       m_WasPlaying = UnityEngine.Application.isPlaying;
 
